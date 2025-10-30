@@ -44,14 +44,24 @@ cargo install cargo-watch --locked --version 8.1.2
 # Network
 
 Simulate network jitter, linux only:
-sudo tc qdisc add dev lo root netem delay 100ms 10ms 
+
+```bash
+# increases the ping by 100ms per direction with a jitter of 10ms
+sudo tc qdisc add dev lo root netem delay 100ms 10ms
+# disables the artificial ping change
 sudo tc qdisc del dev lo root
+```
 
 # Sanitizers
 
 ASan & TSan (the `--target` flag is important here!, `+nightly` might be required (after cargo)):
+
+```bash
+# ASan
 RUSTFLAGS="-Z sanitizer=address" cargo run --target x86_64-unknown-linux-gnu
+# TSan
 TSAN_OPTIONS="ignore_noninstrumented_modules=1" RUSTFLAGS="-Z sanitizer=thread" cargo run --target x86_64-unknown-linux-gnu
+```
 
 # TOML formating
 
@@ -67,9 +77,10 @@ Extensions like `tamasfe.even-better-toml` also allow to use them inside code ed
 
 # Linux helpers
 
-Linux x11 mouse cursor while debugging:
-install xdotool package
-if you use the vscode workspace in misc/vscode it will do the following steps automatically
+#### Linux x11 mouse cursor while debugging:
+Install xdotool package.
+
+If you use the vscode workspace in misc/vscode it will do the following steps automatically
 
 lldb has to execute this add start of debugging:
 
