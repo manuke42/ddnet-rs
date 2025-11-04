@@ -496,14 +496,18 @@ impl PredictionTimer {
 
         let fps = 1.0 / frame_time;
 
-        // 500 ms, basically ratio a lag compansates per call
+        // 500 ms, basically ratio a lag compansates per call.
+        // Smaller values mean the lag is only considered handled
+        // when adjustment to the prediction reaches that threshold.
         const HUNDERED_PERCENT_PER_S: f64 = 0.5;
+        // This ratio is applied to slow adjument down at a constant rate
+        const ADJUSTMENT_RATIO: f64 = 0.7;
         // basically the minimum fps we support
         const HUNDERED_PERCENT_PER_FPS: f64 = 50.0;
         let perc_adjust = self.timing.smooth_adjustment_time.abs() / HUNDERED_PERCENT_PER_S;
         let perc_fps_adjust = HUNDERED_PERCENT_PER_FPS / fps;
 
-        let perc = (perc_adjust * perc_fps_adjust).clamp(0.0, 1.0);
+        let perc = (perc_adjust * perc_fps_adjust * ADJUSTMENT_RATIO).clamp(0.0, 1.0);
 
         let adjust = self.timing.smooth_adjustment_time * perc;
         self.timing.smooth_adjustment_time *= 1.0 - perc;
@@ -713,8 +717,8 @@ mod test {
                     (Duration::from_secs(1).as_nanos() / snaps_per_sec as u128) as u64,
                 ))
                 .as_secs_f64();
-            // one way from server to client (so only half rtt)
 
+            // one way from server to client (so only half rtt)
             let time_snap = snap.0;
             let time_client = time_snap.as_secs_f64() - time.as_secs_f64();
             let time_server = snap.1 as f64 * 1.0 / snaps_per_sec as f64;
