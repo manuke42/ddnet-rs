@@ -53,7 +53,7 @@ pub fn ctf_list(
                     texture,
                     ui,
                     ui_state,
-                    ui.ctx().screen_rect(),
+                    ui.ctx().content_rect(),
                     Some(ui.clip_rect()),
                     pos + vec2::new(x * item_size, 0.0),
                     vec2::new(item_size, asset_size),

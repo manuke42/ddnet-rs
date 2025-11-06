@@ -58,7 +58,7 @@ pub fn game_list(
                     texture,
                     ui,
                     ui_state,
-                    ui.ctx().screen_rect(),
+                    ui.ctx().content_rect(),
                     Some(ui.clip_rect()),
                     pos + vec2::new(x * item_size, y * item_size),
                     vec2::new(item_size, item_size),

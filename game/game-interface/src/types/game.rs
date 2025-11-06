@@ -130,8 +130,9 @@ impl DerefMut for GameTickCooldownAndLength {
 /// An extension to [GameTickCooldown] that additionally to
 /// tracking a cooldown also counts how many ticks passed
 /// since the last cooldown was __activated/created__.
-#[derive(Debug, Hiarc, Serialize, Deserialize, Copy, Clone)]
+#[derive(Debug, Default, Hiarc, Serialize, Deserialize, Copy, Clone)]
 pub enum GameTickCooldownAndLastActionCounter {
+    #[default]
     None,
     Cooldown {
         ticks_left: NonZeroGameTickType,
@@ -142,12 +143,6 @@ pub enum GameTickCooldownAndLastActionCounter {
         ticks_passed: GameTickType,
         last_cooldown_len: NonZeroGameTickType,
     },
-}
-
-impl Default for GameTickCooldownAndLastActionCounter {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 #[derive(Debug, Hiarc)]

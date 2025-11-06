@@ -51,7 +51,7 @@ pub fn ninja_list(
                 pipe.user_data.render_tee,
                 ui,
                 ui_state,
-                ui.ctx().screen_rect(),
+                ui.ctx().content_rect(),
                 Some(ui.clip_rect()),
                 Some(&skin_info),
                 pos,

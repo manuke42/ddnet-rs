@@ -120,7 +120,7 @@ fn check_layer_clicked_tile(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataW
             let (offset, parallax) = layer.get_offset_and_parallax();
             let pos = ui_pos_to_world_pos(
                 pipe.user_data.canvas_handle,
-                &ui.ctx().screen_rect(),
+                &ui.ctx().content_rect(),
                 map.groups.user.zoom,
                 vec2::new(pointer_pos.x, pointer_pos.y),
                 map.groups.user.pos.x,

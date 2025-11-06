@@ -9,7 +9,7 @@ use crate::{events::UiEvent, main_menu::user_data::UserData};
 /// connect & refresh button
 pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>) {
     ui.horizontal(|ui| {
-        ui.set_clip_rect(ui.ctx().screen_rect());
+        ui.set_clip_rect(ui.ctx().content_rect());
         let server_addr_str = pipe.user_data.config.storage::<String>("server-addr");
         let server_addr: Result<SocketAddr, _> = server_addr_str.parse();
 

@@ -334,7 +334,7 @@ pub fn render(ui: &mut egui::Ui, ui_state: &mut UiState, pipe: &mut UiRenderPipe
                 } = menu_dialog_mode
                 {
                     *pipe.user_data.pointer_is_used = true;
-                    if file_dialog.state() == DialogState::Open {
+                    if *file_dialog.state() == DialogState::Open {
                         let mode = file_dialog.mode();
                         if let Some(selected) = file_dialog.update(ui.ctx()).picked() {
                             let selected: PathBuf = selected.into();

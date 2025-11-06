@@ -75,7 +75,7 @@ fn render_tile_picker(
                         tile_texture,
                         ui,
                         ui_state,
-                        ui.ctx().screen_rect(),
+                        ui.ctx().content_rect(),
                         Some(ui.clip_rect()),
                         vec2::new(pos_min.x, pos_min.y) + vec2::new(tile_size, tile_size) / 2.0,
                         vec2::new(tile_size, tile_size),
@@ -228,7 +228,7 @@ fn render_grid(
                         tile_texture,
                         ui,
                         ui_state,
-                        ui.ctx().screen_rect(),
+                        ui.ctx().content_rect(),
                         Some(ui.clip_rect()),
                         vec2::new(pos_min.x, pos_min.y) + vec2::new(tile_size, tile_size) / 2.0,
                         vec2::new(tile_size, tile_size),
@@ -341,7 +341,7 @@ fn render_op_list(
                 &rule_textures.tile_textures_pngs[tile_index as usize],
                 ui,
                 ui_state,
-                ui.ctx().screen_rect(),
+                ui.ctx().content_rect(),
                 Some(ui.clip_rect()),
                 vec2::new(pos_min.x, pos_min.y) + vec2::new(ROW_HEIGHT, ROW_HEIGHT) / 2.0,
                 vec2::new(ROW_HEIGHT, ROW_HEIGHT),
@@ -462,7 +462,7 @@ pub fn render(pipe: &mut UiRenderPipe<UserData>, ui: &mut egui::Ui, ui_state: &m
                 auto_mapper.file_dialog.pick_file();
                 auto_mapper.file_dialog_ty = FileDialogTy::LoadResource;
             }
-            if auto_mapper.file_dialog.state() == DialogState::Open {
+            if *auto_mapper.file_dialog.state() == DialogState::Open {
                 let mode = auto_mapper.file_dialog.mode();
                 if let Some(selected) = auto_mapper
                     .file_dialog

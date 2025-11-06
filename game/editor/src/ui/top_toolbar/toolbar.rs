@@ -527,7 +527,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
 
     ui_state.add_blur_rect(res.response.rect, 0.0);
 
-    let ui_pos = ui.ctx().screen_rect().center();
+    let ui_pos = ui.ctx().content_rect().center();
 
     let tools = &mut pipe.user_data.tools;
     let res =
@@ -595,7 +595,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
                                     {
                                         let pos = ui_pos_to_world_pos(
                                             pipe.user_data.canvas_handle,
-                                            &ui.ctx().screen_rect(),
+                                            &ui.ctx().content_rect(),
                                             map.groups.user.zoom,
                                             vec2::new(ui_pos.x, ui_pos.y),
                                             map.groups.user.pos.x,
@@ -745,7 +745,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
                                     {
                                         let pos = ui_pos_to_world_pos(
                                             pipe.user_data.canvas_handle,
-                                            &ui.ctx().screen_rect(),
+                                            &ui.ctx().content_rect(),
                                             map.groups.user.zoom,
                                             vec2::new(ui_pos.x, ui_pos.y),
                                             map.groups.user.pos.x,

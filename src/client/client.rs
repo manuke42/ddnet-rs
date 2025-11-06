@@ -2074,7 +2074,7 @@ impl ClientNativeImpl {
                                         render_tee,
                                         ui,
                                         ui_state,
-                                        ui.ctx().screen_rect(),
+                                        ui.ctx().content_rect(),
                                         None,
                                         char.info.skin.borrow(),
                                         Some(&char.info.skin_info),

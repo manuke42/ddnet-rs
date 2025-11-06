@@ -30,7 +30,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
         .show_separator_line(false)
         .resizable(false)
         .show(ui.ctx(), |ui| {
-            ui.set_clip_rect(ui.ctx().screen_rect());
+            ui.set_clip_rect(ui.ctx().content_rect());
             ui.style_mut().spacing.item_spacing.y = 0.0;
             let mut rect = ui.available_rect_before_wrap();
             ui.add_space(10.0);
@@ -72,7 +72,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
                         .clamp(0.0, f64::MAX),
                 );
 
-                let canvas = ui.ctx().screen_rect();
+                let canvas = ui.ctx().content_rect();
                 let canvas_width = canvas.width();
                 let canvas_height = canvas.height();
                 let ratio = canvas_width / canvas_height;

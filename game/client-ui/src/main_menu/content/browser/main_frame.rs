@@ -78,7 +78,7 @@ pub fn render(
                                 .find_str(&pipe.user_data.config.storage::<String>("server-addr"));
                             super::info_panel::main_frame::render(
                                 ui,
-                                &ui.ctx().screen_rect().clone(),
+                                &ui.ctx().content_rect().clone(),
                                 &mut UiRenderPipe {
                                     cur_time: pipe.cur_time,
                                     user_data: &mut EntryData {

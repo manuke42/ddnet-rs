@@ -100,7 +100,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
                                             pipe.user_data.flags_container,
                                             ui,
                                             ui_state,
-                                            ui.ctx().screen_rect(),
+                                            ui.ctx().content_rect(),
                                             Some(ui.available_rect_before_wrap()),
                                             &key,
                                             &name.to_lowercase().replace("-", "_"),
