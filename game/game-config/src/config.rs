@@ -166,6 +166,10 @@ pub struct ConfigDemoRecorder {
     /// Use hw accel
     #[default = ""]
     pub hw_accel: String,
+    /// Unix domain socket path used for live frame exporting.
+    /// Leave empty to disable streaming.
+    #[default = "/tmp/teeworlds_frames.sock"]
+    pub frame_socket_path: String,
     /// The sample rate for the audio stream.
     /// Should be a multiple of `fps` for best results.
     #[default = 48000]

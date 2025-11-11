@@ -1,6 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
-    fmt::Debug,
+    fmt::{Debug, Display},
     net::{IpAddr, SocketAddr},
     num::NonZeroUsize,
     path::PathBuf,
@@ -72,6 +72,10 @@ use crate::{
     client::{
         ClientSnapshotForDiff, ClientSnapshotStorage, Clients, ServerClient, ServerClientPlayer,
         ServerNetworkClient, ServerNetworkQueuedClient, ServerPasswordClient,
+    },
+    control::{
+        ControlBridge, ControlTickReport, PlayerControlMessage, PlayerSnapshot, StageSnapshot,
+        format_ingame_mode, spawn_control_server,
     },
     map_votes::{MapVotes, ServerMapVotes},
     network_plugins::{accounts_only::AccountsOnly, cert_ban::CertBans},
@@ -199,6 +203,8 @@ pub struct Server {
     thread_pool: Arc<rayon::ThreadPool>,
     io: Io,
     http_v6: Option<Arc<HttpClient>>,
+    control_bridge: Arc<ControlBridge>,
+    _control_ws_task: IoRuntimeTask<()>,
 
     time: SteadyClock,
 
@@ -863,6 +869,9 @@ impl Server {
 
         let rcon = Rcon::new(&io);
 
+        let (control_bridge, control_handle) = ControlBridge::create();
+        let control_ws_task = spawn_control_server(&io.rt, control_handle);
+
         // write local server info if required.
         {
             let mut state = shared_info.state.lock().unwrap();
@@ -993,6 +1002,8 @@ impl Server {
             thread_pool,
             io,
             http_v6: HttpClient::new_with_bind_addr("::0".parse().unwrap()).map(Arc::new),
+            control_bridge,
+            _control_ws_task: control_ws_task,
 
             config_game,
             server_port_v4: sock_addrs[0].port(),
@@ -3058,8 +3069,10 @@ impl Server {
         self.last_tick_time = cur_time;
         self.last_register_time = None;
 
+        self.publish_control_state();
+
         let game_event_generator = self.game_event_generator_server.clone();
-        while self.is_open.load(std::sync::atomic::Ordering::Relaxed) {
+        'outer: while self.is_open.load(std::sync::atomic::Ordering::Relaxed) {
             cur_time = self.time.now();
             if self
                 .last_register_time
@@ -3272,6 +3285,16 @@ impl Server {
             }
 
             while is_next_tick(cur_time, &mut self.last_tick_time, ticks_in_a_second) {
+                if !self.control_bridge.wait_for_tick() {
+                    //log info:
+                    log::info!(target: "server", "stopping server tick loop due to control bridge request");
+                    break 'outer;
+                }
+                let pending_inputs = self.control_bridge.take_inputs();
+                if !pending_inputs.is_empty() {
+                    self.apply_control_inputs(pending_inputs);
+                }
+
                 // apply all queued inputs
                 if let Some(mut inputs) = self
                     .game_server
@@ -3480,6 +3503,8 @@ impl Server {
                 }
 
                 self.game_server.game.clear_events();
+
+                self.publish_control_state();
             }
 
             self.game_server.cached_character_infos =
@@ -3575,6 +3600,119 @@ impl Server {
                 std::thread::sleep(next_tick_time);
             }
         }
+
+        self.control_bridge.close();
+    }
+
+    fn apply_control_inputs(&mut self, inputs: Vec<PlayerControlMessage>) {
+        for msg in inputs {
+            let target_tick = msg
+                .for_monotonic_tick
+                .unwrap_or(self.game_server.cur_monotonic_tick + 1);
+            if self.game_server.players.contains_key(&msg.player_id) {
+                self.game_server
+                    .player_inp(&msg.player_id, msg.input, target_tick);
+            } else {
+                log::debug!("ignored control input for unknown player {}", msg.player_id);
+            }
+        }
+    }
+
+    fn publish_control_state(&self) {
+        let snapshot = self.build_control_tick_report();
+        self.control_bridge.publish_state(&snapshot);
+    }
+
+    fn build_control_tick_report(&self) -> ControlTickReport {
+        let stages = self.game_server.game.all_stages(1.0);
+        let characters = self.game_server.game.collect_characters_info();
+
+        let mut player_snapshots = Vec::new();
+        let mut stage_snapshots = Vec::new();
+
+        for (stage_id, stage) in stages.iter() {
+            let stage_label = format!("{stage_id:?}");
+            stage_snapshots.push(StageSnapshot {
+                stage_id: stage_label.clone(),
+                game_ticks_passed: stage.game_ticks_passed,
+                character_count: stage.world.characters.len(),
+                projectile_count: stage.world.projectiles.len(),
+                pickup_count: stage.world.pickups.len(),
+                laser_count: stage.world.lasers.len(),
+                flag_count: stage.world.ctf_flags.len(),
+            });
+
+            for (character_id, render_info) in stage.world.characters.iter() {
+                log::debug!(
+                    target: "control-bridge",
+                    "stage {} character {:?} pos=({:.2},{:.2}) vel=({:.2},{:.2})",
+                    stage_label,
+                    character_id,
+                    render_info.lerped_pos.x,
+                    render_info.lerped_pos.y,
+                    render_info.lerped_vel.x,
+                    render_info.lerped_vel.y
+                );
+                let Some(player_id_u64) = Self::entity_id_to_u64(character_id) else {
+                    continue;
+                };
+
+                let character_meta = characters.get(character_id);
+                let name = character_meta.map(|info| info.info.name.as_str().to_string());
+                let account = character_meta
+                    .and_then(|info| info.account_name.as_ref())
+                    .map(|name| name.as_str().to_string());
+                let ingame_mode = character_meta
+                    .and_then(|info| info.player_info.as_ref())
+                    .map(|player| format_ingame_mode(&player.ingame_mode));
+                let browser_score = character_meta
+                    .map(|info| info.browser_score.as_str().to_string())
+                    .filter(|score| !score.is_empty());
+                let stage_for_player = character_meta
+                    .and_then(|info| info.stage_id.as_ref())
+                    .map(|id| format!("{id:?}"))
+                    .or_else(|| Some(stage_label.clone()));
+
+                let hook_target = render_info
+                    .lerped_hook
+                    .and_then(|hook| hook.hooked_char)
+                    .and_then(|id| Self::entity_id_to_u64(&id));
+
+                let position = [render_info.lerped_pos.x, render_info.lerped_pos.y];
+                let velocity = [render_info.lerped_vel.x, render_info.lerped_vel.y];
+                let speed = render_info.lerped_vel.x.hypot(render_info.lerped_vel.y);
+                let current_weapon = format!("{:?}", render_info.cur_weapon);
+
+                player_snapshots.push(PlayerSnapshot {
+                    player_id: player_id_u64,
+                    name,
+                    account,
+                    stage_id: stage_for_player,
+                    position,
+                    velocity,
+                    speed,
+                    move_dir: render_info.move_dir,
+                    current_weapon,
+                    has_air_jump: render_info.has_air_jump,
+                    phased: render_info.phased,
+                    hook_target,
+                    ingame_mode,
+                    browser_score,
+                });
+            }
+        }
+
+        ControlTickReport {
+            tick: self.game_server.cur_monotonic_tick,
+            map: self.game_server.map.name.as_str().to_string(),
+            player_count: player_snapshots.len(),
+            players: player_snapshots,
+            stages: stage_snapshots,
+        }
+    }
+
+    fn entity_id_to_u64<T: Display>(id: &T) -> Option<u64> {
+        id.to_string().parse().ok()
     }
 
     /// Reload the game server with a new map,

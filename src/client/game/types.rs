@@ -28,6 +28,7 @@ use graphics_backend::backend::GraphicsBackend;
 use network::network::quinn_network::QuinnNetwork;
 use pool::datatypes::StringPool;
 use sound::sound::SoundManager;
+use sound_backend::sound_backend::SoundBackend;
 use ui_base::types::UiState;
 
 use crate::spatial_chat::spatial_chat::SpatialChat;
@@ -35,6 +36,7 @@ use crate::spatial_chat::spatial_chat::SpatialChat;
 pub struct GameBase {
     pub graphics: Graphics,
     pub graphics_backend: Rc<GraphicsBackend>,
+    pub sound_backend: Rc<SoundBackend>,
     pub sound: SoundManager,
     pub time: SteadyClock,
     pub tp: Arc<rayon::ThreadPool>,

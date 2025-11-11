@@ -14,6 +14,9 @@ use demo::{
     DemoEvent,
     recorder::{DemoRecorder, DemoRecorderCreateProps},
 };
+#[cfg(unix)]
+use std::path::Path;
+
 use game_base::{
     game_types::time_until_tick,
     local_server_info::LocalServerInfo,
@@ -42,6 +45,8 @@ use game_server::server::Server;
 use game_state_wasm::game::state_wasm_manager::GameStateWasmManager;
 use ghost::recorder::GhostRecorder;
 use input_binds::binds::Binds;
+#[cfg(unix)]
+use log::error;
 use pool::{
     datatypes::{PoolBTreeMap, PoolVec},
     mt_pool::Pool as MtPool,
@@ -55,6 +60,12 @@ use crate::{
     game::data::{ClientConnectedPlayer, SnapshotStorageItem},
     localplayer::{ClientPlayer, ClientPlayerZoomMode, ServerInputForDiff},
     spatial_chat::spatial_chat::SpatialChatGameWorldTy,
+};
+
+#[cfg(unix)]
+use frame_sender::{
+    traits::AudioVideoEncoder as FrameSocketEncoderTrait,
+    types::EncoderSettings as FrameSocketEncoderSettings,
 };
 
 use super::{
@@ -113,9 +124,71 @@ pub struct ActiveGame {
     pub base: GameBase,
 
     pub send_input_every_tick: bool,
+
+    #[cfg(unix)]
+    pub frame_sender: Option<frame_sender::AvEncoder>,
+    #[cfg(unix)]
+    pub frame_sender_failed: bool,
 }
 
 impl ActiveGame {
+    #[cfg(unix)]
+    pub fn ensure_frame_sender(
+        &mut self,
+        socket_path: &Path,
+        fps: u32,
+        sample_rate: u32,
+        crf: u8,
+        hw_accel: String,
+    ) {
+        if self.frame_sender.is_some() || self.frame_sender_failed {
+            return;
+        }
+
+        if socket_path.as_os_str().is_empty() {
+            self.frame_sender_failed = true;
+            return;
+        }
+
+        let width = self.base.graphics.canvas_handle.window_canvas_width();
+        let height = self.base.graphics.canvas_handle.window_canvas_height();
+
+        let max_threads = std::thread::available_parallelism()
+            .map(|value| value.get().saturating_add(1) as u64)
+            .unwrap_or(2);
+
+        let settings = FrameSocketEncoderSettings {
+            fps,
+            width,
+            height,
+            hw_accel,
+            max_threads,
+            sample_rate,
+            crf,
+        };
+
+        match FrameSocketEncoderTrait::new(
+            0,
+            0,
+            socket_path,
+            &self.base.graphics_backend,
+            &self.base.sound_backend,
+            settings,
+        ) {
+            Ok(encoder) => {
+                self.frame_sender = Some(encoder);
+            }
+            Err(err) => {
+                self.frame_sender_failed = true;
+                error!(
+                    "failed to initialize frame sender for {}: {}",
+                    socket_path.display(),
+                    err
+                );
+            }
+        }
+    }
+
     #[instrument(level = "trace", skip_all)]
     pub fn send_input(
         &mut self,

@@ -2177,6 +2177,7 @@ impl ClientNativeImpl {
             GameBase {
                 graphics: self.graphics.clone(),
                 graphics_backend: self.graphics_backend.clone(),
+                sound_backend: self.sound_backend.clone(),
                 sound: self.sound.clone(),
                 time: self.time.clone(),
                 tp: self.thread_pool.clone(),

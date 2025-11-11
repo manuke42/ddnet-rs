@@ -1,0 +1,24 @@
+[package]
+name = "frame-sender"
+version = "0.1.0"
+edition = "2024"
+
+
+[features]
+default = []
+
+[dependencies]
+base = { path = "../base" }
+graphics-backend = { path = "../graphics-backend" }
+graphics-backend-traits = { path = "../graphics-backend-traits" }
+hiarc = { path = "../hiarc", features = ["derive", "enable_tokio"] }
+pool = { path = "../pool", features = ["enable_hiarc"] }
+sound = { path = "../sound" }
+sound-backend = { path = "../sound-backend" }
+#matroska = { git = "https://github.com/rust-av/matroska" }
+#rav1e = { version = "0.7.1", default-features = false, features = ["threading"] }
+#av-data = "0.4.2"
+#av-format = "0.7"
+
+anyhow = { version = "1.0.100", features = ["backtrace"] }
+log = "0.4.28"

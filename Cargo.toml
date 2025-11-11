@@ -110,6 +110,7 @@ members = [
   "lib/config",
   "lib/config-fs",
   "lib/config-macro",
+  "lib/frame-sender",
   "lib/game-database",
   "lib/game-database-backend",
   "lib/game-database-macros",
@@ -202,6 +203,7 @@ microphone = { path = "lib/microphone" }
 native = { path = "lib/native" }
 network = { path = "lib/network" }
 pool = { path = "lib/pool" }
+frame-sender = { path = "lib/frame-sender" }
 sound = { path = "lib/sound" }
 sound-backend = { path = "lib/sound-backend" }
 steam = { path = "lib/steam" }

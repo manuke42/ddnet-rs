@@ -9,6 +9,9 @@ use std::{
     time::Duration,
 };
 
+#[cfg(unix)]
+use std::path::PathBuf;
+
 use active::ActiveGame;
 use anyhow::anyhow;
 use base::{
@@ -651,6 +654,10 @@ impl Game {
 
                         resource_download_server,
                         send_input_every_tick,
+                        #[cfg(unix)]
+                        frame_sender: None,
+                        #[cfg(unix)]
+                        frame_sender_failed: false,
                     }))
                 } else {
                     map.continue_loading();
@@ -996,6 +1003,19 @@ impl Game {
                         pipe.config.ui.path.route("ingame");
                     }
                     game.on_msg(&timestamp, msg, pipe);
+
+                    #[cfg(unix)]
+                    if !is_waiting {
+                        let recorder_cfg = &pipe.config_game.cl.recorder;
+                        let socket_path = PathBuf::from(recorder_cfg.frame_socket_path.clone());
+                        if !socket_path.as_os_str().is_empty() {
+                            let fps = recorder_cfg.fps;
+                            let sample_rate = recorder_cfg.sample_rate;
+                            let crf = recorder_cfg.crf;
+                            let hw_accel = recorder_cfg.hw_accel.clone();
+                            game.ensure_frame_sender(&socket_path, fps, sample_rate, crf, hw_accel);
+                        }
+                    }
 
                     if is_waiting {
                         *self = Self::WaitingForFirstSnapshot(game);
