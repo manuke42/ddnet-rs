@@ -250,7 +250,10 @@ impl BackendFrameFetcher for AudioVideoEncoderImpl {
             }
             Err(err) => {
                 self.video_frames_in_queue.store(0, Ordering::Relaxed);
-                warn!("dropping video frame {}: {}", self.cur_video_frame, err);
+                //onyl every 100 frames to avoid spamming
+                if self.cur_video_frame % 500 == 0 {
+                    warn!("dropping video frame {}: {}", self.cur_video_frame, err);
+                }
             }
         }
     }

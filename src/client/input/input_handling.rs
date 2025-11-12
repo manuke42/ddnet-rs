@@ -5,6 +5,7 @@ use binds::binds::{
     BindAction, BindActionsCharacter, BindActionsHotkey, BindActionsLocalPlayer,
     gen_local_player_action_hash_map,
 };
+use crossbeam::channel::{Receiver, Sender};
 use camera::{Camera, CameraInterface};
 use client_types::console::ConsoleEntry;
 use client_ui::chat::user_data::ChatMode;
@@ -128,6 +129,8 @@ pub struct InputHandling {
     last_known_cursor: Option<CursorIcon>,
 
     inp: Input,
+    external_events_tx: Sender<InputEv>,
+    external_events_rx: Receiver<InputEv>,
 
     bind_cmds: HashMap<&'static str, BindActionsLocalPlayer>,
 }
@@ -140,6 +143,7 @@ impl InputHandling {
         });
 
         let bind_cmds = gen_local_player_action_hash_map();
+    let (external_events_tx, external_events_rx) = crossbeam::channel::unbounded();
         Self {
             state: egui_winit::State::new(
                 ctx,
@@ -151,6 +155,8 @@ impl InputHandling {
             ),
             last_known_cursor: None,
             inp: Input::new(),
+            external_events_tx,
+            external_events_rx,
             bind_cmds,
         }
     }
@@ -173,8 +179,20 @@ impl InputHandling {
     }
 
     #[instrument(level = "trace", skip_all)]
+    fn drain_external_events(&mut self) {
+        while let Ok(event) = self.external_events_rx.try_recv() {
+            self.inp.evs.push(event);
+        }
+    }
+
+    #[instrument(level = "trace", skip_all)]
     pub fn collect_events(&mut self) {
+        self.drain_external_events();
         self.inp.egui = Some(self.state.egui_input_mut().take());
+    }
+
+    pub fn external_sender(&self) -> Sender<InputEv> {
+        self.external_events_tx.clone()
     }
 
     #[instrument(level = "trace", skip_all)]

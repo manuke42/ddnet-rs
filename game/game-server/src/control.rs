@@ -452,7 +452,7 @@ fn handle_command(
         Ok(ControlCommand::Step { count }) => {
             let permits = count.unwrap_or(1).max(1);
             handle.allow_ticks(permits);
-            log::info!(target: "server", "allowed {permits} tick(s) via control websocket");
+            //log::info!(target: "server", "allowed {permits} tick(s) via control websocket");
             let _ = response_tx.send(Message::Text(Utf8Bytes::from(
                 serde_json::to_string(&AckResponse {
                     r#type: "step_ack",

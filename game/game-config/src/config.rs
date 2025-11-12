@@ -275,6 +275,10 @@ pub struct ConfigClient {
     #[default = true]
     /// Enables the auto update if available
     pub auto_updater: bool,
+    /// Path of the unix domain socket used to inject input events.
+    /// Leave empty to disable the socket listener.
+    #[default = "/tmp/ddnet-input.sock"]
+    pub input_socket_path: String,
 }
 
 #[config_default]

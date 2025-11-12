@@ -177,6 +177,8 @@ use super::{
     overlays::client_stats::{ClientStats, ClientStatsRenderPipe, DebugHudRenderPipe},
     spatial_chat::spatial_chat::{self, SpatialChatGameWorldTy, SpatialChatGameWorldTyRef},
 };
+#[cfg(unix)]
+use super::input::socket::InputSocketServer;
 
 type UiManager = UiManagerBase<Config>;
 
@@ -421,6 +423,10 @@ struct ClientNativeImpl {
 
     // input & helper
     inp_manager: InputHandling,
+    #[cfg(unix)]
+    input_socket: Option<InputSocketServer>,
+    #[cfg(unix)]
+    input_socket_failed: bool,
 
     // auto updater, should be at the end
     #[cfg(feature = "auto_updater")]
@@ -3035,6 +3041,10 @@ impl FromNativeLoadingImpl<ClientNativeLoadingImpl> for GraphicsApp<ClientNative
 
             global_binds,
             inp_manager,
+            #[cfg(unix)]
+            input_socket: None,
+            #[cfg(unix)]
+            input_socket_failed: false,
 
             legacy_proxy_thread: None,
 
@@ -3162,6 +3172,14 @@ impl AppWithGraphics for ClientNativeImpl {
     fn run(&mut self, native: &mut dyn NativeImpl) {
         self.inp_manager.collect_events();
 
+        #[cfg(unix)]
+        if !matches!(self.game, Game::Active(_)) {
+            if self.input_socket.is_some() {
+                self.input_socket = None;
+            }
+            self.input_socket_failed = false;
+        }
+
         let mut open_editor = false;
         self.inp_manager.handle_global_binds(
             &mut self.global_binds,
@@ -3247,6 +3265,26 @@ impl AppWithGraphics for ClientNativeImpl {
             && !self.editor.is_open()
             && self.demo_player.is_none();
         if let Game::Active(game) = &mut self.game {
+            #[cfg(unix)]
+            if self.input_socket.is_none() && !self.input_socket_failed {
+                let socket_path = PathBuf::from(self.config.game.cl.input_socket_path.clone());
+                if !socket_path.as_os_str().is_empty() {
+                    match InputSocketServer::start(&socket_path, self.inp_manager.external_sender())
+                    {
+                        Ok(socket) => {
+                            self.input_socket = Some(socket);
+                        }
+                        Err(err) => {
+                            log::error!(
+                                "failed to start input socket at {}: {err}",
+                                socket_path.display()
+                            );
+                            self.input_socket_failed = true;
+                        }
+                    }
+                }
+            }
+
             // check loading of votes
             if self.votes.needs_map_votes() {
                 if !game.map_votes_loaded {
