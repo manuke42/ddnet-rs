@@ -1,17 +1,17 @@
 use std::{
     fs,
-    io::{self, Read},
+    io::{self, Read, Write},
     os::unix::net::{UnixListener, UnixStream},
     path::{Path, PathBuf},
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
     time::Duration,
 };
 
-use anyhow::{anyhow, Context, Result};
-use crossbeam::channel::Sender;
+use anyhow::{Context, Result, anyhow};
+use crossbeam::channel::{Receiver, RecvTimeoutError, Sender, TryRecvError};
 use input_binds::binds::{BindKey, MouseExtra};
 use log::{debug, error, info, warn};
 use native::native::{DeviceId, KeyCode, MouseButton, PhysicalKey};
@@ -25,6 +25,8 @@ use base::join_thread::JoinThread;
 pub struct InputSocketServer {
     path: PathBuf,
     shutdown: Arc<AtomicBool>,
+    response_tx: Sender<String>,
+    response_requests_rx: Receiver<()>,
     _thread: JoinThread<()>,
 }
 
@@ -48,7 +50,10 @@ impl InputSocketServer {
 
         if let Err(err) = fs::remove_file(&path) {
             if err.kind() != io::ErrorKind::NotFound {
-                warn!("failed to remove stale input socket at {}: {err}", path.display());
+                warn!(
+                    "failed to remove stale input socket at {}: {err}",
+                    path.display()
+                );
             }
         }
 
@@ -56,16 +61,40 @@ impl InputSocketServer {
         let thread_shutdown = shutdown.clone();
         let thread_path = path.clone();
         let thread_sender = sender.clone();
+        let (response_tx, response_rx) = crossbeam::channel::unbounded();
+        let (response_request_tx, response_request_rx) = crossbeam::channel::unbounded();
         let handle = std::thread::Builder::new()
             .name("unix-input-socket".to_string())
-            .spawn(move || run_socket_loop(thread_path, thread_sender, thread_shutdown))
+            .spawn(move || {
+                run_socket_loop(
+                    thread_path,
+                    thread_sender,
+                    response_rx,
+                    response_request_tx,
+                    thread_shutdown,
+                )
+            })
             .context("failed to spawn unix input socket thread")?;
 
         Ok(Self {
             path,
             shutdown,
+            response_tx,
+            response_requests_rx: response_request_rx,
             _thread: JoinThread::new(handle),
         })
+    }
+
+    pub fn response_sender(&self) -> Sender<String> {
+        self.response_tx.clone()
+    }
+
+    pub fn take_pending_responses(&self) -> usize {
+        let mut count = 0;
+        while self.response_requests_rx.try_recv().is_ok() {
+            count += 1;
+        }
+        count
     }
 }
 
@@ -84,7 +113,13 @@ impl Drop for InputSocketServer {
     }
 }
 
-fn run_socket_loop(path: PathBuf, sender: Sender<InputEv>, shutdown: Arc<AtomicBool>) {
+fn run_socket_loop(
+    path: PathBuf,
+    sender: Sender<InputEv>,
+    response_rx: Receiver<String>,
+    response_request_tx: Sender<()>,
+    shutdown: Arc<AtomicBool>,
+) {
     let listener = match UnixListener::bind(&path) {
         Ok(listener) => listener,
         Err(err) => {
@@ -99,7 +134,14 @@ fn run_socket_loop(path: PathBuf, sender: Sender<InputEv>, shutdown: Arc<AtomicB
         match listener.accept() {
             Ok((stream, _)) => {
                 debug!("input socket client connected");
-                if let Err(err) = handle_connection(stream, sender.clone(), &shutdown) {
+                drain_responses(&response_rx);
+                if let Err(err) = handle_connection(
+                    stream,
+                    sender.clone(),
+                    &response_rx,
+                    &response_request_tx,
+                    &shutdown,
+                ) {
                     warn!("error while handling input socket client: {err}");
                 }
                 debug!("input socket client disconnected");
@@ -119,6 +161,8 @@ fn run_socket_loop(path: PathBuf, sender: Sender<InputEv>, shutdown: Arc<AtomicB
 fn handle_connection(
     mut stream: UnixStream,
     sender: Sender<InputEv>,
+    response_rx: &Receiver<String>,
+    response_request_tx: &Sender<()>,
     shutdown: &Arc<AtomicBool>,
 ) -> Result<()> {
     stream
@@ -133,7 +177,14 @@ fn handle_connection(
             Ok(0) => break,
             Ok(count) => {
                 buffer.extend_from_slice(&temp[..count]);
-                consume_buffer(&mut buffer, &sender)?;
+                consume_buffer(
+                    &mut buffer,
+                    &sender,
+                    response_rx,
+                    response_request_tx,
+                    shutdown,
+                    &mut stream,
+                )?;
             }
             Err(err) if err.kind() == io::ErrorKind::WouldBlock => {
                 continue;
@@ -148,7 +199,14 @@ fn handle_connection(
     Ok(())
 }
 
-fn consume_buffer(buffer: &mut Vec<u8>, sender: &Sender<InputEv>) -> Result<()> {
+fn consume_buffer(
+    buffer: &mut Vec<u8>,
+    sender: &Sender<InputEv>,
+    response_rx: &Receiver<String>,
+    response_request_tx: &Sender<()>,
+    shutdown: &Arc<AtomicBool>,
+    stream: &mut UnixStream,
+) -> Result<()> {
     loop {
         let Some(pos) = buffer.iter().position(|b| *b == b'\n') else {
             break;
@@ -165,62 +223,117 @@ fn consume_buffer(buffer: &mut Vec<u8>, sender: &Sender<InputEv>) -> Result<()> 
                 continue;
             }
         };
-        if let Err(err) = process_payload(text, sender) {
-            return Err(err);
+        let processed = process_payload(text, sender)?;
+        if processed {
+            if let Err(err) = response_request_tx.send(()) {
+                return Err(anyhow!(
+                    "failed to queue input socket response request: {err}"
+                ));
+            }
+            match wait_for_response(response_rx, shutdown)? {
+                Some(response) => send_response(stream, response)?,
+                None => break,
+            }
         }
     }
     Ok(())
 }
 
-fn process_payload(text: &str, sender: &Sender<InputEv>) -> Result<()> {
+fn process_payload(text: &str, sender: &Sender<InputEv>) -> Result<bool> {
     let msg: SocketEvent = match serde_json::from_str(text) {
         Ok(msg) => msg,
         Err(err) => {
             warn!("input socket: ignoring malformed payload `{text}` ({err})");
-            return Ok(());
+            return Ok(false);
         }
     };
     dispatch_event(msg, sender)
 }
 
-fn dispatch_event(event: SocketEvent, sender: &Sender<InputEv>) -> Result<()> {
+fn dispatch_event(event: SocketEvent, sender: &Sender<InputEv>) -> Result<bool> {
     let device = DeviceId::dummy();
-    let event = match event {
-        SocketEvent::Key { code, state } => InputEv::Key(InputKeyEv {
+    let maybe_event = match event {
+        SocketEvent::Key { code, state } => Some(InputEv::Key(InputKeyEv {
             key: BindKey::Key(PhysicalKey::Code(code)),
             is_down: state.is_pressed(),
             device,
-        }),
-        SocketEvent::MouseButton { button, state } => InputEv::Key(InputKeyEv {
+        })),
+        SocketEvent::MouseButton { button, state } => Some(InputEv::Key(InputKeyEv {
             key: BindKey::Mouse(button),
             is_down: state.is_pressed(),
             device,
-        }),
-        SocketEvent::MouseMove { dx, dy } => InputEv::Move(InputAxisMoveEv {
+        })),
+        SocketEvent::MouseMove { dx, dy } => Some(InputEv::Move(InputAxisMoveEv {
             device,
             xrel: dx,
             yrel: dy,
-        }),
+        })),
         SocketEvent::Scroll { delta } => {
             if delta == 0.0 {
-                return Ok(());
-            }
-            let key = if delta < 0.0 {
-                BindKey::Extra(MouseExtra::WheelDown)
+                None
             } else {
-                BindKey::Extra(MouseExtra::WheelUp)
-            };
-            InputEv::Key(InputKeyEv {
-                key,
-                is_down: false,
-                device,
-            })
+                let key = if delta < 0.0 {
+                    BindKey::Extra(MouseExtra::WheelDown)
+                } else {
+                    BindKey::Extra(MouseExtra::WheelUp)
+                };
+                Some(InputEv::Key(InputKeyEv {
+                    key,
+                    is_down: false,
+                    device,
+                }))
+            }
         }
     };
 
-    sender
-        .send(event)
-        .context("failed to forward input socket event")
+    if let Some(event) = maybe_event {
+        sender
+            .send(event)
+            .context("failed to forward input socket event")?;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
+
+fn wait_for_response(
+    response_rx: &Receiver<String>,
+    shutdown: &Arc<AtomicBool>,
+) -> Result<Option<String>> {
+    loop {
+        if shutdown.load(Ordering::Relaxed) {
+            return Ok(None);
+        }
+        match response_rx.recv_timeout(Duration::from_millis(50)) {
+            Ok(response) => return Ok(Some(response)),
+            Err(RecvTimeoutError::Timeout) => {
+                continue;
+            }
+            Err(RecvTimeoutError::Disconnected) => {
+                return Err(anyhow!("input socket response channel disconnected"));
+            }
+        }
+    }
+}
+
+fn send_response(stream: &mut UnixStream, response: String) -> Result<()> {
+    let mut data = response.into_bytes();
+    data.push(b'\n');
+    stream
+        .write_all(&data)
+        .context("failed to write response to input socket client")?;
+    stream
+        .flush()
+        .context("failed to flush input socket response to client")
+}
+
+fn drain_responses(response_rx: &Receiver<String>) {
+    loop {
+        match response_rx.try_recv() {
+            Ok(_) => {}
+            Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => break,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]

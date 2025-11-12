@@ -18,7 +18,7 @@ Send newline-delimited JSON objects. Each object must contain a `type` field and
 | `type`        | Additional fields                                            | Notes                                    |
 |---------------|--------------------------------------------------------------|------------------------------------------|
 | `key`         | `code`: string (`KeyW`, `Space`, etc.), `state`: `down`/`up` | Uses winit `KeyCode` names.              |
-| `mouse_button`| `button`: `left`/`right`/`middle`/`back`/`forward`, `state`  | State accepts `down`/`up`.               |
+| `mouse_button`| `button`: `Left`/`Right`/`Middle`/`Back`/`Forward`, `state`  | State accepts `down`/`up`.               |
 | `mouse_move`  | `dx`, `dy`: floating-point deltas                            | Values represent relative motion.        |
 | `scroll`      | `delta`: positive or negative value                          | Sign controls wheel direction.           |
 
@@ -29,8 +29,8 @@ Example commands:
 {"type":"key","code":"KeyW","state":"up"}
 {"type":"mouse_move","dx":12.5,"dy":-4.0}
 {"type":"scroll","delta":1.0}
-{"type":"mouse_button","button":"left","state":"down"}
-{"type":"mouse_button","button":"left","state":"up"}
+{"type":"mouse_button","button":"Left","state":"down"}
+{"type":"mouse_button","button":"Left","state":"up"}
 ```
 
 Each line **must** end with a newline character (`\n`). Commands with an empty `delta` (zero) are ignored.

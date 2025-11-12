@@ -5,7 +5,6 @@ use binds::binds::{
     BindAction, BindActionsCharacter, BindActionsHotkey, BindActionsLocalPlayer,
     gen_local_player_action_hash_map,
 };
-use crossbeam::channel::{Receiver, Sender};
 use camera::{Camera, CameraInterface};
 use client_types::console::ConsoleEntry;
 use client_ui::chat::user_data::ChatMode;
@@ -13,6 +12,7 @@ use client_ui::console::utils::run_command;
 use client_ui::emote_wheel::user_data::EmoteWheelEvent;
 use command_parser::parser::CommandTypeRef;
 use config::config::ConfigEngine;
+use crossbeam::channel::{Receiver, Sender};
 use egui::{Context, CursorIcon};
 use game_config::config::ConfigGame;
 use game_interface::types::emoticons::EmoticonType;
@@ -133,6 +133,8 @@ pub struct InputHandling {
     external_events_rx: Receiver<InputEv>,
 
     bind_cmds: HashMap<&'static str, BindActionsLocalPlayer>,
+    #[cfg(unix)]
+    socket_response_tx: Option<Sender<String>>,
 }
 
 impl InputHandling {
@@ -143,7 +145,7 @@ impl InputHandling {
         });
 
         let bind_cmds = gen_local_player_action_hash_map();
-    let (external_events_tx, external_events_rx) = crossbeam::channel::unbounded();
+        let (external_events_tx, external_events_rx) = crossbeam::channel::unbounded();
         Self {
             state: egui_winit::State::new(
                 ctx,
@@ -158,6 +160,8 @@ impl InputHandling {
             external_events_tx,
             external_events_rx,
             bind_cmds,
+            #[cfg(unix)]
+            socket_response_tx: None,
         }
     }
 
@@ -189,6 +193,31 @@ impl InputHandling {
     pub fn collect_events(&mut self) {
         self.drain_external_events();
         self.inp.egui = Some(self.state.egui_input_mut().take());
+    }
+
+    #[cfg(unix)]
+    pub fn set_socket_responder(&mut self, responder: Sender<String>) {
+        self.socket_response_tx = Some(responder);
+    }
+
+    #[cfg(unix)]
+    pub fn clear_socket_responder(&mut self) {
+        self.socket_response_tx = None;
+    }
+
+    #[cfg(unix)]
+    pub fn send_socket_response(&mut self, response: String) -> bool {
+        let Some(sender) = &self.socket_response_tx else {
+            return false;
+        };
+        match sender.send(response) {
+            Ok(_) => true,
+            Err(err) => {
+                log::warn!("input socket: failed to send response: {err}");
+                self.socket_response_tx = None;
+                false
+            }
+        }
     }
 
     pub fn external_sender(&self) -> Sender<InputEv> {

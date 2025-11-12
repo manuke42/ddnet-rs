@@ -166,6 +166,8 @@ use game_base::{
 
 use game_network::messages::{ClientToServerMessage, ClientToServerPlayerMessage};
 
+#[cfg(unix)]
+use super::input::socket::InputSocketServer;
 use super::{
     game::{
         data::{ClientConnectedPlayer, GameData},
@@ -177,8 +179,6 @@ use super::{
     overlays::client_stats::{ClientStats, ClientStatsRenderPipe, DebugHudRenderPipe},
     spatial_chat::spatial_chat::{self, SpatialChatGameWorldTy, SpatialChatGameWorldTyRef},
 };
-#[cfg(unix)]
-use super::input::socket::InputSocketServer;
 
 type UiManager = UiManagerBase<Config>;
 
@@ -427,6 +427,10 @@ struct ClientNativeImpl {
     input_socket: Option<InputSocketServer>,
     #[cfg(unix)]
     input_socket_failed: bool,
+    #[cfg(unix)]
+    pending_socket_responses: usize,
+    #[cfg(unix)]
+    last_known_player_x: Option<f64>,
 
     // auto updater, should be at the end
     #[cfg(feature = "auto_updater")]
@@ -861,6 +865,23 @@ impl ClientNativeImpl {
                 ),
                 ext: main_game.collect_render_ext(),
             };
+
+            #[cfg(unix)]
+            {
+                self.last_known_player_x =
+                    game.game_data
+                        .local
+                        .active_local_player()
+                        .and_then(|(id, _)| {
+                            render_game_input
+                                .character_infos
+                                .get(id)
+                                .and_then(|c| c.stage_id)
+                                .and_then(|stage_id| render_game_input.stages.get(&stage_id))
+                                .and_then(|stage| stage.world.characters.get(id))
+                                .map(|character| character.lerped_pos.x as f64)
+                        });
+            }
 
             type CharacterInfos = PoolFxLinkedHashMap<CharacterId, CharacterInfo>;
             type StageRenderInfos = PoolFxLinkedHashMap<StageId, StageRenderInfo>;
@@ -2593,6 +2614,33 @@ impl ClientNativeImpl {
         let events = self.local_console.get_events();
         self.handle_console_events_impl(native, events, 0);
     }
+
+    #[cfg(unix)]
+    fn flush_socket_responses(&mut self) {
+        if let Some(socket) = self.input_socket.as_ref() {
+            let new_requests = socket.take_pending_responses();
+            if new_requests > 0 {
+                self.pending_socket_responses =
+                    self.pending_socket_responses.saturating_add(new_requests);
+            }
+        }
+
+        if self.pending_socket_responses == 0 {
+            return;
+        }
+
+        let responses = self.pending_socket_responses;
+        self.pending_socket_responses = 0;
+
+        let player_x = self.last_known_player_x.unwrap_or(0.0);
+        let message = player_x.to_string();
+
+        for _ in 0..responses {
+            if !self.inp_manager.send_socket_response(message.clone()) {
+                break;
+            }
+        }
+    }
 }
 
 impl FromNativeLoadingImpl<ClientNativeLoadingImpl> for GraphicsApp<ClientNativeImpl> {
@@ -3045,6 +3093,10 @@ impl FromNativeLoadingImpl<ClientNativeLoadingImpl> for GraphicsApp<ClientNative
             input_socket: None,
             #[cfg(unix)]
             input_socket_failed: false,
+            #[cfg(unix)]
+            pending_socket_responses: 0,
+            #[cfg(unix)]
+            last_known_player_x: None,
 
             legacy_proxy_thread: None,
 
@@ -3176,8 +3228,20 @@ impl AppWithGraphics for ClientNativeImpl {
         if !matches!(self.game, Game::Active(_)) {
             if self.input_socket.is_some() {
                 self.input_socket = None;
+                self.inp_manager.clear_socket_responder();
             }
             self.input_socket_failed = false;
+            self.pending_socket_responses = 0;
+            self.last_known_player_x = None;
+        }
+
+        #[cfg(unix)]
+        if let Some(socket) = self.input_socket.as_ref() {
+            let new_requests = socket.take_pending_responses();
+            if new_requests > 0 {
+                self.pending_socket_responses =
+                    self.pending_socket_responses.saturating_add(new_requests);
+            }
         }
 
         let mut open_editor = false;
@@ -3272,6 +3336,8 @@ impl AppWithGraphics for ClientNativeImpl {
                     match InputSocketServer::start(&socket_path, self.inp_manager.external_sender())
                     {
                         Ok(socket) => {
+                            let responder = socket.response_sender();
+                            self.inp_manager.set_socket_responder(responder);
                             self.input_socket = Some(socket);
                         }
                         Err(err) => {
@@ -3641,6 +3707,9 @@ impl AppWithGraphics for ClientNativeImpl {
 
         // rendering
         self.render(native);
+
+        #[cfg(unix)]
+        self.flush_socket_responses();
 
         self.spatial_chat.update(
             &self.scene,

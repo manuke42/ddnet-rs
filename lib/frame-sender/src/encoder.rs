@@ -10,6 +10,8 @@ use std::{
         atomic::{AtomicU64, Ordering},
         mpsc,
     },
+    thread,
+    time::{Duration, Instant},
 };
 
 use anyhow::Context;
@@ -39,6 +41,8 @@ const MESSAGE_KIND_FRAME: u16 = 1;
 const HEADER_MAGIC: &[u8; 4] = b"DDNF";
 const FRAME_FORMAT: &[u8; 4] = b"RGBA";
 const HEADER_SIZE: usize = 32;
+const FRAME_SEND_TIMEOUT: Duration = Duration::from_secs(3);
+const FRAME_SEND_RETRY_DELAY: Duration = Duration::from_millis(2);
 
 #[derive(Debug)]
 struct FramePacket {
@@ -243,16 +247,36 @@ impl BackendFrameFetcher for AudioVideoEncoderImpl {
             pixels: frame_data.dest_data_buffer,
         };
 
-        match self.video_sender.send(packet) {
-            Ok(()) => {
-                self.cur_video_frame += 1;
-                self.video_frames_in_queue.fetch_add(1, Ordering::Relaxed);
-            }
-            Err(err) => {
-                self.video_frames_in_queue.store(0, Ordering::Relaxed);
-                //onyl every 100 frames to avoid spamming
-                if self.cur_video_frame % 500 == 0 {
-                    warn!("dropping video frame {}: {}", self.cur_video_frame, err);
+        let mut packet = packet;
+        let start = Instant::now();
+        loop {
+            match self.video_sender.try_send(packet) {
+                Ok(()) => {
+                    self.cur_video_frame += 1;
+                    self.video_frames_in_queue.fetch_add(1, Ordering::Relaxed);
+                    break;
+                }
+                Err(mpsc::TrySendError::Full(p)) => {
+                    if start.elapsed() >= FRAME_SEND_TIMEOUT {
+                        self.video_frames_in_queue.store(0, Ordering::Relaxed);
+                        error!(
+                            "timed out sending video frame {} after {:?}; dropping frame",
+                            self.cur_video_frame, FRAME_SEND_TIMEOUT
+                        );
+                        break;
+                    }
+                    packet = p;
+                    thread::sleep(FRAME_SEND_RETRY_DELAY);
+                }
+                Err(mpsc::TrySendError::Disconnected(_)) => {
+                    self.video_frames_in_queue.store(0, Ordering::Relaxed);
+                    if self.cur_video_frame % 3000 == 0 {
+                        warn!(
+                            "dropping video frame {}: video receiver channel disconnected",
+                            self.cur_video_frame
+                        );
+                    }
+                    break;
                 }
             }
         }
