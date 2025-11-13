@@ -270,7 +270,7 @@ impl BackendFrameFetcher for AudioVideoEncoderImpl {
                 }
                 Err(mpsc::TrySendError::Disconnected(_)) => {
                     self.video_frames_in_queue.store(0, Ordering::Relaxed);
-                    if self.cur_video_frame % 3000 == 0 {
+                    if self.cur_video_frame % 3000 == 1 {
                         warn!(
                             "dropping video frame {}: video receiver channel disconnected",
                             self.cur_video_frame

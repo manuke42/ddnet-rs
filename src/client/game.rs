@@ -573,6 +573,7 @@ impl Game {
                     network.send_unordered_to_server(&ClientToServerMessage::Ready(MsgClReady {
                         players: Self::player_net_infos(&local.expected_local_players, config_game),
                         rcon_secret: connect.rcon_secret,
+                        drive_tick_loop: config_game.cl.drive_tick_loop,
                     }));
                     let ClientMapLoading::Map(ClientMapFile::Game(mut map)) = map else {
                         panic!("remove this in future.")

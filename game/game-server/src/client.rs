@@ -128,6 +128,9 @@ pub struct ServerClient {
 
     /// alternative drop reason if the network signalled a disconnect
     pub drop_reason: Option<PlayerDropReason>,
+
+    /// Whether this client currently drives the tick loop.
+    pub controls_tick_loop: bool,
 }
 
 impl ServerClient {
@@ -161,6 +164,8 @@ impl ServerClient {
             requested_account_details: false,
 
             drop_reason: None,
+
+            controls_tick_loop: false,
         }
     }
 }

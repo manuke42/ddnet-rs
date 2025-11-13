@@ -163,6 +163,10 @@ pub struct MsgClReady {
     /// Optional rcon secret, that should be tried to auth
     /// for rcon access.
     pub rcon_secret: Option<[u8; 32]>,
+
+    /// Request ownership of the server tick gate.
+    #[serde(default)]
+    pub drive_tick_loop: bool,
 }
 
 #[derive(Debug, Error, Clone, Serialize, Deserialize)]

@@ -279,6 +279,9 @@ pub struct ConfigClient {
     /// Leave empty to disable the socket listener.
     #[default = "/tmp/ddnet-input.sock"]
     pub input_socket_path: String,
+    /// When enabled the client requests to drive the server tick loop.
+    #[default = true]
+    pub drive_tick_loop: bool,
 }
 
 #[config_default]
@@ -698,6 +701,9 @@ pub struct ConfigServer {
     /// traffic.
     #[default = false]
     pub spatial_chat: bool,
+    /// Expose the deterministic control websocket.
+    #[default = false]
+    pub control_websocket_enabled: bool,
     /// If set, client's must input the correct password
     /// before being able to join the server
     #[default = ""]
