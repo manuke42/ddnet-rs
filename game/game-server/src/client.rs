@@ -131,6 +131,9 @@ pub struct ServerClient {
 
     /// Whether this client currently drives the tick loop.
     pub controls_tick_loop: bool,
+
+    /// Whether the client requested to drive the tick loop during the ready handshake.
+    pub wants_tick_control: bool,
 }
 
 impl ServerClient {
@@ -166,6 +169,7 @@ impl ServerClient {
             drop_reason: None,
 
             controls_tick_loop: false,
+            wants_tick_control: false,
         }
     }
 }

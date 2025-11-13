@@ -75,7 +75,7 @@ use crate::{
     },
     control::{
         ControlBridge, ControlTickReport, PlayerControlMessage, PlayerSnapshot, StageSnapshot,
-        format_ingame_mode, spawn_control_server,
+        TickGateAcquire, format_ingame_mode, spawn_control_server,
     },
     map_votes::{MapVotes, ServerMapVotes},
     network_plugins::{accounts_only::AccountsOnly, cert_ban::CertBans},
@@ -179,6 +179,7 @@ type ReponsesAndSkipped = (Vec<Result<String, String>>, Vec<String>);
 struct TickControllerState {
     connection_id: NetworkConnectionId,
     last_permitted_tick: GameTickType,
+    last_input_packet_id: Option<u64>,
 }
 
 pub struct Server {
@@ -1176,9 +1177,13 @@ impl Server {
         }
 
         // else find in clients, connect one from queue if this client disconnected
+        if let Some(client) = self.clients.clients.get_mut(con_id) {
+            client.controls_tick_loop = false;
+        }
+        self.deactivate_tick_controller(con_id);
+
         let found = self.clients.clients.remove(con_id);
         if let Some(p) = found {
-            self.deactivate_tick_controller(con_id);
             // update vote if nessecary
             if let Some(vote) = &mut self.game_server.cur_vote {
                 if let Some(voted) = vote.participating_ip.remove(&p.ip) {
@@ -1225,9 +1230,18 @@ impl Server {
     }
 
     fn activate_tick_controller(&mut self, con_id: &NetworkConnectionId) {
+        if let Some(prev) = &self.tick_controller {
+            if let Some(client) = self.clients.clients.get_mut(&prev.connection_id) {
+                client.controls_tick_loop = false;
+            }
+        }
+        if let Some(client) = self.clients.clients.get_mut(con_id) {
+            client.controls_tick_loop = true;
+        }
         self.tick_controller = Some(TickControllerState {
             connection_id: *con_id,
             last_permitted_tick: self.game_server.cur_monotonic_tick,
+            last_input_packet_id: None,
         });
         log::info!(
             target: "server",
@@ -1242,6 +1256,9 @@ impl Server {
             .as_ref()
             .map_or(false, |controller| controller.connection_id == *con_id)
         {
+            if let Some(client) = self.clients.clients.get_mut(con_id) {
+                client.controls_tick_loop = false;
+            }
             self.tick_controller = None;
             log::info!(
                 target: "server",
@@ -1251,21 +1268,43 @@ impl Server {
         }
     }
 
-    fn advance_tick_controller(&mut self, con_id: &NetworkConnectionId, up_to_tick: GameTickType) {
+    fn advance_tick_controller(
+        &mut self,
+        con_id: &NetworkConnectionId,
+        up_to_tick: GameTickType,
+        packet_id: u64,
+    ) {
         if let Some(controller) = self.tick_controller.as_mut()
             && controller.connection_id == *con_id
         {
-            let diff = up_to_tick.saturating_sub(controller.last_permitted_tick);
-            if diff > 0 {
-                let permits = diff.min(usize::MAX as GameTickType) as usize;
-                controller.last_permitted_tick = up_to_tick;
-                self.control_bridge.allow_ticks(permits);
-                log::debug!(
+            if controller
+                .last_input_packet_id
+                .is_some_and(|last| packet_id <= last)
+            {
+                log::trace!(
                     target: "server",
-                    "client {:?} released {permits} tick permit(s) up to monotonic tick {up_to_tick}",
+                    "ignoring duplicate input packet {} from {:?} for tick control",
+                    packet_id,
                     con_id
                 );
+                return;
             }
+            controller.last_input_packet_id = Some(packet_id);
+
+            let diff = up_to_tick.saturating_sub(controller.last_permitted_tick);
+            let permits = if diff == 0 {
+                1
+            } else {
+                diff.min(usize::MAX as GameTickType)
+            };
+            controller.last_permitted_tick = up_to_tick.max(controller.last_permitted_tick);
+            self.control_bridge.allow_ticks(permits as usize);
+            log::debug!(
+                target: "server",
+                "client {:?} released {permits} tick permit(s) up to monotonic tick {up_to_tick} (packet {})",
+                con_id,
+                packet_id
+            );
         }
     }
 
@@ -2322,7 +2361,6 @@ impl Server {
                         wants_tick_control
                     );
                     let can_assign_tick_controller = self.tick_controller.is_none();
-                    let mut assign_tick_controller = false;
 
                     // if client is actually waiting, make it part of the game
                     let account_server_public_keys = self
@@ -2333,14 +2371,23 @@ impl Server {
                     let client = self.clients.try_client_ready(con_id);
                     let check_vote = client.is_some();
                     if let Some(client) = client {
-                        assign_tick_controller = wants_tick_control && can_assign_tick_controller;
-                        client.controls_tick_loop = assign_tick_controller;
-                        if wants_tick_control && !assign_tick_controller {
-                            log::warn!(
-                                target: "server",
-                                "client {:?} requested tick control but it is already assigned",
-                                con_id
-                            );
+                        client.wants_tick_control = wants_tick_control;
+                        client.controls_tick_loop = false;
+
+                        if wants_tick_control {
+                            if can_assign_tick_controller {
+                                log::debug!(
+                                    target: "server",
+                                    "client {:?} requested tick control, waiting for readiness signal",
+                                    con_id
+                                );
+                            } else {
+                                log::warn!(
+                                    target: "server",
+                                    "client {:?} requested tick control but it is already assigned",
+                                    con_id
+                                );
+                            }
                         }
 
                         let user_id = Self::user_id(&account_server_public_keys, &client.auth);
@@ -2452,10 +2499,6 @@ impl Server {
                             }),
                             con_id,
                         );
-                    }
-
-                    if assign_tick_controller {
-                        self.activate_tick_controller(con_id);
                     }
 
                     if check_vote {
@@ -2621,7 +2664,47 @@ impl Server {
                 }
                 if drives_tick_loop {
                     if let Some(max_tick) = max_tick_from_inputs {
-                        self.advance_tick_controller(con_id, max_tick);
+                        self.advance_tick_controller(con_id, max_tick, id);
+                    }
+                }
+            }
+            ClientToServerMessage::TickControllerReady => {
+                let wants_control = self
+                    .clients
+                    .clients
+                    .get(con_id)
+                    .map(|client| client.wants_tick_control)
+                    .unwrap_or(false);
+
+                if !wants_control {
+                    log::debug!(
+                        target: "server",
+                        "client {:?} reported tick control readiness without requesting control",
+                        con_id
+                    );
+                } else {
+                    let current_owner = self
+                        .tick_controller
+                        .as_ref()
+                        .map(|controller| controller.connection_id);
+
+                    match current_owner {
+                        None => {
+                            self.activate_tick_controller(con_id);
+                        }
+                        Some(owner) if owner == *con_id => {
+                            if let Some(client) = self.clients.clients.get_mut(con_id) {
+                                client.controls_tick_loop = true;
+                            }
+                        }
+                        Some(owner) => {
+                            log::warn!(
+                                target: "server",
+                                "client {:?} reported tick control readiness but controller is assigned to {:?}",
+                                con_id,
+                                owner
+                            );
+                        }
                     }
                 }
             }
@@ -3390,9 +3473,24 @@ impl Server {
                     );
                     break;
                 }
-                let gating_required =
-                    self.tick_controller.is_some() || self.config_game.sv.control_websocket_enabled;
-                if gating_required {
+                if self.tick_controller.is_some() {
+                    match self.control_bridge.try_acquire_tick() {
+                        TickGateAcquire::Granted => {
+                            // continue with tick execution
+                        }
+                        TickGateAcquire::Pending => {
+                            std::thread::sleep(Duration::from_millis(1));
+                            continue 'outer;
+                        }
+                        TickGateAcquire::Closed => {
+                            log::info!(
+                                target: "server",
+                                "stopping server tick loop due to control bridge request"
+                            );
+                            break 'outer;
+                        }
+                    }
+                } else if self.config_game.sv.control_websocket_enabled {
                     if !self.control_bridge.wait_for_tick() {
                         log::info!(
                             target: "server",

@@ -3641,6 +3641,9 @@ impl Client {
 
                             debug!("[NOT IMPLEMENTED] rcon auto login: {:?}", msg.rcon_secret);
                         }
+                        ClientToServerMessage::TickControllerReady => {
+                            // Legacy proxy does not forward tick control handshakes.
+                        }
                         ClientToServerMessage::AddLocalPlayer(ev) => {
                             if self.players.len() < 2
                                 || (self.connect_addr.ip().is_loopback()

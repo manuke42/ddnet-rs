@@ -124,6 +124,8 @@ pub struct ActiveGame {
     pub base: GameBase,
 
     pub send_input_every_tick: bool,
+    pub drive_tick_loop: bool,
+    pub tick_control_ready_sent: bool,
 
     #[cfg(unix)]
     pub frame_sender: Option<frame_sender::AvEncoder>,
@@ -195,6 +197,12 @@ impl ActiveGame {
         player_inputs: &FxLinkedHashMap<PlayerId, PoolVec<PlayerInputChainable>>,
         time: &SteadyClock,
     ) {
+        if self.drive_tick_loop && !self.tick_control_ready_sent {
+            self.network
+                .send_unordered_to_server(&ClientToServerMessage::TickControllerReady);
+            self.tick_control_ready_sent = true;
+        }
+
         if !player_inputs.is_empty()
             || (!self.send_input_every_tick && !self.game_data.snap_acks.is_empty())
         {

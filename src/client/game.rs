@@ -655,6 +655,8 @@ impl Game {
 
                         resource_download_server,
                         send_input_every_tick,
+                        drive_tick_loop: config_game.cl.drive_tick_loop,
+                        tick_control_ready_sent: false,
                         #[cfg(unix)]
                         frame_sender: None,
                         #[cfg(unix)]

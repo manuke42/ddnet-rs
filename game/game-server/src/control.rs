@@ -85,6 +85,13 @@ struct TickGateState {
     closed: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TickGateAcquire {
+    Granted,
+    Pending,
+    Closed,
+}
+
 impl TickGate {
     fn new() -> Self {
         Self {
@@ -106,6 +113,18 @@ impl TickGate {
         }
         guard.permits = guard.permits.saturating_sub(1);
         true
+    }
+
+    fn try_acquire(&self) -> TickGateAcquire {
+        let mut guard = self.inner.lock().unwrap();
+        if guard.closed {
+            return TickGateAcquire::Closed;
+        }
+        if guard.permits == 0 {
+            return TickGateAcquire::Pending;
+        }
+        guard.permits = guard.permits.saturating_sub(1);
+        TickGateAcquire::Granted
     }
 
     fn allow(&self, count: usize) {
@@ -166,6 +185,10 @@ impl ControlBridge {
 
     pub fn wait_for_tick(&self) -> bool {
         self.inner.gate.wait_for_tick()
+    }
+
+    pub fn try_acquire_tick(&self) -> TickGateAcquire {
+        self.inner.gate.try_acquire()
     }
 
     pub fn allow_ticks(&self, count: usize) {

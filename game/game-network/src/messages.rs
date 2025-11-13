@@ -195,6 +195,7 @@ pub enum ClientToServerMessage<'a> {
         inputs: MsgClInputs,
         snap_ack: PoolCow<'a, [MsgClSnapshotAck]>,
     },
+    TickControllerReady,
     LoadVotes(MsgClLoadVotes),
     AccountChangeName {
         new_name: NetworkReducedAsciiString<MAX_ACCOUNT_NAME_LEN>,
