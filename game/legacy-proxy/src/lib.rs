@@ -89,7 +89,7 @@ use libtw2_gamenet_ddnet::{
     snap_obj::{
         self, CHARACTERFLAG_WEAPON_GRENADE, CHARACTERFLAG_WEAPON_GUN, CHARACTERFLAG_WEAPON_HAMMER,
         CHARACTERFLAG_WEAPON_LASER, CHARACTERFLAG_WEAPON_SHOTGUN, Character, DdnetCharacter,
-        DdnetPlayer, obj_size,
+        DdnetPlayer, PROJECTILEFLAG_NORMALIZE_VEL, obj_size,
     },
 };
 use libtw2_net::net::PeerId;
@@ -1723,19 +1723,16 @@ impl Client {
                 SnapObj::DdnetProjectile(projectile) => {
                     let vel = if projectile.owner < 0 {
                         vec2::new(
-                            projectile.vel_x as f32 / 100000.0,
-                            projectile.vel_y as f32 / 100000.0,
+                            projectile.vel_x as f32 / 1000000.0,
+                            projectile.vel_y as f32 / 1000000.0,
                         )
+                    } else if (projectile.flags & PROJECTILEFLAG_NORMALIZE_VEL) != 0 {
+                        normalize(&vec2::new(projectile.vel_x as f32, projectile.vel_y as f32))
                     } else {
-                        const PROJECTILEFLAG_NORMALIZE_VEL: i32 = 1 << 4;
-                        if (projectile.flags & PROJECTILEFLAG_NORMALIZE_VEL) != 0 {
-                            normalize(&vec2::new(projectile.vel_x as f32, projectile.vel_y as f32))
-                        } else {
-                            vec2::new(
-                                projectile.vel_x as f32 / 100.0,
-                                projectile.vel_y as f32 / 100.0,
-                            )
-                        }
+                        vec2::new(
+                            projectile.vel_x as f32 / 100.0,
+                            projectile.vel_y as f32 / 100.0,
+                        )
                     };
                     add_proj(
                         snapshot,
