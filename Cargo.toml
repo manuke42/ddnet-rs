@@ -198,6 +198,7 @@ graphics-backend = { path = "lib/graphics-backend" }
 graphics-types = { path = "lib/graphics-types" }
 image-utils = { path = "lib/image-utils" }
 input-binds = { path = "lib/input-binds" }
+libc = "0.2"
 math = { path = "lib/math" }
 microphone = { path = "lib/microphone" }
 native = { path = "lib/native" }

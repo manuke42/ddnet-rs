@@ -44,7 +44,18 @@ fn show_message_box(title: &str, message: &str) {
     log::info!("[UNSUPPORTED] msg box: {title} {message}");
 }
 
+#[cfg(unix)]
+fn ignore_sigpipe() {
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_IGN);
+    }
+}
+
+#[cfg(not(unix))]
+fn ignore_sigpipe() {}
+
 fn main_impl(app: NativeApp) {
+    ignore_sigpipe();
     let _ = thread_priority::set_current_thread_priority(thread_priority::ThreadPriority::Max);
     let time = SteadyClock::start();
 

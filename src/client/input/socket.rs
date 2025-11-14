@@ -284,6 +284,7 @@ fn dispatch_event(event: SocketEvent, sender: &Sender<InputEv>) -> Result<bool> 
                 }))
             }
         }
+        SocketEvent::InputEnd => Some(InputEv::SocketBatchEnd(device)),
     };
 
     if let Some(event) = maybe_event {
@@ -319,12 +320,79 @@ fn wait_for_response(
 fn send_response(stream: &mut UnixStream, response: String) -> Result<()> {
     let mut data = response.into_bytes();
     data.push(b'\n');
-    stream
-        .write_all(&data)
+    write_all_nosigpipe(stream, &data)
         .context("failed to write response to input socket client")?;
     stream
         .flush()
         .context("failed to flush input socket response to client")
+}
+
+fn write_all_nosigpipe(stream: &UnixStream, buf: &[u8]) -> io::Result<()> {
+    #[cfg(any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "freebsd",
+        target_os = "dragonfly",
+        target_os = "netbsd",
+        target_os = "openbsd",
+    ))]
+    {
+        return write_all_nosigpipe_unix(stream, buf);
+    }
+
+    #[cfg(not(any(
+        target_os = "linux",
+        target_os = "android",
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "freebsd",
+        target_os = "dragonfly",
+        target_os = "netbsd",
+        target_os = "openbsd",
+    )))]
+    {
+        return stream.write_all(buf);
+    }
+}
+
+#[cfg(any(
+    target_os = "linux",
+    target_os = "android",
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "freebsd",
+    target_os = "dragonfly",
+    target_os = "netbsd",
+    target_os = "openbsd",
+))]
+fn write_all_nosigpipe_unix(stream: &UnixStream, mut buf: &[u8]) -> io::Result<()> {
+    use std::os::unix::io::AsRawFd;
+
+    while !buf.is_empty() {
+        let written = unsafe {
+            libc::send(
+                stream.as_raw_fd(),
+                buf.as_ptr() as *const libc::c_void,
+                buf.len(),
+                libc::MSG_NOSIGNAL,
+            )
+        };
+
+        if written == -1 {
+            let err = io::Error::last_os_error();
+            if err.kind() == io::ErrorKind::Interrupted {
+                continue;
+            }
+            return Err(err);
+        }
+
+        let written = written as usize;
+        buf = &buf[written..];
+    }
+
+    Ok(())
 }
 
 fn drain_responses(response_rx: &Receiver<String>) {
@@ -354,6 +422,7 @@ enum SocketEvent {
     Scroll {
         delta: f64,
     },
+    InputEnd,
 }
 
 #[derive(Debug, Deserialize)]

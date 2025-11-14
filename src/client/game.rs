@@ -12,7 +12,7 @@ use std::{
 #[cfg(unix)]
 use std::path::PathBuf;
 
-use active::ActiveGame;
+use active::{ActiveGame, TickLoopPhase};
 use anyhow::anyhow;
 use base::{
     hash::Hash,
@@ -657,6 +657,10 @@ impl Game {
                         send_input_every_tick,
                         drive_tick_loop: config_game.cl.drive_tick_loop,
                         tick_control_ready_sent: false,
+                        tick_loop_phase: TickLoopPhase::AwaitReady,
+                        tick_loop_input_dispatched: false,
+                        tick_loop_output_consumed: true,
+                        pending_socket_batch_done: false,
                         #[cfg(unix)]
                         frame_sender: None,
                         #[cfg(unix)]

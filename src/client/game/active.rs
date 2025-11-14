@@ -74,6 +74,14 @@ use super::{
     types::{GameBase, GameConnect, GameMsgPipeline, GameNetwork},
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TickLoopPhase {
+    AwaitReady,
+    Input,
+    WaitingForServer,
+    Output,
+}
+
 pub struct ActiveGame {
     pub network: GameNetwork,
 
@@ -126,6 +134,10 @@ pub struct ActiveGame {
     pub send_input_every_tick: bool,
     pub drive_tick_loop: bool,
     pub tick_control_ready_sent: bool,
+    pub tick_loop_phase: TickLoopPhase,
+    pub tick_loop_input_dispatched: bool,
+    pub tick_loop_output_consumed: bool,
+    pub pending_socket_batch_done: bool,
 
     #[cfg(unix)]
     pub frame_sender: Option<frame_sender::AvEncoder>,
@@ -134,6 +146,121 @@ pub struct ActiveGame {
 }
 
 impl ActiveGame {
+    pub fn allows_input_handling(&self) -> bool {
+        !self.drive_tick_loop || matches!(self.tick_loop_phase, TickLoopPhase::Input)
+    }
+
+    pub fn register_socket_batch_done(&mut self, done: bool) {
+        if self.drive_tick_loop && done {
+            self.pending_socket_batch_done = true;
+        }
+    }
+
+    pub fn drive_tick_loop_step(&mut self, cur_time: Duration, time: &SteadyClock) {
+        if !self.drive_tick_loop {
+            return;
+        }
+
+        match self.tick_loop_phase {
+            TickLoopPhase::AwaitReady => {
+                if self.ready_for_input_phase() {
+                    self.enter_input_phase();
+                }
+            }
+            TickLoopPhase::Input => {
+                if self.tick_loop_input_dispatched {
+                    return;
+                }
+                let should_send = self.pending_socket_batch_done || self.has_unsent_input_changes();
+                if should_send
+                    && let Some(tick_of_inp) = self.dispatch_next_tick_input(cur_time, time)
+                {
+                    self.record_local_inputs_for_tick(tick_of_inp);
+                    self.ensure_future_input_slot(tick_of_inp + 1);
+                    self.tick_loop_phase = TickLoopPhase::WaitingForServer;
+                    self.tick_loop_input_dispatched = true;
+                    self.pending_socket_batch_done = false;
+                }
+            }
+            TickLoopPhase::WaitingForServer | TickLoopPhase::Output => {}
+        }
+    }
+
+    pub fn complete_output_phase(&mut self) {
+        if !self.drive_tick_loop {
+            return;
+        }
+        if matches!(self.tick_loop_phase, TickLoopPhase::Output) && !self.tick_loop_output_consumed
+        {
+            self.tick_loop_output_consumed = true;
+            self.enter_input_phase();
+        }
+    }
+
+    fn ready_for_input_phase(&self) -> bool {
+        self.game_data.handled_snap_id.is_some()
+            && self.game_data.local.active_local_player().is_some()
+    }
+
+    fn enter_input_phase(&mut self) {
+        self.tick_loop_phase = TickLoopPhase::Input;
+        self.tick_loop_input_dispatched = false;
+    }
+
+    fn has_unsent_input_changes(&self) -> bool {
+        self.game_data
+            .local
+            .local_players
+            .values()
+            .any(|player| player.input != player.sent_input)
+    }
+
+    fn dispatch_next_tick_input(
+        &mut self,
+        cur_time: Duration,
+        time: &SteadyClock,
+    ) -> Option<GameTickType> {
+        let tick_of_inp = self.map.game.predicted_game_monotonic_tick + 1;
+        let mut player_inputs = self.player_inputs_pool.new();
+
+        self.game_data.get_and_update_latest_input(
+            cur_time,
+            Duration::ZERO,
+            1,
+            tick_of_inp,
+            &mut player_inputs,
+            &self.player_inputs_chainable_pool,
+            true,
+        );
+
+        if player_inputs.is_empty() {
+            return None;
+        }
+
+        self.send_input(&player_inputs, time);
+        Some(tick_of_inp)
+    }
+
+    fn record_local_inputs_for_tick(&mut self, tick_of_inp: GameTickType) {
+        let input_per_tick = &mut self.game_data.input_per_tick;
+        if !input_per_tick.contains_key(&tick_of_inp) {
+            input_per_tick.insert(tick_of_inp, self.game_data.player_inp_pool.new());
+        }
+        if let Some(per_tick) = input_per_tick.get_mut(&tick_of_inp) {
+            for (player_id, local_player) in self.game_data.local.local_players.iter() {
+                per_tick.insert(*player_id, local_player.sent_input);
+            }
+        }
+    }
+
+    fn ensure_future_input_slot(&mut self, tick: GameTickType) {
+        if !self.game_data.input_per_tick.contains_key(&tick) {
+            self.game_data
+                .input_per_tick
+                .insert(tick, self.game_data.player_inp_pool.new());
+        }
+    }
+
     #[cfg(unix)]
     pub fn ensure_frame_sender(
         &mut self,
@@ -673,6 +800,12 @@ impl ActiveGame {
                 let time_diff = tick_diff * tick_time.as_secs_f64() + time_diff;
 
                 prediction_timer.add_snap(time_diff, timestamp);
+
+                if self.drive_tick_loop {
+                    self.tick_loop_phase = TickLoopPhase::Output;
+                    self.tick_loop_output_consumed = false;
+                    self.tick_loop_input_dispatched = false;
+                }
             }
             ServerToClientMessage::Events {
                 events,

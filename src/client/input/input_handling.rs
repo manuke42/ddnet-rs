@@ -59,6 +59,8 @@ pub struct InputAxisMoveEv {
 pub enum InputEv {
     Key(InputKeyEv),
     Move(InputAxisMoveEv),
+    #[cfg(unix)]
+    SocketBatchEnd(DeviceId),
 }
 
 impl InputEv {
@@ -66,6 +68,8 @@ impl InputEv {
         match self {
             InputEv::Key(ev) => &ev.device,
             InputEv::Move(ev) => &ev.device,
+            #[cfg(unix)]
+            InputEv::SocketBatchEnd(device) => device,
         }
     }
 }
@@ -135,6 +139,8 @@ pub struct InputHandling {
     bind_cmds: HashMap<&'static str, BindActionsLocalPlayer>,
     #[cfg(unix)]
     socket_response_tx: Option<Sender<String>>,
+    #[cfg(unix)]
+    socket_input_batch_done: bool,
 }
 
 impl InputHandling {
@@ -162,6 +168,8 @@ impl InputHandling {
             bind_cmds,
             #[cfg(unix)]
             socket_response_tx: None,
+            #[cfg(unix)]
+            socket_input_batch_done: false,
         }
     }
 
@@ -185,9 +193,23 @@ impl InputHandling {
     #[instrument(level = "trace", skip_all)]
     fn drain_external_events(&mut self) {
         while let Ok(event) = self.external_events_rx.try_recv() {
+            #[cfg(unix)]
+            if matches!(event, InputEv::SocketBatchEnd(_)) {
+                self.socket_input_batch_done = true;
+                continue;
+            }
             self.inp.evs.push(event);
         }
     }
+
+    #[cfg(unix)]
+    fn register_hardware_batch(&mut self, device: DeviceId) {
+        self.socket_input_batch_done = true;
+        self.inp.evs.push(InputEv::SocketBatchEnd(device));
+    }
+
+    #[cfg(not(unix))]
+    fn register_hardware_batch(&mut self, _device: DeviceId) {}
 
     #[instrument(level = "trace", skip_all)]
     pub fn collect_events(&mut self) {
@@ -203,6 +225,11 @@ impl InputHandling {
     #[cfg(unix)]
     pub fn clear_socket_responder(&mut self) {
         self.socket_response_tx = None;
+    }
+
+    #[cfg(unix)]
+    pub fn take_socket_batch_done(&mut self) -> bool {
+        std::mem::take(&mut self.socket_input_batch_done)
     }
 
     #[cfg(unix)]
@@ -885,6 +912,8 @@ impl InputHandling {
                     );
                 }
                 InputEv::Move(_) => {}
+                #[cfg(unix)]
+                InputEv::SocketBatchEnd(_) => {}
             }
         }
     }
@@ -1030,6 +1059,8 @@ impl InputHandling {
                         InputEv::Move(_) => {
                             // else ignore mouse movement
                         }
+                        #[cfg(unix)]
+                        InputEv::SocketBatchEnd(_) => return false,
                     }
 
                     let Some((_, local_player)) = game_data.local.active_local_player_mut() else {
@@ -1073,6 +1104,7 @@ impl InputHandling {
             is_down: true,
             device: *device,
         }));
+        self.register_hardware_batch(*device);
     }
 
     pub fn key_up(
@@ -1086,6 +1118,7 @@ impl InputHandling {
             is_down: false,
             device: *device,
         }));
+        self.register_hardware_batch(*device);
     }
 
     pub fn mouse_down(
@@ -1101,6 +1134,7 @@ impl InputHandling {
             is_down: true,
             device: *device,
         }));
+        self.register_hardware_batch(*device);
     }
 
     pub fn mouse_up(
@@ -1116,6 +1150,7 @@ impl InputHandling {
             is_down: false,
             device: *device,
         }));
+        self.register_hardware_batch(*device);
     }
 
     pub fn mouse_move(
@@ -1131,7 +1166,8 @@ impl InputHandling {
             device: *device,
             xrel,
             yrel,
-        }))
+        }));
+        self.register_hardware_batch(*device);
     }
 
     pub fn scroll(
@@ -1165,6 +1201,7 @@ impl InputHandling {
             is_down: false,
             device: *device,
         }));
+        self.register_hardware_batch(*device);
     }
 
     fn consumable_event(event: &native::native::WindowEvent) -> bool {

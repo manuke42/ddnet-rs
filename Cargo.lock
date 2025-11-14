@@ -2866,6 +2866,7 @@ dependencies = [
  "image-utils",
  "input-binds",
  "legacy-proxy",
+ "libc",
  "log 0.4.28",
  "map",
  "math",
