@@ -209,4 +209,9 @@ pub enum ClientToServerMessage<'a> {
     /// Notify the server that the clients wants no
     /// more spatial chat packets.
     SpatialChatDeactivated,
+    /// Deterministic stepping signal issued by the client.
+    DeterministicStep {
+        /// Number of ticks the server is allowed to simulate.
+        ticks: u32,
+    },
 }

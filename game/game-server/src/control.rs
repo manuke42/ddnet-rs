@@ -168,6 +168,10 @@ impl ControlBridge {
         self.inner.gate.wait_for_tick()
     }
 
+    pub fn allow_ticks(&self, count: usize) {
+        self.inner.gate.allow(count);
+    }
+
     pub fn take_inputs(&self) -> Vec<PlayerControlMessage> {
         let mut guard = self.inner.queue.lock().unwrap();
         guard.drain(..).collect()

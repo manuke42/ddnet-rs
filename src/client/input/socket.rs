@@ -18,7 +18,7 @@ use native::native::{DeviceId, KeyCode, MouseButton, PhysicalKey};
 use serde::Deserialize;
 use serde_json;
 
-use super::input_handling::{InputAxisMoveEv, InputEv, InputKeyEv};
+use super::input_handling::{InputAxisMoveEv, InputControlCommand, InputEv, InputKeyEv};
 use base::join_thread::JoinThread;
 
 #[derive(Debug)]
@@ -284,6 +284,9 @@ fn dispatch_event(event: SocketEvent, sender: &Sender<InputEv>) -> Result<bool> 
                 }))
             }
         }
+        SocketEvent::InputEnd { ticks } => {
+            Some(InputEv::Control(InputControlCommand::FlushInputs { ticks }))
+        }
     };
 
     if let Some(event) = maybe_event {
@@ -353,6 +356,10 @@ enum SocketEvent {
     },
     Scroll {
         delta: f64,
+    },
+    InputEnd {
+        #[serde(default)]
+        ticks: Option<u32>,
     },
 }
 

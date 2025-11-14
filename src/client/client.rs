@@ -1,6 +1,6 @@
 use std::{
-    borrow::Borrow, cell::RefCell, net::SocketAddr, num::NonZeroUsize, path::PathBuf, rc::Rc,
-    sync::Arc, time::Duration,
+    borrow::Borrow, cell::RefCell, collections::VecDeque, net::SocketAddr, num::NonZeroUsize,
+    path::PathBuf, rc::Rc, sync::Arc, time::Duration,
 };
 
 use anyhow::anyhow;
@@ -75,7 +75,7 @@ use ddnet_info_proxy::DdnetInfoProxy;
 use demo::recorder::DemoRecorder;
 use editor::editor::{EditorInterface, EditorResult};
 use egui::{CursorIcon, FontDefinitions};
-use game_config::config::{Config, ConfigGame, ConfigMap};
+use game_config::config::{Config, ConfigClient, ConfigGame, ConfigMap};
 use graphics::graphics::graphics::Graphics;
 use graphics_backend::{
     backend::{
@@ -170,12 +170,12 @@ use game_network::messages::{ClientToServerMessage, ClientToServerPlayerMessage}
 use super::input::socket::InputSocketServer;
 use super::{
     game::{
+        active::ActiveGame,
         data::{ClientConnectedPlayer, GameData},
         types::{DisconnectAutoCleanup, GameBase, GameConnect, GameMsgPipeline},
     },
     game_events::{GameEventPipeline, GameEventsClient},
     input::input_handling::{InputEv, InputHandling, InputHandlingEvent},
-    localplayer::ClientPlayerInputPerTick,
     overlays::client_stats::{ClientStats, ClientStatsRenderPipe, DebugHudRenderPipe},
     spatial_chat::spatial_chat::{self, SpatialChatGameWorldTy, SpatialChatGameWorldTyRef},
 };
@@ -436,6 +436,8 @@ struct ClientNativeImpl {
     #[cfg(feature = "auto_updater")]
     auto_updater: Option<auto_updater::AutoUpdater>,
 
+    deterministic: DeterministicRuntime,
+
     // put graphics at the end, so it's dropped last
     graphics: Graphics,
     graphics_backend: Rc<GraphicsBackend>,
@@ -549,6 +551,50 @@ impl ClientNativeImpl {
     fn on_msaa_change(&mut self) {
         self.graphics
             .multi_sampling(self.config.engine.gl.msaa_samples);
+    }
+
+    fn store_local_inputs(game: &mut ActiveGame, tick_of_inp: GameTickType) {
+        let tick_inps = &mut game.game_data.input_per_tick;
+        if !tick_inps.contains_key(&tick_of_inp) {
+            tick_inps.insert(tick_of_inp, game.game_data.player_inp_pool.new());
+        }
+
+        game.game_data
+            .local
+            .local_players
+            .iter()
+            .for_each(|(local_player_id, local_player)| {
+                let player_inp = tick_inps.get_mut(&tick_of_inp).unwrap();
+                player_inp.insert(*local_player_id, local_player.sent_input);
+            });
+    }
+
+    fn flush_player_inputs(
+        cur_time: Duration,
+        game: &mut ActiveGame,
+        time: &mut SteadyClock,
+        time_per_tick: Duration,
+        ticks_to_send: GameTickType,
+        tick_of_inp: GameTickType,
+    ) -> bool {
+        if ticks_to_send == 0 {
+            return false;
+        }
+
+        let mut player_inputs = game.player_inputs_pool.new();
+        game.game_data.get_and_update_latest_input(
+            cur_time,
+            time_per_tick,
+            ticks_to_send,
+            tick_of_inp,
+            &mut player_inputs,
+            &game.player_inputs_chainable_pool,
+            game.send_input_every_tick,
+        );
+
+        game.send_input(&player_inputs, time);
+        Self::store_local_inputs(game, tick_of_inp);
+        true
     }
 
     #[instrument(level = "trace", skip_all)]
@@ -1447,6 +1493,7 @@ impl ClientNativeImpl {
                             .filter_map(|ev| match ev {
                                 InputEv::Key(ev) => ev.is_down.then_some(ev.key),
                                 InputEv::Move(_) => None,
+                                InputEv::Control(_) => None,
                             })
                             .collect(),
                     });
@@ -3020,6 +3067,8 @@ impl FromNativeLoadingImpl<ClientNativeLoadingImpl> for GraphicsApp<ClientNative
 
         local_console.ui.ui_state.is_ui_open = false;
 
+        let deterministic_runtime = DeterministicRuntime::new(&loading.config_game.cl);
+
         let mut client = GraphicsApp::new(ClientNativeImpl {
             #[cfg(feature = "auto_updater")]
             auto_updater: loading.config_game.cl.auto_updater.then(|| {
@@ -3099,6 +3148,8 @@ impl FromNativeLoadingImpl<ClientNativeLoadingImpl> for GraphicsApp<ClientNative
             last_known_player_x: None,
 
             legacy_proxy_thread: None,
+
+            deterministic: deterministic_runtime,
 
             // pools & helpers
             string_pool: Pool::with_sized(256, || String::with_capacity(256)), // TODO: random values rn
@@ -3328,6 +3379,22 @@ impl AppWithGraphics for ClientNativeImpl {
             && !self.game.remote_console_open()
             && !self.editor.is_open()
             && self.demo_player.is_none();
+
+        let deterministic_enabled = self.deterministic.is_enabled();
+        let has_running_game = matches!(
+            self.game,
+            Game::Active(_) | Game::WaitingForFirstSnapshot(_)
+        );
+        if deterministic_enabled {
+            let ready = self.game.deterministic_ready();
+            self.deterministic.update_ready(ready, has_running_game);
+            if self.game.take_deterministic_snapshot_ready() {
+                self.deterministic.mark_snapshot_received();
+            }
+        } else {
+            self.deterministic.reset();
+        }
+
         if let Game::Active(game) = &mut self.game {
             #[cfg(unix)]
             if self.input_socket.is_none() && !self.input_socket_failed {
@@ -3380,7 +3447,10 @@ impl AppWithGraphics for ClientNativeImpl {
                     .fill_misc_votes(game.game_data.misc_votes.clone());
             }
 
-            if has_input {
+            let allow_input_collection = has_input
+                && (!deterministic_enabled || self.deterministic.allows_input_collection());
+
+            if allow_input_collection {
                 let evs = self.inp_manager.handle_player_binds(
                     &mut game.game_data,
                     &mut self.ui_manager.ui,
@@ -3453,9 +3523,14 @@ impl AppWithGraphics for ClientNativeImpl {
                                 )),
                             );
                         }
+                        InputHandlingEvent::DeterministicFlush { ticks } => {
+                            self.deterministic.enqueue_flush(ticks);
+                        }
                     }
                 }
+            }
 
+            if has_input {
                 let player = game.game_data.local.active_local_player();
                 let needs_abs_cursor = player
                     .and_then(|(id, client_player)| {
@@ -3488,209 +3563,251 @@ impl AppWithGraphics for ClientNativeImpl {
                 );
             }
 
-            game.game_data.prediction_timer.add_frametime(
-                self.cur_time.saturating_sub(game.game_data.last_frame_time),
-                self.cur_time,
-            );
+            let frame_delta = self.cur_time.saturating_sub(game.game_data.last_frame_time);
+            let freeze_prediction = deterministic_enabled && self.deterministic.freeze_prediction();
+            if !freeze_prediction {
+                game.game_data
+                    .prediction_timer
+                    .add_frametime(frame_delta, self.cur_time);
+            }
             game.game_data.last_frame_time = self.cur_time;
-            let game_state = &mut game.map.game;
-
-            let tick_of_inp = game_state.predicted_game_monotonic_tick + 1;
-            let ticks_per_second = game_state.game_tick_speed();
-
-            let mut player_inputs = game.player_inputs_pool.new();
+            let (tick_of_inp, ticks_per_second) = {
+                let game_state = &game.map.game;
+                (
+                    game_state.predicted_game_monotonic_tick + 1,
+                    game_state.game_tick_speed(),
+                )
+            };
 
             let time_per_tick = Duration::from_nanos(
                 (Duration::from_secs(1).as_nanos() / ticks_per_second.get() as u128) as u64,
             );
-            let ticks_to_send = game
-                .game_data
-                .prediction_timer
-                .time_units_to_respect(time_per_tick, 7.try_into().unwrap())
-                as GameTickType;
-            game.game_data.get_and_update_latest_input(
-                self.cur_time,
-                time_per_tick,
-                ticks_to_send,
-                tick_of_inp,
-                &mut player_inputs,
-                &game.player_inputs_chainable_pool,
-                game.send_input_every_tick,
-            );
+            let ticks_to_send = if freeze_prediction {
+                0
+            } else {
+                game.game_data
+                    .prediction_timer
+                    .time_units_to_respect(time_per_tick, 7.try_into().unwrap())
+                    as GameTickType
+            };
 
-            game.send_input(&player_inputs, time);
-            let game_state = &mut game.map.game;
-            // save the current input of all users for possible recalculations later
-            let tick_inps = &mut game.game_data.input_per_tick;
-
-            let add_input =
-                |tick_of_inp: GameTickType, input_per_tick: &mut ClientPlayerInputPerTick| {
-                    if !input_per_tick.contains_key(&tick_of_inp) {
-                        input_per_tick.insert(tick_of_inp, game.game_data.player_inp_pool.new());
-                    }
-
-                    // apply input of local player to player
-                    game.game_data.local.local_players.iter().for_each(
-                        |(local_player_id, local_player)| {
-                            let player_inp = input_per_tick.get_mut(&tick_of_inp).unwrap();
-                            player_inp.insert(*local_player_id, local_player.sent_input);
-                        },
+            let mut deterministic_step_ticks = None;
+            if deterministic_enabled {
+                if let Some(flush) = self.deterministic.take_pending_flush() {
+                    let flush_ticks = flush.ticks;
+                    Self::flush_player_inputs(
+                        self.cur_time,
+                        game,
+                        time,
+                        time_per_tick,
+                        1,
+                        tick_of_inp,
                     );
-                };
-            add_input(tick_of_inp, tick_inps);
-
-            let time_for_prediction = self.cur_time;
-
-            let instant_input = self.config.game.cl.instant_input;
-            // Reset the game state if needed
-            if instant_input && let Some(cur_state_snap) = game.game_data.cur_state_snap.take() {
-                let _ = game_state.build_from_snapshot(&cur_state_snap);
+                    self.deterministic.mark_inputs_submitted(flush);
+                    deterministic_step_ticks = Some(flush_ticks);
+                }
+            } else {
+                Self::flush_player_inputs(
+                    self.cur_time,
+                    game,
+                    time,
+                    time_per_tick,
+                    ticks_to_send,
+                    tick_of_inp,
+                );
             }
 
-            #[instrument(level = "trace", skip_all)]
-            fn apply_input(
-                predicted_game_monotonic_tick: GameTickType,
-                tick_inps: &mut FxLinkedHashMap<u64, PoolFxLinkedHashMap<PlayerId, PlayerInput>>,
-                fallback_to_prev_input: bool,
-                mut on_apply: impl FnMut(&PlayerId, &PlayerInput, CharacterInputConsumableDiff),
-            ) {
-                let tick_of_inp = predicted_game_monotonic_tick + 1;
-                let (next_input, prev_input) = (
-                    tick_inps.get(&tick_of_inp).or_else(|| {
-                        tick_inps
-                            .iter()
-                            .rev()
-                            .find_map(|(&tick, inp)| (tick <= tick_of_inp).then_some(inp))
-                    }),
-                    tick_inps.get(&predicted_game_monotonic_tick),
-                );
-                let check_input = if fallback_to_prev_input {
-                    next_input.or(prev_input)
-                } else {
-                    next_input
-                };
-                if let Some(inputs) = check_input {
-                    for (id, tick_inp) in inputs.iter() {
-                        let mut inp = PlayerInput::default();
-                        if let Some(prev_inp) =
-                            prev_input.or(next_input).and_then(|inp| inp.get(id))
-                        {
-                            inp.inp = prev_inp.inp;
-                        }
-                        if let Some(diff) =
-                            inp.try_overwrite(&tick_inp.inp, tick_inp.version(), true)
-                        {
-                            on_apply(id, tick_inp, diff);
+            if let Some(ticks) = deterministic_step_ticks {
+                game.network
+                    .send_unordered_to_server(&ClientToServerMessage::DeterministicStep { ticks });
+            }
+
+            if freeze_prediction {
+                game.game_data.intra_tick_time = Duration::ZERO;
+            } else {
+                let time_for_prediction = self.cur_time;
+
+                let instant_input = self.config.game.cl.instant_input;
+                // Reset the game state if needed
+                if instant_input {
+                    if let Some(cur_state_snap) = game.game_data.cur_state_snap.take() {
+                        let game_state = &mut game.map.game;
+                        let _ = game_state.build_from_snapshot(&cur_state_snap);
+                    }
+                }
+
+                #[instrument(level = "trace", skip_all)]
+                fn apply_input(
+                    predicted_game_monotonic_tick: GameTickType,
+                    tick_inps: &mut FxLinkedHashMap<
+                        u64,
+                        PoolFxLinkedHashMap<PlayerId, PlayerInput>,
+                    >,
+                    fallback_to_prev_input: bool,
+                    mut on_apply: impl FnMut(&PlayerId, &PlayerInput, CharacterInputConsumableDiff),
+                ) {
+                    let tick_of_inp = predicted_game_monotonic_tick + 1;
+                    let (next_input, prev_input) = (
+                        tick_inps.get(&tick_of_inp).or_else(|| {
+                            tick_inps
+                                .iter()
+                                .rev()
+                                .find_map(|(&tick, inp)| (tick <= tick_of_inp).then_some(inp))
+                        }),
+                        tick_inps.get(&predicted_game_monotonic_tick),
+                    );
+                    let check_input = if fallback_to_prev_input {
+                        next_input.or(prev_input)
+                    } else {
+                        next_input
+                    };
+                    if let Some(inputs) = check_input {
+                        for (id, tick_inp) in inputs.iter() {
+                            let mut inp = PlayerInput::default();
+                            if let Some(prev_inp) =
+                                prev_input.or(next_input).and_then(|inp| inp.get(id))
+                            {
+                                inp.inp = prev_inp.inp;
+                            }
+                            if let Some(diff) =
+                                inp.try_overwrite(&tick_inp.inp, tick_inp.version(), true)
+                            {
+                                on_apply(id, tick_inp, diff);
+                            }
                         }
                     }
                 }
-            }
 
-            // do the ticks if necessary
-            while is_next_tick(
-                time_for_prediction,
-                &mut game.game_data.last_game_tick,
-                ticks_per_second,
-            ) {
-                // apply input of players
-                let mut inps = game.game_data.player_inputs_state_pool.new();
-                apply_input(
-                    game_state.predicted_game_monotonic_tick,
-                    tick_inps,
-                    false,
-                    |id, tick_inp, diff| {
-                        inps.insert(
-                            *id,
-                            CharacterInputInfo {
-                                inp: tick_inp.inp,
-                                diff,
-                            },
-                        );
-                    },
-                );
-                let cur_snap = game_state.snapshot_for(SnapshotClientInfo::Everything);
-                game_state.build_from_snapshot_for_prev(&cur_snap);
+                // do the ticks if necessary
+                while is_next_tick(
+                    time_for_prediction,
+                    &mut game.game_data.last_game_tick,
+                    ticks_per_second,
+                ) {
+                    let next_tick_to_store = {
+                        // apply input of players
+                        let mut inps = game.game_data.player_inputs_state_pool.new();
+                        {
+                            let game_state = &mut game.map.game;
+                            {
+                                let tick_inps = &mut game.game_data.input_per_tick;
+                                apply_input(
+                                    game_state.predicted_game_monotonic_tick,
+                                    tick_inps,
+                                    false,
+                                    |id, tick_inp, diff| {
+                                        inps.insert(
+                                            *id,
+                                            CharacterInputInfo {
+                                                inp: tick_inp.inp,
+                                                diff,
+                                            },
+                                        );
+                                    },
+                                );
+                            }
+                            let cur_snap = game_state.snapshot_for(SnapshotClientInfo::Everything);
+                            game_state.build_from_snapshot_for_prev(&cur_snap);
 
-                game_state.set_player_inputs(inps);
-                game_state.predicted_game_monotonic_tick += 1;
-                game_state.tick(Default::default());
+                            game_state.set_player_inputs(inps);
+                            game_state.predicted_game_monotonic_tick += 1;
+                            game_state.tick(Default::default());
 
-                // Update the cached character infos
-                game.game_data.cached_character_infos = game_state.collect_characters_info();
+                            // Update the cached character infos
+                            game.game_data.cached_character_infos =
+                                game_state.collect_characters_info();
 
-                Server::dbg_game(
-                    &self.config.game.dbg,
-                    &game.game_data.last_game_tick,
-                    game_state,
-                    tick_inps
-                        .get(&game_state.predicted_game_monotonic_tick)
-                        .map(|inps| inps.values().map(|inp| &inp.inp)),
-                    game_state.predicted_game_monotonic_tick,
-                    ticks_per_second.get(),
-                    &self.shared_info,
-                    "client",
-                );
+                            {
+                                let tick_inps = &mut game.game_data.input_per_tick;
+                                Server::dbg_game(
+                                    &self.config.game.dbg,
+                                    &game.game_data.last_game_tick,
+                                    game_state,
+                                    tick_inps
+                                        .get(&game_state.predicted_game_monotonic_tick)
+                                        .map(|inps| inps.values().map(|inp| &inp.inp)),
+                                    game_state.predicted_game_monotonic_tick,
+                                    ticks_per_second.get(),
+                                    &self.shared_info,
+                                    "client",
+                                );
+                            }
 
-                let mut player_ids = game.game_data.player_ids_pool.new();
-                player_ids.extend(game.game_data.local.local_players.keys());
-                let events = game_state.events_for(EventClientInfo {
-                    client_player_ids: player_ids,
-                    everything: true,
-                    other_stages: true,
-                });
-                if !events.is_empty() {
-                    game.events
-                        .entry((game_state.predicted_game_monotonic_tick, true))
-                        .or_insert_with(|| events);
+                            let mut player_ids = game.game_data.player_ids_pool.new();
+                            player_ids.extend(game.game_data.local.local_players.keys());
+                            let events = game_state.events_for(EventClientInfo {
+                                client_player_ids: player_ids,
+                                everything: true,
+                                other_stages: true,
+                            });
+                            if !events.is_empty() {
+                                game.events
+                                    .entry((game_state.predicted_game_monotonic_tick, true))
+                                    .or_insert_with(|| events);
+                            }
+                            game_state.clear_events();
+
+                            game_state.predicted_game_monotonic_tick + 1
+                        }
+                    };
+
+                    // add a "dummy" input for the next tick already, since in a bad
+                    // case this while-loop might run again
+                    Self::store_local_inputs(game, next_tick_to_store);
                 }
-                game_state.clear_events();
 
-                // add a "dummy" input for the next tick already, since in a bad
-                // case this while-loop might run again
-                add_input(game_state.predicted_game_monotonic_tick + 1, tick_inps);
-            }
-
-            // next intra tick time
-            game.game_data.intra_tick_time = intra_tick_time(
-                self.cur_time,
-                game.game_data.last_game_tick,
-                ticks_per_second,
-            );
-
-            if instant_input {
-                let cur_state_snap = game_state.snapshot_for(SnapshotClientInfo::Everything);
-                game_state.build_from_snapshot_for_prev(&cur_state_snap);
-                game.game_data.cur_state_snap = Some(cur_state_snap);
-
-                // there is always a prediction tick
-                // apply input of players for it as if it's the next tick
-                let mut pred_inps = game.game_data.player_inputs_state_pool.new();
-                apply_input(
-                    game_state.predicted_game_monotonic_tick,
-                    tick_inps,
-                    true,
-                    |id, tick_inp, diff| {
-                        pred_inps.insert(
-                            *id,
-                            CharacterInputInfo {
-                                inp: tick_inp.inp,
-                                diff,
-                            },
-                        );
-                    },
+                // next intra tick time
+                game.game_data.intra_tick_time = intra_tick_time(
+                    self.cur_time,
+                    game.game_data.last_game_tick,
+                    ticks_per_second,
                 );
-                game_state.set_player_inputs(pred_inps);
-                game_state.tick(TickOptions {
-                    is_future_tick_prediction: true,
-                });
-                game_state.clear_events();
-            }
 
-            game.game_data.last_game_tick = Duration::from_secs_f64(
-                (game.game_data.last_game_tick.as_secs_f64()
-                    + game.game_data.prediction_timer.smooth_adjustment_time())
-                .clamp(0.0, f64::MAX),
-            );
+                if instant_input {
+                    let cur_state_snap = {
+                        let game_state = &mut game.map.game;
+                        let snap = game_state.snapshot_for(SnapshotClientInfo::Everything);
+                        game_state.build_from_snapshot_for_prev(&snap);
+                        snap
+                    };
+                    game.game_data.cur_state_snap = Some(cur_state_snap);
+
+                    // there is always a prediction tick
+                    // apply input of players for it as if it's the next tick
+                    let mut pred_inps = game.game_data.player_inputs_state_pool.new();
+                    {
+                        let game_state = &mut game.map.game;
+                        {
+                            let tick_inps = &mut game.game_data.input_per_tick;
+                            apply_input(
+                                game_state.predicted_game_monotonic_tick,
+                                tick_inps,
+                                true,
+                                |id, tick_inp, diff| {
+                                    pred_inps.insert(
+                                        *id,
+                                        CharacterInputInfo {
+                                            inp: tick_inp.inp,
+                                            diff,
+                                        },
+                                    );
+                                },
+                            );
+                        }
+                        game_state.set_player_inputs(pred_inps);
+                        game_state.tick(TickOptions {
+                            is_future_tick_prediction: true,
+                        });
+                        game_state.clear_events();
+                    }
+                }
+
+                game.game_data.last_game_tick = Duration::from_secs_f64(
+                    (game.game_data.last_game_tick.as_secs_f64()
+                        + game.game_data.prediction_timer.smooth_adjustment_time())
+                    .clamp(0.0, f64::MAX),
+                );
+            }
         }
 
         #[cfg(feature = "auto_updater")]
@@ -3710,6 +3827,8 @@ impl AppWithGraphics for ClientNativeImpl {
 
         #[cfg(unix)]
         self.flush_socket_responses();
+
+        self.deterministic.finish_output();
 
         self.spatial_chat.update(
             &self.scene,
@@ -3797,5 +3916,109 @@ impl AppWithGraphics for ClientNativeImpl {
         if let EditorState::Open(editor) = &mut self.editor {
             editor.file_hovered(file);
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DeterministicFlushRequest {
+    ticks: u32,
+}
+
+struct DeterministicRuntime {
+    enabled: bool,
+    queue: VecDeque<DeterministicFlushRequest>,
+    local_ready: bool,
+    pending_step: Option<DeterministicFlushRequest>,
+    snapshot_ready: bool,
+}
+
+impl DeterministicRuntime {
+    fn new(config: &ConfigClient) -> Self {
+        Self {
+            enabled: config.deterministic_mode,
+            queue: VecDeque::new(),
+            local_ready: false,
+            pending_step: None,
+            snapshot_ready: false,
+        }
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    fn reset(&mut self) {
+        self.local_ready = false;
+        self.queue.clear();
+        self.pending_step = None;
+        self.snapshot_ready = false;
+    }
+
+    fn update_ready(&mut self, ready: bool, has_game: bool) {
+        if !self.enabled {
+            return;
+        }
+        if !has_game {
+            self.reset();
+            return;
+        }
+        self.local_ready = ready;
+    }
+
+    fn enqueue_flush(&mut self, ticks: Option<u32>) {
+        if !self.enabled {
+            return;
+        }
+        let ticks = ticks.unwrap_or(1).max(1);
+        self.queue.push_back(DeterministicFlushRequest { ticks });
+    }
+
+    fn take_pending_flush(&mut self) -> Option<DeterministicFlushRequest> {
+        if !self.enabled {
+            return None;
+        }
+        if !self.allows_input_collection() {
+            return None;
+        }
+        self.queue.pop_front()
+    }
+
+    fn allows_input_collection(&self) -> bool {
+        if !self.enabled {
+            return true;
+        }
+        self.local_ready && self.pending_step.is_none() && !self.snapshot_ready
+    }
+
+    fn mark_inputs_submitted(&mut self, request: DeterministicFlushRequest) {
+        if !self.enabled {
+            return;
+        }
+        self.pending_step = Some(request);
+        self.snapshot_ready = false;
+        self.local_ready = false;
+    }
+
+    fn mark_snapshot_received(&mut self) {
+        if !self.enabled {
+            return;
+        }
+        if self.pending_step.is_some() {
+            self.snapshot_ready = true;
+        }
+    }
+
+    fn finish_output(&mut self) {
+        if !self.enabled {
+            return;
+        }
+        if self.snapshot_ready {
+            self.snapshot_ready = false;
+            self.pending_step = None;
+        }
+    }
+
+    fn freeze_prediction(&self) -> bool {
+        self.enabled
     }
 }

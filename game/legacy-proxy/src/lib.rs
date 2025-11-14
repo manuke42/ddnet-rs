@@ -4331,6 +4331,7 @@ impl Client {
                         ClientToServerMessage::AccountRequestInfo => {}
                         ClientToServerMessage::SpatialChat { .. } => {}
                         ClientToServerMessage::SpatialChatDeactivated => {}
+                        ClientToServerMessage::DeterministicStep { .. } => {}
                     },
                 }
             }

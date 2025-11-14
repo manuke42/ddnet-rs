@@ -125,6 +125,8 @@ pub struct ActiveGame {
 
     pub send_input_every_tick: bool,
 
+    pub deterministic_snapshot_ready: bool,
+
     #[cfg(unix)]
     pub frame_sender: Option<frame_sender::AvEncoder>,
     #[cfg(unix)]
@@ -132,6 +134,19 @@ pub struct ActiveGame {
 }
 
 impl ActiveGame {
+    pub fn mark_deterministic_snapshot_ready(&mut self) {
+        self.deterministic_snapshot_ready = true;
+    }
+
+    pub fn take_deterministic_snapshot_ready(&mut self) -> bool {
+        std::mem::take(&mut self.deterministic_snapshot_ready)
+    }
+
+    pub fn is_local_player_ready_for_deterministic(&self) -> bool {
+        self.game_data.local.active_local_player().is_some()
+            && self.game_data.handled_snap_id.is_some()
+    }
+
     #[cfg(unix)]
     pub fn ensure_frame_sender(
         &mut self,
@@ -665,6 +680,8 @@ impl ActiveGame {
                 let time_diff = tick_diff * tick_time.as_secs_f64() + time_diff;
 
                 prediction_timer.add_snap(time_diff, timestamp);
+
+                self.mark_deterministic_snapshot_ready();
             }
             ServerToClientMessage::Events {
                 events,

@@ -654,6 +654,7 @@ impl Game {
 
                         resource_download_server,
                         send_input_every_tick,
+                        deterministic_snapshot_ready: false,
                         #[cfg(unix)]
                         frame_sender: None,
                         #[cfg(unix)]
@@ -1057,6 +1058,24 @@ impl Game {
             Some(game)
         } else {
             None
+        }
+    }
+
+    pub fn deterministic_ready(&self) -> bool {
+        match self {
+            Game::Active(game) | Game::WaitingForFirstSnapshot(game) => {
+                game.is_local_player_ready_for_deterministic()
+            }
+            _ => false,
+        }
+    }
+
+    pub fn take_deterministic_snapshot_ready(&mut self) -> bool {
+        match self {
+            Game::Active(game) | Game::WaitingForFirstSnapshot(game) => {
+                game.take_deterministic_snapshot_ready()
+            }
+            _ => false,
         }
     }
 }

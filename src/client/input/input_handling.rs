@@ -56,16 +56,23 @@ pub struct InputAxisMoveEv {
 }
 
 #[derive(Debug, Clone)]
+pub enum InputControlCommand {
+    FlushInputs { ticks: Option<u32> },
+}
+
+#[derive(Debug, Clone)]
 pub enum InputEv {
     Key(InputKeyEv),
     Move(InputAxisMoveEv),
+    Control(InputControlCommand),
 }
 
 impl InputEv {
-    pub fn device(&self) -> &DeviceId {
+    pub fn device(&self) -> Option<&DeviceId> {
         match self {
-            InputEv::Key(ev) => &ev.device,
-            InputEv::Move(ev) => &ev.device,
+            InputEv::Key(ev) => Some(&ev.device),
+            InputEv::Move(ev) => Some(&ev.device),
+            InputEv::Control(_) => None,
         }
     }
 }
@@ -121,6 +128,10 @@ pub enum InputHandlingEvent {
     },
     VoteYes,
     VoteNo,
+    /// Deterministic control command emitted by automation tooling.
+    DeterministicFlush {
+        ticks: Option<u32>,
+    },
 }
 
 pub struct InputHandling {
@@ -884,7 +895,7 @@ impl InputHandling {
                         io,
                     );
                 }
-                InputEv::Move(_) => {}
+                InputEv::Move(_) | InputEv::Control(_) => {}
             }
         }
     }
@@ -903,12 +914,21 @@ impl InputHandling {
         let mut res = Vec::new();
 
         self.inp.evs.retain(|ev| {
-            if game_data
-                .device_to_local_player_index
-                .get(ev.device())
-                .copied()
-                .unwrap_or(0)
-                < game_data.local.local_players.len()
+            if let InputEv::Control(cmd) = ev {
+                res.push(InputHandlingEvent::DeterministicFlush {
+                    ticks: match cmd {
+                        InputControlCommand::FlushInputs { ticks } => *ticks,
+                    },
+                });
+                return false;
+            }
+
+            let device_index = ev
+                .device()
+                .and_then(|device| game_data.device_to_local_player_index.get(device).copied())
+                .unwrap_or(0);
+
+            if device_index < game_data.local.local_players.len()
                 || game_data.local.local_players.len() == 1
             {
                 let Some((local_player_id, local_player)) =
@@ -1029,6 +1049,9 @@ impl InputHandling {
                         }
                         InputEv::Move(_) => {
                             // else ignore mouse movement
+                        }
+                        InputEv::Control(_) => {
+                            unreachable!("control events should have been handled before matches")
                         }
                     }
 

@@ -279,6 +279,13 @@ pub struct ConfigClient {
     /// Leave empty to disable the socket listener.
     #[default = "/tmp/ddnet-input.sock"]
     pub input_socket_path: String,
+    /// Enable deterministic, manually stepped gameplay loops controlled via tooling.
+    #[default = false]
+    pub deterministic_mode: bool,
+    /// WebSocket endpoint the client should use to control server ticks when
+    /// `deterministic_mode` is enabled.
+    #[default = "ws://127.0.0.1:5000"]
+    pub deterministic_control_url: String,
 }
 
 #[config_default]

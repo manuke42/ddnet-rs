@@ -2724,6 +2724,15 @@ impl Server {
                     spatial_chat.on_client_drop(con_id);
                 }
             }
+            ClientToServerMessage::DeterministicStep { ticks } => {
+                let permits = ticks.max(1) as usize;
+                log::trace!(
+                    target: "server",
+                    "allowing {permits} deterministic tick(s) requested by {:?}",
+                    con_id
+                );
+                self.control_bridge.allow_ticks(permits);
+            }
         }
     }
 
