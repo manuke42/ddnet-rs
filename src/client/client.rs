@@ -899,16 +899,12 @@ impl ClientNativeImpl {
                                 (player_id, false)
                             }
                             PlayerCameraMode::Free => (player_id, true),
-                            PlayerCameraMode::LockedOn { character_ids, .. } => (
-                                {
-                                    if character_ids.len() == 1 {
-                                        *character_ids.iter().next().unwrap()
-                                    } else {
-                                        player_id
-                                    }
-                                },
-                                false,
-                            ),
+                            PlayerCameraMode::LockedOn { .. } => {
+                                // LockedOn uses specific character ids for rendering mode,
+                                // but for choosing the camera player id here we still use
+                                // the player_id and treat it as not a free camera.
+                                (player_id, false)
+                            }
                         }
                     } else {
                         (player_id, false)
@@ -3227,9 +3223,10 @@ impl AppWithGraphics for ClientNativeImpl {
         self.inp_manager.collect_events();
 
         #[cfg(unix)]
-        let socket_input_cycle_done = self.inp_manager.take_socket_batch_done();
+        let (socket_input_cycle_done, socket_input_active) =
+            self.inp_manager.take_socket_batch_info();
         #[cfg(not(unix))]
-        let socket_input_cycle_done = false;
+        let (socket_input_cycle_done, socket_input_active) = (false, false);
 
         #[cfg(unix)]
         if !matches!(self.game, Game::Active(_)) {
@@ -3336,7 +3333,7 @@ impl AppWithGraphics for ClientNativeImpl {
             && !self.editor.is_open()
             && self.demo_player.is_none();
         if let Game::Active(game) = &mut self.game {
-            game.register_socket_batch_done(socket_input_cycle_done);
+            game.register_socket_batch_done(socket_input_cycle_done, socket_input_active);
             #[cfg(unix)]
             if self.input_socket.is_none() && !self.input_socket_failed {
                 let socket_path = PathBuf::from(self.config.game.cl.input_socket_path.clone());
@@ -3727,7 +3724,15 @@ impl AppWithGraphics for ClientNativeImpl {
         }
 
         // rendering
-        self.render(native);
+        let should_render = if let Game::Active(game) = &self.game {
+            game.allows_rendering()
+        } else {
+            true
+        };
+
+        if should_render {
+            self.render(native);
+        }
 
         #[cfg(unix)]
         self.flush_socket_responses();

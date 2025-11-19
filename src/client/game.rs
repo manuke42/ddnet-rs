@@ -661,6 +661,7 @@ impl Game {
                         tick_loop_input_dispatched: false,
                         tick_loop_output_consumed: true,
                         pending_socket_batch_done: false,
+                        socket_input_active: false,
                         #[cfg(unix)]
                         frame_sender: None,
                         #[cfg(unix)]

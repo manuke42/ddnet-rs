@@ -141,6 +141,8 @@ pub struct InputHandling {
     socket_response_tx: Option<Sender<String>>,
     #[cfg(unix)]
     socket_input_batch_done: bool,
+    #[cfg(unix)]
+    socket_input_active: bool,
 }
 
 impl InputHandling {
@@ -155,21 +157,23 @@ impl InputHandling {
         Self {
             state: egui_winit::State::new(
                 ctx,
-                Default::default(),
+                egui::ViewportId::ROOT,
                 window,
-                Some(window.scale_factor().clamp(0.00001, f64::MAX) as f32),
+                Some(window.scale_factor() as f32),
                 None,
                 None,
             ),
             last_known_cursor: None,
             inp: Input::new(),
-            external_events_tx,
-            external_events_rx,
+            external_events_tx: external_events_tx,
+            external_events_rx: external_events_rx,
             bind_cmds,
             #[cfg(unix)]
             socket_response_tx: None,
             #[cfg(unix)]
             socket_input_batch_done: false,
+            #[cfg(unix)]
+            socket_input_active: false,
         }
     }
 
@@ -197,6 +201,10 @@ impl InputHandling {
             if matches!(event, InputEv::SocketBatchEnd(_)) {
                 self.socket_input_batch_done = true;
                 continue;
+            }
+            #[cfg(unix)]
+            {
+                self.socket_input_active = true;
             }
             self.inp.evs.push(event);
         }
@@ -230,6 +238,13 @@ impl InputHandling {
     #[cfg(unix)]
     pub fn take_socket_batch_done(&mut self) -> bool {
         std::mem::take(&mut self.socket_input_batch_done)
+    }
+
+    #[cfg(unix)]
+    pub fn take_socket_batch_info(&mut self) -> (bool, bool) {
+        let done = std::mem::take(&mut self.socket_input_batch_done);
+        let active = std::mem::take(&mut self.socket_input_active);
+        (done, active)
     }
 
     #[cfg(unix)]

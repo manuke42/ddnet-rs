@@ -138,6 +138,7 @@ pub struct ActiveGame {
     pub tick_loop_input_dispatched: bool,
     pub tick_loop_output_consumed: bool,
     pub pending_socket_batch_done: bool,
+    pub socket_input_active: bool,
 
     #[cfg(unix)]
     pub frame_sender: Option<frame_sender::AvEncoder>,
@@ -150,9 +151,16 @@ impl ActiveGame {
         !self.drive_tick_loop || matches!(self.tick_loop_phase, TickLoopPhase::Input)
     }
 
-    pub fn register_socket_batch_done(&mut self, done: bool) {
-        if self.drive_tick_loop && done {
-            self.pending_socket_batch_done = true;
+    pub fn allows_rendering(&self) -> bool {
+        !self.drive_tick_loop || matches!(self.tick_loop_phase, TickLoopPhase::Output)
+    }
+
+    pub fn register_socket_batch_done(&mut self, done: bool, socket_input_active: bool) {
+        if self.drive_tick_loop {
+            if done {
+                self.pending_socket_batch_done = true;
+            }
+            self.socket_input_active = socket_input_active;
         }
     }
 
@@ -171,7 +179,12 @@ impl ActiveGame {
                 if self.tick_loop_input_dispatched {
                     return;
                 }
-                let should_send = self.pending_socket_batch_done || self.has_unsent_input_changes();
+                // If socket input is active (we received events but no batch end), we wait.
+                // If pending_socket_batch_done is true, we send.
+                // If has_unsent_input_changes is true AND socket_input_active is false, we send (hardware input).
+                let should_send = self.pending_socket_batch_done
+                    || (self.has_unsent_input_changes() && !self.socket_input_active);
+
                 if should_send
                     && let Some(tick_of_inp) = self.dispatch_next_tick_input(cur_time, time)
                 {
@@ -180,6 +193,7 @@ impl ActiveGame {
                     self.tick_loop_phase = TickLoopPhase::WaitingForServer;
                     self.tick_loop_input_dispatched = true;
                     self.pending_socket_batch_done = false;
+                    self.socket_input_active = false;
                 }
             }
             TickLoopPhase::WaitingForServer | TickLoopPhase::Output => {}
