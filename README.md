@@ -30,6 +30,25 @@ cargo run --release --features bundled_data_dir,ffmpeg,microphone,enable_steam
 - `microphone` enables the microphone backend which allows features like spatial chat.
 - `enable_steam` enables steam support, the resulting binary has to be executed inside a steam runtime to work.
 
+Terminal Client
+---------------
+
+A standalone terminal client for deterministic, tick-controlled gameplay:
+
+```bash
+# Build the terminal client
+cargo build --release -p terminal-client
+
+# Run
+./target/release/terminal-client --server 127.0.0.1:8303
+```
+
+See `src/terminal-client/README.md` and `DETERMINISTIC_CONTROL.md` for details on:
+- Deterministic tick control
+- Input via Unix sockets
+- Frame output
+- ML training and automated testing
+
 Android
 -------
 
