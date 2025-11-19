@@ -10,6 +10,23 @@ The deterministic tick control system allows external tools to control the game 
 - Debugging and analysis
 - Deterministic simulation for research
 
+## Two Implementation Options
+
+DDNet-rs provides two ways to use deterministic tick control:
+
+1. **Terminal Client** (`src/terminal-client`) - **Recommended for automation**
+   - Standalone binary that runs in terminal
+   - Dedicated for deterministic control
+   - Minimal dependencies
+   - See `src/terminal-client/README.md` for details
+
+2. **Main Client with `drive_tick_loop`** (`src/client`)
+   - Full game client with tick control mode
+   - Requires graphics and UI infrastructure
+   - Suitable for visual debugging
+
+This document covers both implementations.
+
 ## Architecture
 
 ### Phase-Based State Machine
@@ -70,14 +87,37 @@ hw_accel = ""
 
 ## Usage
 
-### 1. Start the Game
+### Option 1: Terminal Client (Recommended)
+
+Build and run the terminal client:
+
+```bash
+# Build
+cargo build --release -p terminal-client
+
+# Run
+./target/release/terminal-client --server 127.0.0.1:8303 \
+  --input-socket /tmp/ddnet-input.sock \
+  --frame-socket /tmp/ddnet-frames.sock
+```
+
+The terminal client will:
+1. Connect to the server
+2. Wait for player to spawn
+3. Enter Input phase and wait for input via socket
+4. Process inputs, advance one tick, render, and output frame
+5. Loop back to Input phase
+
+See `src/terminal-client/README.md` for full details.
+
+### Option 2: Main Client with drive_tick_loop
 
 Start the game with `drive_tick_loop = true` in your config. The game will:
 - Connect to the server (can be local integrated server)
 - Wait for player to spawn (AwaitReady phase)
 - Enter Input phase and wait for input
 
-### 2. Send Inputs
+### Send Inputs (Both Options)
 
 Connect to the input socket and send JSON messages:
 

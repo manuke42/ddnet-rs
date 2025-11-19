@@ -156,6 +156,7 @@ members = [
   "src/part-convert",
   "src/server",
   "src/skin-convert",
+  "src/terminal-client",
 ]
 
 # :/ https://github.com/rust-mobile/xbuild/issues/161
