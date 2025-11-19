@@ -47,6 +47,7 @@ use ghost::recorder::GhostRecorder;
 use input_binds::binds::Binds;
 #[cfg(unix)]
 use log::error;
+use log::info;
 use pool::{
     datatypes::{PoolBTreeMap, PoolVec},
     mt_pool::Pool as MtPool,
@@ -188,6 +189,7 @@ impl ActiveGame {
                 if should_send
                     && let Some(tick_of_inp) = self.dispatch_next_tick_input(cur_time, time)
                 {
+                    info!(target: "client", "Dispatching input for tick {}, transitioning to WaitingForServer phase", tick_of_inp);
                     self.record_local_inputs_for_tick(tick_of_inp);
                     self.ensure_future_input_slot(tick_of_inp + 1);
                     self.tick_loop_phase = TickLoopPhase::WaitingForServer;
@@ -206,6 +208,7 @@ impl ActiveGame {
         }
         if matches!(self.tick_loop_phase, TickLoopPhase::Output) && !self.tick_loop_output_consumed
         {
+            info!(target: "client", "Completing Output phase, returning to Input phase");
             self.tick_loop_output_consumed = true;
             self.enter_input_phase();
         }
@@ -217,6 +220,7 @@ impl ActiveGame {
     }
 
     fn enter_input_phase(&mut self) {
+        info!(target: "client", "Entering Input phase at tick {}", self.map.game.predicted_game_monotonic_tick);
         self.tick_loop_phase = TickLoopPhase::Input;
         self.tick_loop_input_dispatched = false;
     }
@@ -816,6 +820,7 @@ impl ActiveGame {
                 prediction_timer.add_snap(time_diff, timestamp);
 
                 if self.drive_tick_loop {
+                    info!(target: "client", "Snapshot received for tick {}, transitioning to Output phase", monotonic_tick);
                     self.tick_loop_phase = TickLoopPhase::Output;
                     self.tick_loop_output_consumed = false;
                     self.tick_loop_input_dispatched = false;
