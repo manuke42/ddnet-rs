@@ -21,6 +21,7 @@ Send newline-delimited JSON objects. Each object must contain a `type` field and
 | `mouse_button`| `button`: `Left`/`Right`/`Middle`/`Back`/`Forward`, `state`  | State accepts `down`/`up`.               |
 | `mouse_move`  | `dx`, `dy`: floating-point deltas                            | Values represent relative motion.        |
 | `scroll`      | `delta`: positive or negative value                          | Sign controls wheel direction.           |
+| `input_end`   | (none)                                                       | Marks end of input batch for tick control. |
 
 Example commands:
 
@@ -31,9 +32,39 @@ Example commands:
 {"type":"scroll","delta":1.0}
 {"type":"mouse_button","button":"Left","state":"down"}
 {"type":"mouse_button","button":"Left","state":"up"}
+{"type":"input_end"}
 ```
 
 Each line **must** end with a newline character (`\n`). Commands with an empty `delta` (zero) are ignored.
+
+## Response Format
+
+When `drive_tick_loop` is enabled, the client responds to each `input_end` message with a JSON object containing:
+
+```json
+{"phase":"input","tick":42,"player_x":123.45}
+```
+
+Fields:
+- `phase`: Current tick loop phase (`await_ready`, `input`, `waiting_for_server`, `output`, or `inactive`)
+- `tick`: Current predicted monotonic tick number
+- `player_x`: X position of the active player
+
+## Deterministic Tick Control
+
+When `config.game.cl.drive_tick_loop` is enabled:
+
+1. **AwaitReady phase**: Client waits for player to spawn
+2. **Input phase**: Client waits for input batch ending with `input_end`
+3. **WaitingForServer phase**: Client sends input and waits for server
+4. **Output phase**: Client receives snapshot, renders, and outputs frame
+5. Loop returns to Input phase
+
+During Input phase, the client waits for either:
+- Hardware input (keyboard/mouse) followed by automatic batch completion
+- Socket input batch terminated by `input_end` message
+
+The server pauses its tick loop and waits for input from the controlling client.
 
 ## Test Sender Utility
 

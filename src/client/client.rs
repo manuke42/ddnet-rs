@@ -2630,8 +2630,24 @@ impl ClientNativeImpl {
         let responses = self.pending_socket_responses;
         self.pending_socket_responses = 0;
 
-        let player_x = self.last_known_player_x.unwrap_or(0.0);
-        let message = player_x.to_string();
+        // Build a state message including phase, tick, and player position
+        let message = if let Game::Active(game) = &self.game {
+            let phase = match game.tick_loop_phase {
+                crate::game::active::TickLoopPhase::AwaitReady => "await_ready",
+                crate::game::active::TickLoopPhase::Input => "input",
+                crate::game::active::TickLoopPhase::WaitingForServer => "waiting_for_server",
+                crate::game::active::TickLoopPhase::Output => "output",
+            };
+            let tick = game.map.game.predicted_game_monotonic_tick;
+            let player_x = self.last_known_player_x.unwrap_or(0.0);
+            format!(
+                r#"{{"phase":"{}","tick":{},"player_x":{}}}"#,
+                phase, tick, player_x
+            )
+        } else {
+            let player_x = self.last_known_player_x.unwrap_or(0.0);
+            format!(r#"{{"phase":"inactive","player_x":{}}}"#, player_x)
+        };
 
         for _ in 0..responses {
             if !self.inp_manager.send_socket_response(message.clone()) {
