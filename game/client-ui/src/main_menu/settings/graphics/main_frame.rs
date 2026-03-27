@@ -142,6 +142,14 @@ fn render_settings(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>) {
         ui.checkbox(&mut config_game.cl.render.use_ingame_aspect_ratio, "");
         ui.end_row();
 
+        ui.label("Max FPS (0 = unlimited)");
+        ui.add(
+            DragValue::new(&mut config_game.cl.refresh_rate)
+                .range(0..=10000)
+                .suffix(" fps"),
+        );
+        ui.end_row();
+
         if config_game.cl.render.use_ingame_aspect_ratio {
             let aspect_ratio = config_game.cl.render.ingame_aspect_ratio;
             let conf_values = ConfigRender::conf_values_structured();
