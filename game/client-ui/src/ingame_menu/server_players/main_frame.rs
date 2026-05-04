@@ -1,5 +1,6 @@
 use egui::Frame;
 use egui_extras::{Column, TableBuilder};
+use math::math::vector::vec2;
 use tracing::instrument;
 use ui_base::{
     style::bg_frame_color,
@@ -8,6 +9,7 @@ use ui_base::{
 };
 
 use crate::ingame_menu::user_data::UserData;
+use crate::utils::render_flag_for_ui;
 
 #[instrument(level = "trace", skip_all)]
 pub fn render(ui: &mut egui::Ui, ui_state: &mut UiState, pipe: &mut UiRenderPipe<UserData>) {
@@ -47,9 +49,25 @@ pub fn render(ui: &mut egui::Ui, ui_state: &mut UiState, pipe: &mut UiRenderPipe
                                 ui.label(char.name.as_str());
                             });
                             row.col(|ui| {
-                                ui.label("TODO:");
+                                let rect = ui.available_rect_before_wrap();
+                                let left_center = rect.left_center();
+                                let user_data = pipe.user_data.as_mut();
+                                let default_key = user_data.flags_container.default_key.clone();
+                                render_flag_for_ui(
+                                    user_data.stream_handle,
+                                    user_data.canvas_handle,
+                                    user_data.flags_container,
+                                    ui,
+                                    ui_state,
+                                    ui.ctx().screen_rect(),
+                                    Some(rect),
+                                    &default_key,
+                                    &char.flag.to_lowercase().replace("-", "_"),
+                                    vec2::new(left_center.x + 10.0, left_center.y),
+                                    rect.width().min(rect.height() * 2.0).min(25.0),
+                                );
                             });
-                        })
+                        });
                     });
             });
         });
