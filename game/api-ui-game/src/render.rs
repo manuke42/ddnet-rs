@@ -149,7 +149,7 @@ pub fn create_entities_container() -> EntitiesContainer {
         &GRAPHICS.with(|g| (*g).clone()),
         &SOUND.with(|g| (*g).clone()),
         &scene,
-        HOOK_CONTAINER_PATH.as_ref(),
+        ENTITIES_CONTAINER_PATH.as_ref(),
         ContainerLoadOptions {
             assume_unused: true,
             ..Default::default()
@@ -172,7 +172,7 @@ pub fn create_freeze_container() -> FreezeContainer {
         &GRAPHICS.with(|g| (*g).clone()),
         &SOUND.with(|g| (*g).clone()),
         &scene,
-        HOOK_CONTAINER_PATH.as_ref(),
+        FREEZE_CONTAINER_PATH.as_ref(),
         ContainerLoadOptions {
             assume_unused: true,
             ..Default::default()
@@ -197,7 +197,7 @@ pub fn create_particles_container() -> ParticlesContainer {
         &GRAPHICS.with(|g| (*g).clone()),
         &SOUND.with(|g| (*g).clone()),
         &scene,
-        HOOK_CONTAINER_PATH.as_ref(),
+        PARTICLES_CONTAINER_PATH.as_ref(),
         ContainerLoadOptions {
             assume_unused: true,
             ..Default::default()
@@ -220,7 +220,7 @@ pub fn create_ninja_container() -> NinjaContainer {
         &GRAPHICS.with(|g| (*g).clone()),
         &SOUND.with(|g| (*g).clone()),
         &scene,
-        HOOK_CONTAINER_PATH.as_ref(),
+        NINJA_CONTAINER_PATH.as_ref(),
         ContainerLoadOptions {
             assume_unused: true,
             ..Default::default()
@@ -243,7 +243,7 @@ pub fn create_game_container() -> GameContainer {
         &GRAPHICS.with(|g| (*g).clone()),
         &SOUND.with(|g| (*g).clone()),
         &scene,
-        HOOK_CONTAINER_PATH.as_ref(),
+        GAME_CONTAINER_PATH.as_ref(),
         ContainerLoadOptions {
             assume_unused: true,
             ..Default::default()
@@ -266,7 +266,7 @@ pub fn create_hud_container() -> HudContainer {
         &GRAPHICS.with(|g| (*g).clone()),
         &SOUND.with(|g| (*g).clone()),
         &scene,
-        HOOK_CONTAINER_PATH.as_ref(),
+        HUD_CONTAINER_PATH.as_ref(),
         ContainerLoadOptions {
             assume_unused: true,
             ..Default::default()
@@ -289,7 +289,7 @@ pub fn create_ctf_container() -> CtfContainer {
         &GRAPHICS.with(|g| (*g).clone()),
         &SOUND.with(|g| (*g).clone()),
         &scene,
-        HOOK_CONTAINER_PATH.as_ref(),
+        CTF_CONTAINER_PATH.as_ref(),
         ContainerLoadOptions {
             assume_unused: true,
             ..Default::default()
