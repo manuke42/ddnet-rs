@@ -1691,27 +1691,29 @@ impl CDatafileWrapper {
             let mut in_quad_layer = false;
             for layer in &self.layers {
                 match layer {
-                    MapLayer::Tile(layer) => {
-                        if layer.0.image == img_index as i32
+                    MapLayer::Tile(layer)
+                        if (layer.0.image == img_index as i32
                             || (layer.0.image > 0
                                 && self
                                     .duplicated_img_reads_list
                                     .get(&img_index)
-                                    .is_some_and(|list| list.contains(&(layer.0.image as usize))))
-                        {
-                            in_tile_layer = true;
-                        }
+                                    .is_some_and(|list| {
+                                        list.contains(&(layer.0.image as usize))
+                                    }))) =>
+                    {
+                        in_tile_layer = true;
                     }
-                    MapLayer::Quads(layer) => {
-                        if layer.0.image == img_index as i32
+                    MapLayer::Quads(layer)
+                        if (layer.0.image == img_index as i32
                             || (layer.0.image > 0
                                 && self
                                     .duplicated_img_reads_list
                                     .get(&img_index)
-                                    .is_some_and(|list| list.contains(&(layer.0.image as usize))))
-                        {
-                            in_quad_layer = true;
-                        }
+                                    .is_some_and(|list| {
+                                        list.contains(&(layer.0.image as usize))
+                                    }))) =>
+                    {
+                        in_quad_layer = true;
                     }
                     _ => {}
                 }
@@ -1739,9 +1741,8 @@ impl CDatafileWrapper {
                 ext_image_count += 1;
             }
         }
-        for (img_index, image, in_quad_layer, in_tile_layer, ext_image_count) in images_high_ordered
-            .into_iter()
-            .chain(images_low_ordered.into_iter())
+        for (img_index, image, in_quad_layer, in_tile_layer, ext_image_count) in
+            images_high_ordered.into_iter().chain(images_low_ordered)
         {
             // skip if duplicated
             if let Some(old_index) = self.duplicated_img_reads.get(&img_index) {

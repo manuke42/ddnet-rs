@@ -702,7 +702,7 @@ mod test {
             snap_time =
                 Duration::from_secs_f64(snap_time.as_secs_f64() + 1.0 / snaps_per_sec as f64);
         }
-        snaps.sort_by(|(time1, _), (time2, _)| time1.cmp(time2));
+        snaps.sort_by_key(|(time1, _)| *time1);
 
         for (i, snap) in snaps.iter_mut().enumerate() {
             let ratio_ping = rng.random_float() as f64 * 2.0;

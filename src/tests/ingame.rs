@@ -195,8 +195,8 @@ pub fn test_ingame_skins(
     let mut entries: Vec<_> = containers
         .skin_container
         .entries_index()
-        .into_iter()
-        .filter_map(|(key, _)| (include_default || key != "default").then_some(key))
+        .into_keys()
+        .filter_map(|key| (include_default || key != "default").then_some(key))
         .collect();
     entries.sort();
     for entry in entries.iter() {

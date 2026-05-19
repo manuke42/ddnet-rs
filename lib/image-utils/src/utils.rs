@@ -56,7 +56,9 @@ pub fn dilate(
 
                 if counter > 0 {
                     for i in 0..bpp - 1 {
-                        sums_of_opaque[i] /= counter;
+                        sums_of_opaque[i] = sums_of_opaque[i]
+                            .checked_div(counter)
+                            .expect("could not device by counter");
                         dst[i] = sums_of_opaque[i] as u8;
                     }
 

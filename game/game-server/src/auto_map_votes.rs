@@ -12,8 +12,8 @@ impl AutoMapVotes {
         let dir = fs.entries_in_dir("map/maps".as_ref()).await?;
 
         let map_files: HashSet<PathBuf> = dir
-            .into_iter()
-            .filter_map(|(p, _)| p.ends_with(".twmap.tar").then::<PathBuf, _>(|| p.into()))
+            .into_keys()
+            .filter_map(|p| p.ends_with(".twmap.tar").then::<PathBuf, _>(|| p.into()))
             .collect();
 
         let map_files = {
@@ -21,8 +21,8 @@ impl AutoMapVotes {
             let dir = fs.entries_in_dir("legacy/maps".as_ref()).await?;
 
             map_files.extend(
-                dir.into_iter()
-                    .filter_map(|(p, _)| p.ends_with(".map").then::<PathBuf, _>(|| p.into())),
+                dir.into_keys()
+                    .filter_map(|p| p.ends_with(".map").then::<PathBuf, _>(|| p.into())),
             );
             map_files
         };

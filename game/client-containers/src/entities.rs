@@ -59,8 +59,8 @@ impl LoadEntities {
          -> anyhow::Result<FxHashMap<_, _>> {
             files
                 .files
-                .iter()
-                .filter_map(|(name, _)| {
+                .keys()
+                .filter_map(|name| {
                     if name.parent().is_some_and(|p| p.eq(Path::new("")))
                         && !name.is_absolute()
                         && name.file_stem().is_some_and(|n| n.to_str().is_some())

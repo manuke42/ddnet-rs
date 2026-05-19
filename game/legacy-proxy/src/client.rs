@@ -75,9 +75,9 @@ impl SocketClient {
         }
     }
     pub fn run_once(&mut self, mut on_event: impl FnMut(&mut Self, ChunkOrEvent<'_, SocketAddr>)) {
-        self.net
-            .tick(&mut self.socket)
-            .for_each(|e| panic!("{e:?}"));
+        if let Some(e) = self.net.tick(&mut self.socket).next() {
+            panic!("{e:?}")
+        }
 
         while let Ok(res) = self.socket.try_recv() {
             self.run_recv(res, &mut on_event);

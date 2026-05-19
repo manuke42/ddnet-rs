@@ -731,12 +731,10 @@ impl TeeEditor {
                 }
             }
             // current project
-            "Project" => {
-                if !self.cur_item.is_empty() {
-                    let item_res = self.items.get(&self.cur_item);
-                    if let Some(_item) = item_res {
-                        // TODO!
-                    }
+            "Project" if !self.cur_item.is_empty() => {
+                let item_res = self.items.get(&self.cur_item);
+                if let Some(_item) = item_res {
+                    // TODO!
                 }
             }
             _ => {}

@@ -731,7 +731,7 @@ impl FileSystemInterface for FileSystem {
             let path = fs.get_path(path);
             if let Ok(ext_file_list) = self.entries_in_dir_impl(&path, fs, &file_list).await {
                 found_one_entry = true;
-                file_list.extend(ext_file_list.into_iter());
+                file_list.extend(ext_file_list);
             }
         }
         if found_one_entry {
@@ -765,7 +765,7 @@ impl FileSystemInterface for FileSystem {
                 .await
             {
                 found_one_dir = true;
-                file_list.extend(list.into_iter());
+                file_list.extend(list);
             }
         }
 

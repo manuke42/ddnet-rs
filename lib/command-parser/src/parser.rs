@@ -884,9 +884,7 @@ fn parse_command<const S: usize>(
         } else {
             (
                 "No text was given".to_string(),
-                tokens
-                    .cur_stack_end_range_plus_one()
-                    .unwrap_or_else(|| 0..0),
+                tokens.cur_stack_end_range_plus_one().unwrap_or(0..0),
             )
         };
         let res = Err(CommandParseResult::InvalidCommandIdent { range, err });
