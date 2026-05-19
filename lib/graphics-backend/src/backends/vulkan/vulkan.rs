@@ -3094,7 +3094,7 @@ impl VulkanBackend {
             render,
 
             multi_sampling_count,
-            next_multi_sampling_count: Default::default(),
+            next_multi_sampling_count: u32::MAX,
 
             render_setup_queue_full_pipeline_creation,
 
