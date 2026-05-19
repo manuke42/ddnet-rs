@@ -22,6 +22,7 @@ jobs:
           x264-src: x264
           x264-build: x264-build
           x264-cache-path: x264-build
+          x264-prefix: /usr/local
           x264-lib-dir: /usr/local/lib
           x264-include-dir: /usr/local/include
         - os: macOS-latest
@@ -32,6 +33,7 @@ jobs:
           x264-src: x264
           x264-build: x264-build
           x264-cache-path: x264-build
+          x264-prefix: /usr/local
           x264-lib-dir: /usr/local/lib
           x264-include-dir: /usr/local/include
         - os: windows-latest
@@ -43,6 +45,7 @@ jobs:
           x264-src: /c/x264
           x264-build: /c/build-x264
           x264-cache-path: 'C:\build-x264'
+          x264-prefix: /mingw64
           x264-lib-dir: /mingw64/lib
           x264-include-dir: /mingw64/include
     runs-on: ${{ matrix.os }}
@@ -108,7 +111,7 @@ jobs:
     - name: Prepare msys dependencies
       if: contains(matrix.os, 'windows')
       run: |
-        # important detail: mingw-w64-x86_64-libx264 is installed for the package config files!
+        # x264 is replaced below with our static build, but this brings in the MSYS2 packaging setup.
         pacman --noconfirm -S git make mingw-w64-x86_64-libx264 mingw-w64-x86_64-toolchain mingw-w64-x86_64-clang mingw-w64-x86_64-gcc mingw-w64-x86_64-nasm mingw-w64-x86_64-opus
 
     - name: Prepare msys
@@ -124,7 +127,7 @@ jobs:
       id: x264-cache
       with:
         path: ${{ matrix.x264-cache-path }}
-        key: ${{ runner.os }}-x264-0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee
+        key: ${{ runner.os }}-x264-0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee-v2
 
     - name: Build static x264
       if: steps.x264-cache.outputs.cache-hit != 'true'
@@ -142,7 +145,7 @@ jobs:
         git checkout 0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee
         mkdir -p "$BUILD"
         cd "$BUILD"
-        "$SRC/configure" --enable-static --enable-pic
+        "$SRC/configure" --prefix="${{ matrix.x264-prefix }}" --enable-static --enable-pic
         if command -v nproc >/dev/null 2>&1; then
           CORES=$(nproc)
         else
@@ -165,6 +168,8 @@ jobs:
           cp "$BUILD/libx264.a" "$LIB_DIR/libx264.a"
           cp "$BUILD/x264.h" "$INCLUDE_DIR/x264.h"
           cp "$BUILD/x264_config.h" "$INCLUDE_DIR/x264_config.h"
+          mkdir -p "$LIB_DIR/pkgconfig"
+          cp "$BUILD/x264.pc" "$LIB_DIR/pkgconfig/x264.pc"
         else
           sudo mkdir -p "$LIB_DIR" "$INCLUDE_DIR"
           sudo cp "$BUILD/libx264.a" "$LIB_DIR/libx264.a"

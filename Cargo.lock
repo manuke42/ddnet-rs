@@ -4086,9 +4086,9 @@ dependencies = [
 
 [[package]]
 name = "ffmpeg-next"
-version = "8.1.0"
+version = "8.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7c4bd5ab1ac61f29c634df1175d350ded29cf74c3c6d4f7030431a5ae3c7d5d"
+checksum = "d658424d233cbd993a972dd73a66ca733acd12a494c68995c9ac32ae1fe65b40"
 dependencies = [
  "bitflags 2.11.1",
  "ffmpeg-sys-next",
@@ -4097,9 +4097,8 @@ dependencies = [
 
 [[package]]
 name = "ffmpeg-sys-next"
-version = "8.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a314bc0e022a33a99567ed4bd2576bd58ffd8fcff7891c29194cfecc26a62547"
+version = "8.0.1"
+source = "git+https://github.com/Jupeyy/rust-ffmpeg-sys.git?branch=pr_mingw_workaround#d3c8f775b9865bd04977f9113d6f4484e4b8b692"
 dependencies = [
  "bindgen 0.72.1",
  "cc",
@@ -13449,8 +13448,3 @@ checksum = "27bc9d5b815bc103f142aa054f561d9187d191692ec7c2d1e2b4737f8dbd7296"
 dependencies = [
  "zune-core",
 ]
-
-[[patch.unused]]
-name = "ffmpeg-sys-next"
-version = "8.0.1"
-source = "git+https://github.com/Jupeyy/rust-ffmpeg-sys.git?branch=pr_mingw_workaround#e264e407cccecf173fa88da2b163439fda18d8e1"
