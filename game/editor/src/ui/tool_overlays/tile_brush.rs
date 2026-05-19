@@ -63,7 +63,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>) {
                         let pos = pos(pointer_pos.ui);
                         let cur = TileBrush::pos_on_map(
                             &pipe.user_data.editor_tab.map,
-                            &ui.ctx().screen_rect(),
+                            &ui.ctx().content_rect(),
                             pipe.user_data.canvas_handle,
                             &pos,
                             &offset,

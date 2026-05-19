@@ -55,7 +55,7 @@ pub fn lang_list(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state:
                 pipe.user_data.flags_container,
                 ui,
                 ui_state,
-                ui.ctx().screen_rect(),
+                ui.ctx().content_rect(),
                 Some(ui.clip_rect()),
                 &flag,
                 name,

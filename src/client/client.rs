@@ -2074,7 +2074,7 @@ impl ClientNativeImpl {
                                         render_tee,
                                         ui,
                                         ui_state,
-                                        ui.ctx().screen_rect(),
+                                        ui.ctx().content_rect(),
                                         None,
                                         char.info.skin.borrow(),
                                         Some(&char.info.skin_info),
@@ -3639,8 +3639,8 @@ impl AppWithGraphics for ClientNativeImpl {
                 self.config.game.cl.refresh_rate
             }
         };
-        if refresh_rate > 0 {
-            let time_until_tick_nanos = Duration::from_secs(1).as_nanos() as u64 / refresh_rate;
+        if let Some(result) = (Duration::from_secs(1).as_nanos() as u64).checked_div(refresh_rate) {
+            let time_until_tick_nanos = result;
 
             let sleep_time_nanos = time_until_tick_nanos as i64
                 - (cur_time.as_nanos() as i64 - self.last_refresh_rate_time.as_nanos() as i64);

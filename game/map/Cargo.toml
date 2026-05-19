@@ -39,7 +39,7 @@ zstd = { version = "0.13", default-features = false, features = [
   "zdict_builder",
 ] }
 
-ruzstd = { version = "0.8.1", optional = true }
+ruzstd = { version = "0.8.2", optional = true }
 
 [dev-dependencies]
 base-fs = { path = "../../lib/base-fs" }

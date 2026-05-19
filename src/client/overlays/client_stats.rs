@@ -240,11 +240,11 @@ impl ClientStatsData {
 
         let (pos, anchor) = if bottom {
             (
-                ui.ctx().screen_rect().right_bottom(),
+                ui.ctx().content_rect().right_bottom(),
                 egui::Align2::RIGHT_BOTTOM,
             )
         } else {
-            (ui.ctx().screen_rect().right_top(), egui::Align2::RIGHT_TOP)
+            (ui.ctx().content_rect().right_top(), egui::Align2::RIGHT_TOP)
         };
 
         ui.painter().text(
@@ -311,7 +311,7 @@ impl ClientStats {
 
     pub fn render_connection_issues(ui: &mut egui::Ui) {
         ui.painter().text(
-            ui.ctx().screen_rect().center(),
+            ui.ctx().content_rect().center(),
             egui::Align2::CENTER_CENTER,
             "\u{f071} Connection to the server unstable or lost.",
             FontId::proportional(25.0),
@@ -322,12 +322,12 @@ impl ClientStats {
     fn render_mic(ui: &mut egui::Ui, bottom: bool) {
         let (pos, anchor) = if bottom {
             (
-                ui.ctx().screen_rect().right_bottom() - egui::vec2(-5.0, 20.0),
+                ui.ctx().content_rect().right_bottom() - egui::vec2(-5.0, 20.0),
                 egui::Align2::RIGHT_BOTTOM,
             )
         } else {
             (
-                ui.ctx().screen_rect().right_top() + egui::vec2(-5.0, 20.0),
+                ui.ctx().content_rect().right_top() + egui::vec2(-5.0, 20.0),
                 egui::Align2::RIGHT_TOP,
             )
         };

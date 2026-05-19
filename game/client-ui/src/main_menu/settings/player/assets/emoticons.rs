@@ -55,7 +55,7 @@ pub fn emoticons_list(
                     pipe.user_data.emoticons_container,
                     ui,
                     ui_state,
-                    ui.ctx().screen_rect(),
+                    ui.ctx().content_rect(),
                     Some(ui.clip_rect()),
                     &name.try_into().unwrap_or_default(),
                     pos + vec2::new(x * emoticons_size, y * emoticons_size),

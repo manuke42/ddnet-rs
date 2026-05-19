@@ -115,7 +115,7 @@ struct Node {
     depth: usize,
     force_render: bool,
     skip_render: bool,
-    children: Vec<Node>,
+    children: Vec<Self>,
 }
 
 struct BenchLayer {

@@ -196,7 +196,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
                                             },
                                             ui,
                                             ui_state,
-                                            ui.ctx().screen_rect(),
+                                            ui.ctx().content_rect(),
                                             Some(ui.clip_rect()),
                                             vec2::new(
                                                 rect.center().x,
@@ -213,7 +213,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
                                         data.skin_renderer,
                                         ui,
                                         ui_state,
-                                        ui.ctx().screen_rect(),
+                                        ui.ctx().content_rect(),
                                         Some(rect),
                                         character.info.skin.borrow(),
                                         Some(&character.skin_info),
@@ -437,7 +437,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
         .anchor(Align2::CENTER_TOP, Vec2::new(0.0, 5.0))
         .max_height(max_height)
         .show(ui.ctx(), |ui| {
-            ui.set_clip_rect(ui.ctx().screen_rect());
+            ui.set_clip_rect(ui.ctx().content_rect());
             ui.style_mut().spacing.item_spacing.y = 0.0;
             let rect = ui
                 .with_layout(
@@ -474,7 +474,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
                                                 pipe.user_data.skin_renderer,
                                                 ui,
                                                 ui_state,
-                                                ui.ctx().screen_rect(),
+                                                ui.ctx().content_rect(),
                                                 Some(rect),
                                                 (*char.skin).borrow(),
                                                 Some(&char.skin_info),
@@ -572,10 +572,10 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
             UiBuilder::default().max_rect(
                 res.map(|r| {
                     ui.ctx()
-                        .screen_rect()
+                        .content_rect()
                         .translate(egui::vec2(0.0, r.response.rect.height()))
                 })
-                .unwrap_or_else(|| ui.ctx().screen_rect()),
+                .unwrap_or_else(|| ui.ctx().content_rect()),
             ),
             |ui| {
                 ui.with_layout(

@@ -42,7 +42,7 @@ pub async fn new_to_legacy_from_buf_async(
                         (raw[0].to_vec(), raw[1].to_vec())
                     };
 
-                    new_sound.extend(channel1.into_iter().zip(channel2.into_iter()).flat_map(
+                    new_sound.extend(channel1.into_iter().zip(channel2).flat_map(
                         |(freq1, freq2)| {
                             [
                                 (freq1 as f64 * i16::MAX as f64)

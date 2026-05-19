@@ -39,7 +39,7 @@ pub fn theme_list(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state
                 &theme.thumbnail,
                 ui,
                 ui_state,
-                ui.ctx().screen_rect(),
+                ui.ctx().content_rect(),
                 Some(ui.clip_rect()),
                 pos,
                 vec2::new(asset_size, asset_size / 2.0),

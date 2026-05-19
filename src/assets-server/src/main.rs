@@ -8,7 +8,7 @@ use anyhow::anyhow;
 use assets_base::AssetsIndex;
 use axum::{Json, Router, extract::DefaultBodyLimit};
 use base::hash::{fmt_hash, generate_hash_for};
-use clap::{Parser, command};
+use clap::Parser;
 use delete::asset_delete;
 use image_utils::png::PngValidatorOptions;
 use index_dir::IndexDir;

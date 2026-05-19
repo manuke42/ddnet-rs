@@ -82,7 +82,7 @@ impl RemoteConsole {
         vars: HashMap<NetworkString<65536>, RconEntry>,
     ) {
         self.entries.clear();
-        for (name, cmd) in cmds.into_iter().chain(vars.into_iter()) {
+        for (name, cmd) in cmds.into_iter().chain(vars) {
             let cmds = self.user.clone();
             self.entries.push(ConsoleEntry::Cmd(ConsoleEntryCmd {
                 name: name.to_string(),

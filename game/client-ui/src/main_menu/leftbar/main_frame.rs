@@ -124,7 +124,7 @@ pub fn render(
                                     thumbnail,
                                     ui,
                                     ui_state,
-                                    ui.ctx().screen_rect(),
+                                    ui.ctx().content_rect(),
                                     Some(clip_rect),
                                     vec2::new(rect.center().x, rect.center().y),
                                     vec2::new(rect.width() / ratio_w, rect.height() / ratio_h),
@@ -176,7 +176,7 @@ pub fn render(
                                         user_data.render_tee,
                                         ui,
                                         ui_state,
-                                        ui.ctx().screen_rect(),
+                                        ui.ctx().content_rect(),
                                         Some(clip_rect),
                                         &profile.name.as_str().try_into().unwrap_or_default(),
                                         profile

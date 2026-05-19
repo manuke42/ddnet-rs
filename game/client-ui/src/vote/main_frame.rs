@@ -24,8 +24,8 @@ use super::user_data::{UserData, VoteRenderType};
 /// not required
 #[instrument(level = "trace", skip_all)]
 pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &mut UiState) {
-    let full_rect = ui.ctx().screen_rect();
-    let mut rect = ui.ctx().screen_rect();
+    let full_rect = ui.ctx().content_rect();
+    let mut rect = ui.ctx().content_rect();
 
     // 15% + some etra offset for the hud
     let x_offset = 10.0;
@@ -266,7 +266,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
                                     &thumbnail.thumbnail,
                                     ui,
                                     ui_state,
-                                    ui.ctx().screen_rect(),
+                                    ui.ctx().content_rect(),
                                     Some(ui.clip_rect()),
                                     vec2::new(center.x, center.y),
                                     vec2::new(width * scale, height * scale),

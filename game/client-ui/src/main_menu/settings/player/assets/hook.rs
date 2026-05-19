@@ -44,7 +44,7 @@ pub fn hook_list(
                 pipe.user_data.toolkit_render,
                 ui,
                 ui_state,
-                ui.ctx().screen_rect(),
+                ui.ctx().content_rect(),
                 Some(ui.clip_rect()),
                 &name.try_into().unwrap_or_default(),
                 pos,

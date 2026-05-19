@@ -186,7 +186,7 @@ pub fn render(
                 user_data.render_tee,
                 ui,
                 ui_state,
-                ui.ctx().screen_rect(),
+                ui.ctx().content_rect(),
                 Some(ui.clip_rect()),
                 &ResourceKey::from_str_lossy(skin_preview.name.as_str()),
                 Some(&skin_info),

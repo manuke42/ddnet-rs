@@ -2383,8 +2383,7 @@ pub fn do_action(
                         .collect()
                 });
 
-                for (layer, (buffer, new_tiles)) in group.layers.iter_mut().zip(buffers.into_iter())
-                {
+                for (layer, (buffer, new_tiles)) in group.layers.iter_mut().zip(buffers) {
                     match layer {
                         MapLayerPhysicsSkeleton::Arbitrary(_) => {
                             return Err(anyhow!("arbitrary physics layers are not supported"));

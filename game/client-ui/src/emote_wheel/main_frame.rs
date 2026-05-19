@@ -18,7 +18,7 @@ use super::user_data::{EmoteWheelEvent, UserData};
 /// not required
 #[instrument(level = "trace", skip_all)]
 pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &mut UiState) {
-    let rect = ui.ctx().screen_rect();
+    let rect = ui.ctx().content_rect();
 
     let width_scale = rect.width() / pipe.user_data.canvas_handle.canvas_width() as f32;
 

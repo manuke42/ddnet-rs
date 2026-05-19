@@ -650,7 +650,7 @@ impl VulkanBackend {
             .flat_map(|sets| split_descriptor_sets(&sets))
             .collect();
 
-            for (descr1, descr2) in descr1.into_iter().zip(descr2.into_iter()) {
+            for (descr1, descr2) in descr1.into_iter().zip(descr2) {
                 res.push(StreamedUniformBuffer {
                     uniform_sets: [descr1, descr2],
                 });
@@ -3094,7 +3094,7 @@ impl VulkanBackend {
             render,
 
             multi_sampling_count,
-            next_multi_sampling_count: Default::default(),
+            next_multi_sampling_count: u32::MAX,
 
             render_setup_queue_full_pipeline_creation,
 

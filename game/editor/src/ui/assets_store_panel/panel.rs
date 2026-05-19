@@ -257,7 +257,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
                             &img.tex,
                             ui,
                             ui_state,
-                            ui.ctx().screen_rect(),
+                            ui.ctx().content_rect(),
                             Some(ui.clip_rect()),
                             pos,
                             vec2::new(width * scale, height * scale),

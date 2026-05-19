@@ -294,7 +294,7 @@ impl SubRenderPass {
                 PipelineContainerCreateMode::OneByOne(creation_data) => {
                     let creation_data = creation_data.clone();
                     let mutex: Arc<parking_lot::Mutex<()>> = Default::default();
-                    for (attr, attr_ex) in attrs.into_iter().zip(attrs_ex.into_iter()) {
+                    for (attr, attr_ex) in attrs.into_iter().zip(attrs_ex) {
                         let pipe_item = Self::get_pipeline_and_layout_mut(
                             pipe_container,
                             attr_ex.is_textured,

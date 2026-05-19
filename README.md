@@ -21,7 +21,8 @@ Features
 --------
 
 Some features require you to compile DDNet-rs with explicit features:
-```
+
+```bash
 cargo run --release --features bundled_data_dir,ffmpeg,microphone,enable_steam
 ```
 
@@ -33,7 +34,7 @@ cargo run --release --features bundled_data_dir,ffmpeg,microphone,enable_steam
 Android
 -------
 
-```
+```bash
 # using https://github.com/rust-mobile/xbuild
 x build --release --arch arm64 --platform android --format apk -p ddnet-rs --features bundled_data_dir
 ```

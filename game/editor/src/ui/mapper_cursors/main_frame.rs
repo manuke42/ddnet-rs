@@ -22,7 +22,7 @@ pub fn render(
                 .game_camera()
                 .project(canvas_handle, &mut state, None);
 
-            let size = ui.ctx().screen_rect().size();
+            let size = ui.ctx().content_rect().size();
             let (x0, y0, x1, y1) = state.get_canvas_mapping();
 
             let w = x1 - x0;

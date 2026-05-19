@@ -497,10 +497,13 @@ impl InputHandling {
                     BindActionsLocalPlayer::ActivateSideOrStageChatInput => {
                         local_player.chat_input_active = Some(ChatMode::Team);
                     }
-                    BindActionsLocalPlayer::ActivateWhisperChatInput => {
-                        if !matches!(local_player.chat_input_active, Some(ChatMode::Whisper(_))) {
-                            local_player.chat_input_active = Some(ChatMode::Whisper(None));
-                        }
+                    BindActionsLocalPlayer::ActivateWhisperChatInput
+                        if !matches!(
+                            local_player.chat_input_active,
+                            Some(ChatMode::Whisper(_))
+                        ) =>
+                    {
+                        local_player.chat_input_active = Some(ChatMode::Whisper(None));
                     }
                     BindActionsLocalPlayer::Kill => evs.push(InputHandlingEvent::Kill {
                         local_player_id: *local_player_id,
@@ -590,9 +593,9 @@ impl InputHandling {
         // generate emoticon/tee-eye event if needed
         if local_player.emote_wheel_active
             && !next_show_emote_wheel
-            && local_player.last_emote_wheel_selection.is_some()
+            && let Some(last_emote_wheel_selection) = local_player.last_emote_wheel_selection
         {
-            let ev = local_player.last_emote_wheel_selection.unwrap();
+            let ev = last_emote_wheel_selection;
             match ev {
                 EmoteWheelEvent::EmoticonSelected(emoticon) => {
                     evs.push(InputHandlingEvent::Emoticon {

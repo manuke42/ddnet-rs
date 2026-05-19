@@ -379,7 +379,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
                                                 };
                                                 let pos = ui_pos_to_world_pos(
                                                     pipe.user_data.canvas_handle,
-                                                    &ui.ctx().screen_rect(),
+                                                    &ui.ctx().content_rect(),
                                                     editor_tab.map.groups.user.zoom,
                                                     vec2::new(cursor_pos.x, cursor_pos.y),
                                                     editor_tab.map.groups.user.pos.x,

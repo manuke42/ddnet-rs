@@ -222,7 +222,7 @@ pub fn render(
                         }
                     }
                     colorize_semicolons(&mut layout_job, last_range..string.len());
-                    ui.fonts(|f| f.layout_job(layout_job))
+                    ui.fonts_mut(|f| f.layout_job(layout_job))
                 };
                 let had_quote = pipe.user_data.msg.char_indices().any(|(index, c)| {
                     if c == '"' {

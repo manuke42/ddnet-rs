@@ -51,7 +51,7 @@ pub fn entities_list(
                 tile_set_preview.base.obj.shader_storage.clone().unwrap(),
                 ui,
                 ui_state,
-                ui.ctx().screen_rect(),
+                ui.ctx().content_rect(),
                 Some(ui.clip_rect()),
                 &name.try_into().unwrap_or_default(),
                 pos,

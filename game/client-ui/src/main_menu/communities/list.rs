@@ -66,7 +66,7 @@ pub fn community_list(
                 thumbnail,
                 ui,
                 ui_state,
-                ui.ctx().screen_rect(),
+                ui.ctx().content_rect(),
                 Some(ui.clip_rect()),
                 pos,
                 vec2::new(asset_size / ratio_w, asset_size / ratio_h),

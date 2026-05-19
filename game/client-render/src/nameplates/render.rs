@@ -77,7 +77,7 @@ impl NameplateRender {
                 } in &mut *pipe.players
                 {
                     ui.set_opacity(phased_alpha);
-                    let size = ui.ctx().screen_rect().size();
+                    let size = ui.ctx().content_rect().size();
                     let (x0, y0, x1, y1) = pipe.state.get_canvas_mapping();
 
                     let w = x1 - x0;

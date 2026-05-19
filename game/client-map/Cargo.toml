@@ -27,4 +27,4 @@ rayon = "1.11.0"
 tracing = { version = "0.1.41", default-features = false, features = [
   "attributes",
 ] }
-wasmparser = "0.238.1"
+wasmparser = "0.240.0"

@@ -92,7 +92,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
                         pipe.user_data.render_tee,
                         ui,
                         ui_state,
-                        ui.ctx().screen_rect(),
+                        ui.ctx().content_rect(),
                         Some(ui.clip_rect()),
                         &skin_name.as_str().try_into().unwrap_or_default(),
                         Some(&skin_info),

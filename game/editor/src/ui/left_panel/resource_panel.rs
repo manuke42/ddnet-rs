@@ -76,7 +76,7 @@ pub fn render<F, R, U>(
         .collect();
 
     let file_dialog = &mut panel_data.file_dialog;
-    if file_dialog.state() == DialogState::Open {
+    if *file_dialog.state() == DialogState::Open {
         let mode = file_dialog.mode();
         if let Some(selected) = file_dialog.update(ui.ctx()).picked() {
             match mode {

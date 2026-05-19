@@ -146,7 +146,7 @@ impl ServerMap {
             };
             let files = futures::future::join_all(files).await;
 
-            for (path, file) in names.into_iter().zip(files.into_iter()) {
+            for (path, file) in names.into_iter().zip(files) {
                 resource_files.insert(path, file?);
             }
 
@@ -285,20 +285,14 @@ impl ServerMap {
                         resource.meta.ty.as_str()
                     )]
                     .into_iter()
-                    .chain(
-                        resource
-                            .hq_meta
-                            .as_ref()
-                            .map(|hq_meta| {
-                                format!(
-                                    "map/resources/images/{}_{}.{}",
-                                    resource.name.as_str(),
-                                    fmt_hash(&hq_meta.blake3_hash),
-                                    hq_meta.ty.as_str()
-                                )
-                            })
-                            .into_iter(),
-                    )
+                    .chain(resource.hq_meta.as_ref().map(|hq_meta| {
+                        format!(
+                            "map/resources/images/{}_{}.{}",
+                            resource.name.as_str(),
+                            fmt_hash(&hq_meta.blake3_hash),
+                            hq_meta.ty.as_str()
+                        )
+                    }))
                     .collect::<Vec<_>>()
                 })
                 .chain(map.resources.sounds.iter().flat_map(|resource| {
@@ -309,20 +303,14 @@ impl ServerMap {
                         resource.meta.ty.as_str()
                     )]
                     .into_iter()
-                    .chain(
-                        resource
-                            .hq_meta
-                            .as_ref()
-                            .map(|hq_meta| {
-                                format!(
-                                    "map/resources/sounds/{}_{}.{}",
-                                    resource.name.as_str(),
-                                    fmt_hash(&hq_meta.blake3_hash),
-                                    hq_meta.ty.as_str()
-                                )
-                            })
-                            .into_iter(),
-                    )
+                    .chain(resource.hq_meta.as_ref().map(|hq_meta| {
+                        format!(
+                            "map/resources/sounds/{}_{}.{}",
+                            resource.name.as_str(),
+                            fmt_hash(&hq_meta.blake3_hash),
+                            hq_meta.ty.as_str()
+                        )
+                    }))
                     .collect::<Vec<_>>()
                 }))
             {

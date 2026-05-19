@@ -503,10 +503,7 @@ impl<'a> PipelineManager<'a> {
         let pipelines = Pipelines::new(
             self.device,
             self.pipeline_cache,
-            pipeline_infos
-                .into_iter()
-                .zip(pipe_layouts.into_iter())
-                .collect(),
+            pipeline_infos.into_iter().zip(pipe_layouts).collect(),
         )?;
 
         Ok(pipelines)

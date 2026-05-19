@@ -276,8 +276,10 @@ impl SoundBrush {
                 self.last_translation = None;
                 self.last_selection = None;
             }
-            if latest_pointer.primary_down() && self.last_translation.is_some() {
-                let last_active = self.last_translation.as_mut().unwrap();
+            if latest_pointer.primary_down()
+                && let Some(last_translation) = &mut self.last_translation
+            {
+                let last_active = last_translation;
                 let new_pos = vec2::new(x1, y1);
                 let aligned_pos = align_pos(new_pos);
                 let new_pos = if let Some(aligned_pos) = aligned_pos {

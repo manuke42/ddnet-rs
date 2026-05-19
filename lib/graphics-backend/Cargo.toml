@@ -40,8 +40,8 @@ either = "1.15.0"
 futures = "0.3.31"
 libc = "0.2.177"
 log = "0.4.28"
-naga = { version = "26.0.0", features = ["wgsl-in", "spv-out", "glsl-out"] }
-naga_oil = "0.19.1"
+naga = { version = "27.0.3", features = ["wgsl-in", "spv-out", "glsl-out"] }
+naga_oil = "0.20.0"
 num-derive = "0.4.2"
 num-traits = "0.2.19"
 parking_lot = "0.12.5"
