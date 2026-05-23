@@ -230,7 +230,7 @@ pub mod state {
         fn get_game_type_from_conf(conf: ConfigGameType) -> GameType {
             match conf {
                 ConfigGameType::Ctf => GameType::Sided,
-                ConfigGameType::Dm => GameType::Solo,
+                ConfigGameType::Dm | ConfigGameType::Race => GameType::Solo,
             }
         }
 
@@ -240,6 +240,7 @@ pub mod state {
             match conf {
                 ConfigGameType::Dm => "dm".try_into().unwrap(),
                 ConfigGameType::Ctf => "ctf".try_into().unwrap(),
+                ConfigGameType::Race => "race".try_into().unwrap(),
             }
         }
 

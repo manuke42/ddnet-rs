@@ -55,6 +55,7 @@ pub mod character {
     };
     use crate::{
         collision::collision::{Collision, CollisionTile, CollisionTypes, HitTile},
+        config::config::ConfigGameType,
         entities::entity::entity::{DropMode, Entity, EntityInterface, EntityTickResult},
         events::events::{CharacterDespawnType, CharacterEvent, CharacterTickEvent},
         simulation_pipe::simulation_pipe::{
@@ -1078,13 +1079,14 @@ pub mod character {
                         &proj_start_pos,
                         PHYSICAL_SIZE * 0.5,
                         &mut |char| {
-                            if pipe.collision.intersect_line(
-                                &proj_start_pos,
-                                char.pos.pos(),
-                                &mut vec2::default(),
-                                &mut vec2::default(),
-                                CollisionTypes::SOLID,
-                            ) != CollisionTile::None
+                            if !matches!(self.game_options.game_ty(), ConfigGameType::Race)
+                                && pipe.collision.intersect_line(
+                                    &proj_start_pos,
+                                    char.pos.pos(),
+                                    &mut vec2::default(),
+                                    &mut vec2::default(),
+                                    CollisionTypes::SOLID,
+                                ) != CollisionTile::None
                             {
                                 return;
                             }

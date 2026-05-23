@@ -143,6 +143,7 @@ use std::{
 use tokio::sync::Notify;
 use vanilla::{
     collision::collision::{Collision, Tunings},
+    config::config::{ConfigGameType, ConfigVanilla},
     entities::{
         character::{
             character::{
@@ -4556,7 +4557,11 @@ impl Client {
                                 required_resources: Default::default(),
                                 game_mod: GameModification::Ddnet,
                                 render_mod: RenderModification::Native,
-                                mod_config: None,
+                                mod_config: serde_json::to_vec(&ConfigVanilla {
+                                    game_type: ConfigGameType::Race,
+                                    ..Default::default()
+                                })
+                                .ok(),
                                 resource_server_fallback: Some(http_server.port_v4),
                                 hint_start_camera_pos: Default::default(),
                                 server_options: GameStateServerOptions {

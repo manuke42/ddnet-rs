@@ -66,7 +66,7 @@ pub mod match_manager {
         /// kills a player from the other side.
         fn side_score_player_kill(game_options: &GameOptions) -> i64 {
             match game_options.game_ty() {
-                ConfigGameType::Dm | ConfigGameType::Ctf => 0,
+                ConfigGameType::Dm | ConfigGameType::Ctf | ConfigGameType::Race => 0,
             }
         }
 
