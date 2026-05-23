@@ -34,6 +34,10 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>) {
                         ui.add(Slider::new(&mut config.global_volume, 0.0..=1.0).max_decimals(2));
                         ui.end_row();
 
+                        ui.label("Play sound when window is inactive:");
+                        ui.checkbox(&mut config.enable_when_inactive, "");
+                        ui.end_row();
+
                         ui.label("Ingame sound volume:");
                         ui.add(
                             Slider::new(&mut config.render.ingame_sound_volume, 0.0..=1.0)

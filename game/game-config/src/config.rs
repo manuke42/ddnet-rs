@@ -239,6 +239,9 @@ pub struct ConfigClient {
     /// How often the game loop should run per second.
     #[default = 0]
     pub refresh_rate: u64,
+    /// How often the game loop should run per second when the window is inactive.
+    #[default = 30]
+    pub refresh_rate_inactive: u64,
     /// Dummy related settings.
     #[default = Default::default()]
     pub dummy: ConfigDummy,
@@ -718,6 +721,9 @@ pub struct ConfigSoundRender {
 pub struct ConfigSound {
     /// Sound configs used during rendering sound & graphics.
     pub render: ConfigSoundRender,
+    /// Whether to keep sound enabled when the window is inactive.
+    #[default = false]
+    pub enable_when_inactive: bool,
     /// The overall volume multiplier
     #[conf_valid(range(min = 0.0, max = 1.0))]
     #[default = 0.3]
