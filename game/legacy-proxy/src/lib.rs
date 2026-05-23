@@ -1845,6 +1845,21 @@ impl Client {
                             ),
                         }),
                     );
+                    events.events.insert(
+                        base.event_id_generator.next_id(),
+                        events::GameWorldEvent::Sound(events::GameWorldSoundEvent {
+                            pos: Some(
+                                vec2::new(hammer_hit.common.x as f32, hammer_hit.common.y as f32)
+                                    / 32.0,
+                            ),
+                            owner_id: Some(player_id),
+                            ev: events::GameWorldEntitySoundEvent::Character(
+                                events::GameCharacterSoundEvent::Sound(
+                                    events::GameCharacterEventSound::HammerHit,
+                                ),
+                            ),
+                        }),
+                    );
                 }
                 SnapObj::Death(death) => {
                     let events = base
