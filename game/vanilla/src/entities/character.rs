@@ -11,7 +11,10 @@ pub mod character {
         num::{NonZeroI64, NonZeroU64},
     };
 
-    use crate::reusable::{CloneWithCopyableElements, ReusableCore};
+    use crate::{
+        reusable::{CloneWithCopyableElements, ReusableCore},
+        weapons::definitions::weapon_def::WeaponUpgradePool,
+    };
     use base::linked_hash_map_view::{
         FxLinkedHashMap, FxLinkedHashSet, LinkedHashMapView, LinkedHashMapViewMut,
     };
@@ -164,7 +167,7 @@ pub mod character {
     impl CloneWithCopyableElements for CharacterReusableCore {
         fn copy_clone_from(&mut self, other: &Self) {
             self.core.copy_clone_from(&other.core);
-            self.weapons.copy_clone_from(&other.weapons);
+            self.weapons.clone_from(&other.weapons);
             self.buffs.copy_clone_from(&other.buffs);
             self.debuffs.copy_clone_from(&other.debuffs);
             self.queued_emoticon.clone_from(&other.queued_emoticon);
@@ -200,6 +203,7 @@ pub mod character {
     pub struct CharacterPool {
         pub(crate) character_pool: Pool<PoolCharacters>,
         pub(crate) character_reusable_cores_pool: Pool<CharacterReusableCore>,
+        pub(crate) character_weapon_upgrade_pool: WeaponUpgradePool,
     }
 
     #[derive(Debug, Hiarc, PartialEq, Eq)]
@@ -507,14 +511,16 @@ pub mod character {
             }
         }
 
-        fn respawn_weapons(reusable_core: &mut CharacterReusableCore) {
+        fn respawn_weapons(pool: &CharacterPool, reusable_core: &mut CharacterReusableCore) {
             let gun = Weapon {
                 cur_ammo: Some(10),
                 next_ammo_regeneration_tick: 0.into(),
+                upgrades: pool.character_weapon_upgrade_pool.new(),
             };
             let hammer = Weapon {
                 cur_ammo: None,
                 next_ammo_regeneration_tick: 0.into(),
+                upgrades: pool.character_weapon_upgrade_pool.new(),
             };
             reusable_core.weapons.clear();
             reusable_core.weapons.insert(WeaponType::Hammer, hammer);
@@ -545,7 +551,7 @@ pub mod character {
             };
             let mut reusable_core = character_pool.character_reusable_cores_pool.new();
 
-            Self::respawn_weapons(&mut reusable_core);
+            Self::respawn_weapons(character_pool, &mut reusable_core);
 
             core.default_eye = player_info.player_info.default_eyes;
             core.eye = core.default_eye;

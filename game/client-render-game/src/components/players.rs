@@ -220,7 +220,13 @@ impl Players {
             let pos = character_render_info.lerped_pos;
             let is_frozen = character_render_info
                 .debuffs
-                .contains_key(&CharacterDebuff::Freeze);
+                .contains_key(&CharacterDebuff::Freeze)
+                || character_render_info
+                    .debuffs
+                    .contains_key(&CharacterDebuff::LiveFrozen)
+                || character_render_info
+                    .debuffs
+                    .contains_key(&CharacterDebuff::DeepFrozen);
             let is_ninja = character_render_info
                 .buffs
                 .contains_key(&CharacterBuff::Ninja);
@@ -230,7 +236,8 @@ impl Players {
             let should_render_hook = !is_ghost;
 
             let character_info = character_infos.get(character_id);
-            let _freeze_skin = is_frozen.then(|| character_info.map(|char| &char.info.freeze));
+            let _freeze_skin: Option<Option<&NetworkResourceKey<24>>> =
+                is_frozen.then(|| character_info.map(|char| &char.info.freeze));
             let ninja_skin = is_ninja.then(|| character_info.map(|char| &char.info.ninja));
 
             let (color_body, _) = skin_colors(character_info, is_frozen);
@@ -295,7 +302,13 @@ impl Players {
 
             let is_frozen = character_render_info
                 .debuffs
-                .contains_key(&CharacterDebuff::Freeze);
+                .contains_key(&CharacterDebuff::Freeze)
+                || character_render_info
+                    .debuffs
+                    .contains_key(&CharacterDebuff::LiveFrozen)
+                || character_render_info
+                    .debuffs
+                    .contains_key(&CharacterDebuff::DeepFrozen);
             let is_ninja = character_render_info
                 .buffs
                 .contains_key(&CharacterBuff::Ninja);

@@ -16,7 +16,7 @@ pub mod simulation_pipe {
     use math::math::vector::vec2;
     use serde::{Deserialize, Serialize};
 
-    use crate::entities::character::character::{CharactersView, CharactersViewMut};
+    use crate::entities::character::character::{CharacterPool, CharactersView, CharactersViewMut};
     use crate::entities::character::core::character_core::{Core, CoreReusable};
     use crate::entities::character::pos::character_pos::{
         CharacterPos, CharacterPositionPlayfield,
@@ -568,13 +568,19 @@ pub mod simulation_pipe {
     pub struct SimulationPipePickup<'a> {
         pub characters: SimulationPipeOwnerlessCharacters<'a>,
         pub field: &'a CharacterPositionPlayfield,
+        pub char_pool: &'a CharacterPool,
     }
 
     impl<'a> SimulationPipePickup<'a> {
-        pub fn new(characters: &'a mut Characters, field: &'a CharacterPositionPlayfield) -> Self {
+        pub fn new(
+            characters: &'a mut Characters,
+            field: &'a CharacterPositionPlayfield,
+            char_pool: &'a CharacterPool,
+        ) -> Self {
             Self {
                 characters: SimulationPipeOwnerlessCharacters { characters },
                 field,
+                char_pool,
             }
         }
     }

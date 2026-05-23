@@ -1049,25 +1049,30 @@ impl Client {
                         }
                     };
                     let mut weapons: FxLinkedHashMap<WeaponType, Weapon> = Default::default();
+                    let def_weapon = Weapon {
+                        next_ammo_regeneration_tick: Default::default(),
+                        cur_ammo: Default::default(),
+                        upgrades: PoolFxHashSet::new_without_pool(),
+                    };
                     if let Some(ddnet_char) = ddnet_char {
                         if (ddnet_char.flags & CHARACTERFLAG_WEAPON_HAMMER) != 0 {
-                            weapons.insert(WeaponType::Hammer, Weapon::default());
+                            weapons.insert(WeaponType::Hammer, def_weapon.clone());
                         }
                         if (ddnet_char.flags & CHARACTERFLAG_WEAPON_GUN) != 0 {
-                            weapons.insert(WeaponType::Gun, Weapon::default());
+                            weapons.insert(WeaponType::Gun, def_weapon.clone());
                         }
                         if (ddnet_char.flags & CHARACTERFLAG_WEAPON_SHOTGUN) != 0 {
-                            weapons.insert(WeaponType::Shotgun, Weapon::default());
+                            weapons.insert(WeaponType::Shotgun, def_weapon.clone());
                         }
                         if (ddnet_char.flags & CHARACTERFLAG_WEAPON_GRENADE) != 0 {
-                            weapons.insert(WeaponType::Grenade, Weapon::default());
+                            weapons.insert(WeaponType::Grenade, def_weapon.clone());
                         }
                         if (ddnet_char.flags & CHARACTERFLAG_WEAPON_LASER) != 0 {
-                            weapons.insert(WeaponType::Laser, Weapon::default());
+                            weapons.insert(WeaponType::Laser, def_weapon.clone());
                         }
                     }
                     let active_weapon = if !weapons.contains_key(&active_weapon) {
-                        weapons.insert(active_weapon, Default::default());
+                        weapons.insert(active_weapon, def_weapon.clone());
                         active_weapon
                     } else {
                         active_weapon
@@ -1575,7 +1580,14 @@ impl Client {
                                     reusable_core: {
                                         let mut core =
                                             PoolCharacterReusableCore::new_without_pool();
-                                        core.weapons.insert(WeaponType::Hammer, Weapon::default());
+                                        core.weapons.insert(
+                                            WeaponType::Hammer,
+                                            Weapon {
+                                                next_ammo_regeneration_tick: Default::default(),
+                                                cur_ammo: Default::default(),
+                                                upgrades: PoolFxHashSet::new_without_pool(),
+                                            },
+                                        );
                                         core
                                     },
                                     player_info: char_player_info,

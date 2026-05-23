@@ -172,6 +172,9 @@ pub mod world {
                     // reusable cores are used in snapshots quite frequently, and thus worth being pooled
                     // multiply by 2, because every character has two cores of this type
                     character_reusable_cores_pool: Pool::with_capacity(max_characters * 2),
+                    // reusable cores are used in snapshots quite frequently, and thus worth being pooled
+                    // multiply by 5 to match the current amount of weapons per char.
+                    character_weapon_upgrade_pool: Pool::with_capacity(max_characters * 5),
                 },
             }
         }
@@ -691,6 +694,7 @@ pub mod world {
                 pickup.tick(&mut SimulationPipePickup::new(
                     &mut self.characters,
                     &self.play_field,
+                    &self.world_pool.character_pool,
                 )) != EntityTickResult::RemoveEntity
             });
         }
@@ -700,6 +704,7 @@ pub mod world {
                 pickup.tick_deferred(&mut SimulationPipePickup::new(
                     &mut self.characters,
                     &self.play_field,
+                    &self.world_pool.character_pool,
                 )) != EntityTickResult::RemoveEntity
             });
         }

@@ -1,5 +1,5 @@
 pub mod state {
-    use std::num::{NonZero, NonZeroU16, NonZeroU64};
+    use std::num::{NonZero, NonZeroU16, NonZeroU32, NonZeroU64};
     use std::rc::Rc;
     use std::sync::Arc;
     use std::time::Duration;
@@ -61,7 +61,7 @@ pub mod state {
     use map::map::config::ConfigVariables;
     use math::math::lerp;
     use math::math::vector::{ubvec4, vec2};
-    use pool::datatypes::{PoolFxHashMap, PoolFxLinkedHashMap, PoolVec};
+    use pool::datatypes::{PoolFxHashMap, PoolFxLinkedHashMap, PoolFxLinkedHashSet, PoolVec};
     use pool::mt_datatypes::{PoolCow as MtPoolCow, PoolFxLinkedHashMap as MtPoolFxLinkedHashMap};
     use pool::pool::Pool;
 
@@ -72,8 +72,8 @@ pub mod state {
     use game_interface::types::render::character::{
         CharacterBuff, CharacterBuffInfo, CharacterDebuff, CharacterDebuffInfo,
         CharacterHookRenderInfo, CharacterInfo, CharacterPlayerInfo, CharacterRenderInfo,
-        LocalCharacterRenderInfo, LocalCharacterVanilla, PlayerCameraMode, PlayerIngameMode,
-        TeeEye,
+        LocalCharacterDdrace, LocalCharacterRenderInfo, LocalCharacterVanilla, PlayerCameraMode,
+        PlayerIngameMode, TeeEye,
     };
     use game_interface::types::render::flag::FlagRenderInfo;
     use game_interface::types::render::laser::LaserRenderInfo;
@@ -93,7 +93,7 @@ pub mod state {
     use crate::command_chain::{Command, CommandChain};
     use crate::config::config::{ConfigGameType, ConfigVanilla, ConfigVanillaWrapper};
     use crate::entities::character::character::{self, CharacterPlayerTy, CharacterSpectateMode};
-    use crate::entities::character::core::character_core::Core;
+    use crate::entities::character::core::character_core::{Core, PHYSICAL_SIZE};
     use crate::entities::character::player::player::{
         Player, PlayerInfo, Players, SpectatorPlayer, SpectatorPlayers,
     };
@@ -111,7 +111,7 @@ pub mod state {
     use crate::sql::save;
     use crate::stage::stage::Stages;
     use crate::types::types::{GameOptions, GameType};
-    use crate::weapons::definitions::weapon_def::Weapon;
+    use crate::weapons::definitions::weapon_def::{Weapon, WeaponUpgrade};
 
     use super::super::{
         collision::collision::Collision, entities::character::character::Character,
@@ -1116,20 +1116,27 @@ pub mod state {
                         let Some(character_info) = self.game.players.player(player_id) else {
                             return Err(anyhow!("The given player was not found in this game"));
                         };
-                        if let Some(character) = self
-                            .game
-                            .stages
-                            .get_mut(&character_info.stage_id())
-                            .and_then(|stage| stage.world.characters.get_mut(player_id))
+                        if let Some(stage) = self.game.stages.get_mut(&character_info.stage_id())
+                            && let Some(character) = stage.world.characters.get_mut(player_id)
                         {
                             let reusable_core = &mut character.reusable_core;
                             let gun = Weapon {
                                 cur_ammo: Some(10),
                                 next_ammo_regeneration_tick: 0.into(),
+                                upgrades: stage
+                                    .world
+                                    .world_pool
+                                    .character_pool
+                                    .character_weapon_upgrade_pool
+                                    .new(),
                             };
-                            reusable_core.weapons.insert(WeaponType::Gun, gun);
-                            reusable_core.weapons.insert(WeaponType::Shotgun, gun);
-                            reusable_core.weapons.insert(WeaponType::Grenade, gun);
+                            reusable_core.weapons.insert(WeaponType::Gun, gun.clone());
+                            reusable_core
+                                .weapons
+                                .insert(WeaponType::Shotgun, gun.clone());
+                            reusable_core
+                                .weapons
+                                .insert(WeaponType::Grenade, gun.clone());
                             reusable_core.weapons.insert(WeaponType::Laser, gun);
 
                             Ok("Cheated all weapons!".to_string())
@@ -1535,6 +1542,22 @@ pub mod state {
                     debuffs.extend(prev_character.reusable_core.debuffs.iter().map(
                         |(debuff, props)| match debuff {
                             CharacterDebuff::Freeze => (CharacterDebuff::Freeze, {
+                                let (remaining_time, total_time) =
+                                    remaining_and_total_time(&props.remaining_tick);
+                                CharacterDebuffInfo {
+                                    remaining_time,
+                                    total_time,
+                                }
+                            }),
+                            CharacterDebuff::DeepFrozen => (CharacterDebuff::DeepFrozen, {
+                                let (remaining_time, total_time) =
+                                    remaining_and_total_time(&props.remaining_tick);
+                                CharacterDebuffInfo {
+                                    remaining_time,
+                                    total_time,
+                                }
+                            }),
+                            CharacterDebuff::LiveFrozen => (CharacterDebuff::LiveFrozen, {
                                 let (remaining_time, total_time) =
                                     remaining_and_total_time(&props.remaining_tick);
                                 CharacterDebuffInfo {
@@ -2129,25 +2152,88 @@ pub mod state {
             player_id: &PlayerId,
         ) -> LocalCharacterRenderInfo {
             if let Some(p) = self.game.players.player(player_id) {
-                let player_char = self
-                    .game
-                    .stages
-                    .get(&p.stage_id())
-                    .unwrap()
-                    .world
-                    .characters
-                    .get(player_id)
-                    .unwrap();
+                let stage = self.game.stages.get(&p.stage_id()).unwrap();
+                let player_char = stage.world.characters.get(player_id).unwrap();
 
-                LocalCharacterRenderInfo::Vanilla(LocalCharacterVanilla {
-                    health: player_char.core.health,
-                    armor: player_char.core.armor,
-                    ammo_of_weapon: player_char
+                if matches!(self.game_options.game_ty(), ConfigGameType::Race) {
+                    let jumps = &player_char.core.core.jumps;
+                    let max_jumps = if jumps.endless {
+                        None
+                    } else {
+                        NonZeroU32::new(jumps.max.max(1) as u32)
+                    };
+                    let pos = *player_char.pos.pos();
+                    let grounded = self.collision.check_pointf(
+                        pos.x + PHYSICAL_SIZE / 2.0,
+                        pos.y + PHYSICAL_SIZE / 2.0 + 5.0,
+                    ) || self.collision.check_pointf(
+                        pos.x - PHYSICAL_SIZE / 2.0,
+                        pos.y + PHYSICAL_SIZE / 2.0 + 5.0,
+                    );
+                    let available_jumps = max_jumps
+                        .map(|max| {
+                            let used_jumps = if grounded {
+                                0
+                            } else {
+                                1 + jumps.count.max(0) as u32
+                            };
+                            max.get().saturating_sub(used_jumps)
+                        })
+                        .unwrap_or_default();
+                    let mut owned_weapons = PoolFxLinkedHashSet::new_without_pool();
+                    for weapon in player_char.reusable_core.weapons.keys() {
+                        owned_weapons.insert(*weapon);
+                    }
+                    let jetpack = player_char
                         .reusable_core
                         .weapons
-                        .get(&player_char.core.active_weapon)
-                        .and_then(|w| w.cur_ammo),
-                })
+                        .values()
+                        .any(|weapon| weapon.upgrades.contains(&WeaponUpgrade::Jetpack));
+                    let mut tele_weapons = PoolFxLinkedHashSet::new_without_pool();
+                    for (weapon_ty, weapon) in player_char.reusable_core.weapons.iter() {
+                        if weapon.upgrades.contains(&WeaponUpgrade::Teleport) {
+                            tele_weapons.insert(*weapon_ty);
+                        }
+                    }
+
+                    LocalCharacterRenderInfo::Ddrace(LocalCharacterDdrace {
+                        jumps: available_jumps,
+                        max_jumps,
+                        endless_hook: player_char.core.core.has_endless,
+                        can_hook_others: !player_char.core.core.hook_hit_disabled,
+                        jetpack,
+                        deep_frozen: player_char
+                            .reusable_core
+                            .debuffs
+                            .contains_key(&CharacterDebuff::DeepFrozen),
+                        live_frozen: player_char
+                            .reusable_core
+                            .debuffs
+                            .contains_key(&CharacterDebuff::LiveFrozen),
+                        can_finish: true,
+                        owned_weapons,
+                        disabled_weapons: PoolFxLinkedHashSet::new_without_pool(),
+                        tele_weapons,
+                        solo: player_char.core.core.solo,
+                        invincible: player_char.core.core.is_super,
+                        dummy_hammer: false,
+                        dummy_copy: false,
+                        stage_locked: stage.stage_locked,
+                        team0_mode: stage.team0_mode,
+                        can_collide: !player_char.core.core.collision_disabled,
+                        checkpoint: None,
+                    })
+                } else {
+                    LocalCharacterRenderInfo::Vanilla(LocalCharacterVanilla {
+                        health: player_char.core.health,
+                        armor: player_char.core.armor,
+                        ammo_of_weapon: player_char
+                            .reusable_core
+                            .weapons
+                            .get(&player_char.core.active_weapon)
+                            .and_then(|w| w.cur_ammo),
+                    })
+                }
             } else {
                 // spectators get nothing
                 LocalCharacterRenderInfo::Unavailable

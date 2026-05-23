@@ -199,6 +199,7 @@ pub mod pickup {
                                 Weapon {
                                     cur_ammo: Some(10),
                                     next_ammo_regeneration_tick: 0.into(),
+                                    upgrades: pipe.char_pool.character_weapon_upgrade_pool.new(),
                                 },
                             );
                             EntityTickResult::RemoveEntity
