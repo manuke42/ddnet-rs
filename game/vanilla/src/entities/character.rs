@@ -690,15 +690,20 @@ pub mod character {
                 *res = CharacterDamageResult::Death;
             } else if tile.index == DdraceTileNum::Freeze as u8 {
                 // freeze
-                self.reusable_core.debuffs.insert(
-                    CharacterDebuff::Freeze,
-                    BuffProps {
-                        remaining_tick: (TICKS_PER_SECOND * 3).into(),
+                let freeze = self
+                    .reusable_core
+                    .debuffs
+                    .entry(CharacterDebuff::Freeze)
+                    .or_insert_with_keep_order(|| BuffProps {
+                        remaining_tick: 0.into(),
                         interact_tick: 0.into(),
                         interact_cursor_dir: Default::default(),
                         interact_val: 0.0,
-                    },
-                );
+                    });
+                if freeze.interact_tick.is_none() {
+                    freeze.remaining_tick = (TICKS_PER_SECOND * 3).into();
+                    freeze.interact_tick = TICKS_PER_SECOND.into();
+                }
             } else if tile.index == DdraceTileNum::Unfreeze as u8 {
                 // unfreeze
                 self.reusable_core.debuffs.remove(&CharacterDebuff::Freeze);
@@ -1331,6 +1336,7 @@ pub mod character {
             });
             self.reusable_core.debuffs.retain_with_order(|_, buff| {
                 buff.remaining_tick.tick();
+                buff.interact_tick.tick();
                 buff.remaining_tick.is_some()
             });
 

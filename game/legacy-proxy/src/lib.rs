@@ -1194,6 +1194,15 @@ impl Client {
                             .0
                             .saturating_sub(ddnet_char.freeze_start.0)
                             .unsigned_abs();
+                        let freeze_refresh_guard_end = ddnet_char
+                            .freeze_start
+                            .0
+                            .saturating_add(TICKS_PER_SECOND as i32);
+                        let freeze_refresh_guard = if freeze_refresh_guard_end > tick {
+                            (freeze_refresh_guard_end - tick) as u64
+                        } else {
+                            0
+                        };
                         reusable_core.debuffs.insert(
                             CharacterDebuff::Freeze,
                             BuffProps {
@@ -1201,7 +1210,7 @@ impl Client {
                                     remaining.unsigned_abs() as u64,
                                     length as u64,
                                 ),
-                                interact_tick: Default::default(),
+                                interact_tick: freeze_refresh_guard.into(),
                                 interact_cursor_dir: Default::default(),
                                 interact_val: 0.0,
                             },
