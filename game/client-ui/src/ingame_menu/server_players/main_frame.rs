@@ -59,7 +59,7 @@ pub fn render(ui: &mut egui::Ui, ui_state: &mut UiState, pipe: &mut UiRenderPipe
                                     user_data.flags_container,
                                     ui,
                                     ui_state,
-                                    ui.ctx().screen_rect(),
+                                    ui.ctx().content_rect(),
                                     Some(rect),
                                     &default_key,
                                     &char.flag.to_lowercase().replace("-", "_"),
