@@ -859,6 +859,10 @@ pub mod character {
         ) -> CharacterDamageResult {
             let core = &mut self_char.core;
             core.core.vel += *force;
+            // Only apply force in race, no dmg
+            if matches!(self_char.game_options.game_ty(), ConfigGameType::Race) {
+                return CharacterDamageResult::None;
+            }
             let old_health = core.health;
             let old_armor = core.armor;
             if dmg_amount > 0 {
