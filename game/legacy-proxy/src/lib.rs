@@ -1799,6 +1799,20 @@ impl Client {
                             ),
                         }),
                     );
+                    events.events.insert(
+                        base.event_id_generator.next_id(),
+                        events::GameWorldEvent::Sound(events::GameWorldSoundEvent {
+                            pos: Some(
+                                vec2::new(spawn.common.x as f32, spawn.common.y as f32) / 32.0,
+                            ),
+                            owner_id: Some(player_id),
+                            ev: events::GameWorldEntitySoundEvent::Character(
+                                events::GameCharacterSoundEvent::Sound(
+                                    events::GameCharacterEventSound::Spawn,
+                                ),
+                            ),
+                        }),
+                    );
                 }
                 SnapObj::HammerHit(hammer_hit) => {
                     let events = base
