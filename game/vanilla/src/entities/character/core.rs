@@ -180,7 +180,7 @@ pub mod character_core {
     }
 
     impl Core {
-        fn clamp_vel(move_restriction: i32, vel_param: &vec2) -> vec2 {
+        pub(crate) fn clamp_vel(move_restriction: i32, vel_param: &vec2) -> vec2 {
             let mut vel = *vel_param;
             if vel.x > 0.0 && (move_restriction & CannotMove::Right as i32) != 0 {
                 vel.x = 0.0;

@@ -71,7 +71,7 @@ pub mod character {
     };
 
     use math::math::{
-        PI, angle, distance_squared, length, lerp, mix, normalize,
+        PI, angle, distance_squared, dot, length, lerp, mix, normalize,
         vector::{ivec2, vec2},
     };
     use pool::{mt_datatypes::PoolVec, pool::Pool, recycle::Recycle, traits::Recyclable};
@@ -772,6 +772,61 @@ pub mod character {
             self.handle_game_front_tiles(tile, res);
         }
 
+        fn handle_speedup_tile(
+            &mut self,
+            tile: &map::map::groups::layers::tiles::SpeedupTile,
+            collision: &Collision,
+        ) {
+            const TILE_SPEED_BOOST_OLD: u8 = DdraceTileNum::Boost as u8;
+            const TILE_SPEED_BOOST: u8 = DdraceTileNum::TeleCheck as u8;
+            const MAX_SPEED_SCALE: f32 = 5.0;
+
+            if tile.force == 0 {
+                return;
+            }
+
+            let angle = tile.angle as f32 * (PI / 180.0);
+            let direction = vec2::new(angle.cos(), angle.sin());
+            let force = tile.force as f32;
+            let mut temp_vel = self.core.core.vel;
+
+            match tile.base.index {
+                TILE_SPEED_BOOST_OLD => {
+                    let max_speed = tile.max_speed as f32;
+                    if tile.force == u8::MAX && tile.max_speed > 0 {
+                        self.core.core.vel = direction * (max_speed / MAX_SPEED_SCALE);
+                        return;
+                    }
+
+                    if tile.max_speed > 0 {
+                        let max_speed = max_speed.max(MAX_SPEED_SCALE);
+                        let speed_left = max_speed / MAX_SPEED_SCALE - dot(&direction, &temp_vel);
+                        temp_vel += direction * speed_left.clamp(-force, force);
+                    } else {
+                        temp_vel += direction * force;
+                    }
+                }
+                TILE_SPEED_BOOST => {
+                    let max_speed = if tile.max_speed == 0 {
+                        let tunings = collision.get_tune_at(self.pos.pos());
+                        let max_ramp_speed = tunings.velramp_range
+                            / (TICKS_PER_SECOND as f32 * tunings.velramp_curvature.max(1.01).ln());
+                        max_ramp_speed.max(tunings.velramp_start / TICKS_PER_SECOND as f32)
+                            * MAX_SPEED_SCALE
+                    } else {
+                        tile.max_speed as f32
+                    };
+
+                    let current_directional_speed = dot(&direction, &self.core.core.vel);
+                    let temp_max_speed = max_speed / MAX_SPEED_SCALE;
+                    temp_vel += direction * (temp_max_speed - current_directional_speed).min(force);
+                }
+                _ => {}
+            }
+
+            self.core.core.vel = Core::clamp_vel(self.core.core.move_restrictions, &temp_vel);
+        }
+
         #[must_use]
         fn handle_tiles(&mut self, old_pos: vec2, collision: &Collision) -> CharacterDamageResult {
             let mut res = CharacterDamageResult::None;
@@ -784,7 +839,9 @@ pub mod character {
                     self.handle_front_layer_tiles(tile, &mut res);
                 }
                 HitTile::Tele(_) => {}
-                HitTile::Speedup(_) => {}
+                HitTile::Speedup(tile) => {
+                    self.handle_speedup_tile(tile, collision);
+                }
                 HitTile::Switch(_) => {}
                 HitTile::Tune(_) => {
                     // tune tiles are handled on the fly where needed

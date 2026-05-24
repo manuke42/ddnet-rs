@@ -189,6 +189,7 @@ pub mod collision {
             let mut front_layer = None;
             let mut tune_layer = None;
             let mut tele_layer = None;
+            let mut speedup_layer = None;
             physics_group
                 .layers
                 .into_iter()
@@ -203,7 +204,9 @@ pub mod collision {
                     MapLayerPhysics::Tele(layer) => {
                         tele_layer = load_all_layers.then_some(layer);
                     }
-                    MapLayerPhysics::Speedup(_) => {}
+                    MapLayerPhysics::Speedup(layer) => {
+                        speedup_layer = load_all_layers.then_some(layer);
+                    }
                     MapLayerPhysics::Switch(_) => {}
                     MapLayerPhysics::Tune(layer) => {
                         tune_layer = load_all_layers.then_some(layer);
@@ -273,7 +276,9 @@ pub mod collision {
                 tele_tiles: tele_layer
                     .map(|l| l.base.tiles.to_vec())
                     .unwrap_or_else(|| vec![Default::default(); game_layer.tiles.len()]),
-                speedup_tiles: vec![Default::default(); game_layer.tiles.len()],
+                speedup_tiles: speedup_layer
+                    .map(|l| l.tiles.to_vec())
+                    .unwrap_or_else(|| vec![Default::default(); game_layer.tiles.len()]),
                 switch_tiles: vec![Default::default(); game_layer.tiles.len()],
             }))
         }
