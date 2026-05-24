@@ -795,6 +795,10 @@ pub mod character {
                 self.core.core.hit_disabled = false;
             } else if tile.index == DdraceTileNum::HitDisable as u8 {
                 self.core.core.hit_disabled = true;
+            } else if tile.index == DdraceTileNum::SoloEnable as u8 {
+                self.core.core.solo = true;
+            } else if tile.index == DdraceTileNum::SoloDisable as u8 {
+                self.core.core.solo = false;
             } else {
                 return false;
             }
