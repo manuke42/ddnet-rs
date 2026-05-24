@@ -3701,8 +3701,14 @@ impl AppWithGraphics for ClientNativeImpl {
 
     fn focus_changed(&mut self, focused: bool) {
         self.focused = focused;
-        // global binds don't allow keeping keys by tabbing out
+        // The OS can steal focus for shortcuts like Alt+Tab without sending
+        // release events, so pressed-key state must not survive focus changes.
         self.global_binds.reset_cur_keys();
+        if let Game::WaitingForFirstSnapshot(game) | Game::Active(game) = &mut self.game {
+            for (_, local_player) in game.game_data.local.local_players.iter_mut() {
+                local_player.binds.reset_cur_keys();
+            }
+        }
     }
 
     fn file_dropped(&mut self, file: PathBuf) {
