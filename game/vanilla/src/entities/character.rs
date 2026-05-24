@@ -799,6 +799,9 @@ pub mod character {
                 self.core.core.solo = true;
             } else if tile.index == DdraceTileNum::SoloDisable as u8 {
                 self.core.core.solo = false;
+            } else if tile.index == DdraceTileNum::RefillJumps as u8 {
+                self.core.core.jumps.count = 0;
+                self.core.core.jumps.flag = 0;
             } else {
                 return false;
             }
