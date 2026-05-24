@@ -818,6 +818,10 @@ pub mod character {
                 if let Some(gun) = self.reusable_core.weapons.get_mut(&WeaponType::Gun) {
                     gun.upgrades.remove(&WeaponUpgrade::Jetpack);
                 }
+            } else if tile.index == DdraceTileNum::NphEnable as u8 {
+                self.core.core.hook_hit_disabled = false;
+            } else if tile.index == DdraceTileNum::NphDisable as u8 {
+                self.core.core.hook_hit_disabled = true;
             } else {
                 return false;
             }
