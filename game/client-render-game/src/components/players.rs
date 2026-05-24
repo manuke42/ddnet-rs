@@ -44,7 +44,9 @@ use vanilla::collision::collision::Collision;
 use game_interface::types::{
     character_info::{MAX_ASSET_NAME_LEN, NetworkSkinInfo},
     id_types::CharacterId,
-    render::character::{CharacterBuff, CharacterDebuff, CharacterInfo, CharacterRenderInfo},
+    render::character::{
+        CharacterBuff, CharacterDebuff, CharacterDebuffInfo, CharacterInfo, CharacterRenderInfo,
+    },
     resource_key::NetworkResourceKey,
 };
 use math::math::{
@@ -177,10 +179,10 @@ impl Players {
 
         fn skin_colors(
             character_info: Option<&CharacterInfo>,
-            is_frozen: bool,
+            frozen_skin_color: Option<TeeRenderSkinColor>,
         ) -> (TeeRenderSkinColor, TeeRenderSkinColor) {
-            if is_frozen {
-                (TeeRenderSkinColor::Freeze, TeeRenderSkinColor::Freeze)
+            if let Some(color) = frozen_skin_color {
+                (color, color)
             } else if let Some(NetworkSkinInfo::Custom {
                 body_color,
                 feet_color,
@@ -189,6 +191,20 @@ impl Players {
                 (body_color.into(), feet_color.into())
             } else {
                 (TeeRenderSkinColor::Original, TeeRenderSkinColor::Original)
+            }
+        }
+
+        fn frozen_skin_color(
+            debuffs: &PoolFxLinkedHashMap<CharacterDebuff, CharacterDebuffInfo>,
+        ) -> Option<TeeRenderSkinColor> {
+            if debuffs.contains_key(&CharacterDebuff::DeepFrozen) {
+                Some(TeeRenderSkinColor::DeepFrozen)
+            } else if debuffs.contains_key(&CharacterDebuff::LiveFrozen) {
+                Some(TeeRenderSkinColor::LiveFrozen)
+            } else if debuffs.contains_key(&CharacterDebuff::Freeze) {
+                Some(TeeRenderSkinColor::Freeze)
+            } else {
+                None
             }
         }
 
@@ -218,15 +234,8 @@ impl Players {
             };
 
             let pos = character_render_info.lerped_pos;
-            let is_frozen = character_render_info
-                .debuffs
-                .contains_key(&CharacterDebuff::Freeze)
-                || character_render_info
-                    .debuffs
-                    .contains_key(&CharacterDebuff::LiveFrozen)
-                || character_render_info
-                    .debuffs
-                    .contains_key(&CharacterDebuff::DeepFrozen);
+            let frozen_skin_color = frozen_skin_color(&character_render_info.debuffs);
+            let is_frozen = frozen_skin_color.is_some();
             let is_ninja = character_render_info
                 .buffs
                 .contains_key(&CharacterBuff::Ninja);
@@ -240,7 +249,7 @@ impl Players {
                 is_frozen.then(|| character_info.map(|char| &char.info.freeze));
             let ninja_skin = is_ninja.then(|| character_info.map(|char| &char.info.ninja));
 
-            let (color_body, _) = skin_colors(character_info, is_frozen);
+            let (color_body, _) = skin_colors(character_info, frozen_skin_color);
 
             // hook
             let hook_hand = should_render_hook
@@ -300,15 +309,8 @@ impl Players {
             let want_other_dir =
                 (input_dir == -1 && vel.x > 0.0) || (input_dir == 1 && vel.x < 0.0); // TODO: use input?
 
-            let is_frozen = character_render_info
-                .debuffs
-                .contains_key(&CharacterDebuff::Freeze)
-                || character_render_info
-                    .debuffs
-                    .contains_key(&CharacterDebuff::LiveFrozen)
-                || character_render_info
-                    .debuffs
-                    .contains_key(&CharacterDebuff::DeepFrozen);
+            let frozen_skin_color = frozen_skin_color(&character_render_info.debuffs);
+            let is_frozen = frozen_skin_color.is_some();
             let is_ninja = character_render_info
                 .buffs
                 .contains_key(&CharacterBuff::Ninja);
@@ -406,7 +408,7 @@ impl Players {
                 }
             }
 
-            let (color_body, color_feet) = skin_colors(character_info, is_frozen);
+            let (color_body, color_feet) = skin_colors(character_info, frozen_skin_color);
 
             let tee_render_info = TeeRenderInfo {
                 color_body,

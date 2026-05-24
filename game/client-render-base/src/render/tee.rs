@@ -21,6 +21,8 @@ pub enum TeeRenderSkinColor {
     Original,
     Colorable(ColorRgba),
     Freeze,
+    DeepFrozen,
+    LiveFrozen,
 }
 
 impl TeeRenderSkinColor {
@@ -32,6 +34,8 @@ impl TeeRenderSkinColor {
                 color
             }
             Self::Freeze => ColorRgba::new(1.0, 1.0, 1.0, alpha),
+            Self::DeepFrozen => ColorRgba::new(0.72, 0.78, 0.86, alpha),
+            Self::LiveFrozen => ColorRgba::new(1.0, 0.72, 0.64, alpha),
         }
     }
 }
@@ -58,7 +62,9 @@ impl RenderSkin for Skin {
         match color {
             TeeRenderSkinColor::Original => &self.textures,
             TeeRenderSkinColor::Colorable(_) => &self.grey_scaled_textures,
-            TeeRenderSkinColor::Freeze => &self.frozen_textures,
+            TeeRenderSkinColor::Freeze
+            | TeeRenderSkinColor::DeepFrozen
+            | TeeRenderSkinColor::LiveFrozen => &self.frozen_textures,
         }
     }
 }
