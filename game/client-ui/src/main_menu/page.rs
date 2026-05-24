@@ -40,7 +40,9 @@ use graphics::{
         stream::stream::GraphicsStreamHandle, texture::texture::GraphicsTextureHandle,
     },
 };
-use master_server_types::{addr::Protocol, servers::BrowserServers};
+use master_server_types::{
+    addr::Protocol, legacy_server_list::LegacyServerList, servers::BrowserServers,
+};
 use math::colors::legacy_color_to_rgba;
 use sound::{scene_object::SceneObject, sound::SoundManager};
 use ui_base::types::{UiRenderPipe, UiState};
@@ -60,7 +62,6 @@ use super::{
     ddnet_info::DdnetInfo,
     demo_list::{DemoList, DemoListEntry},
     features::EnabledFeatures,
-    legacy_server_list::LegacyServerList,
     main_frame,
     monitors::UiMonitors,
     player_settings_ntfy::PlayerSettingsSync,

@@ -6,7 +6,6 @@ pub mod demo;
 pub mod demo_list;
 pub mod features;
 pub mod leftbar;
-pub mod legacy_server_list;
 pub mod main_frame;
 pub mod monitors;
 pub mod page;

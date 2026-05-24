@@ -6075,6 +6075,7 @@ dependencies = [
  "libtw2-snapshot",
  "log 0.4.29",
  "map",
+ "master-server-types",
  "math",
  "network",
  "pool",

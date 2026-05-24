@@ -13,7 +13,7 @@ use base::{
     reduced_ascii_str::ReducedAsciiString,
 };
 use base_http::{http::HttpClient, http_server::HttpDownloadServer};
-use base_io::io::Io;
+use base_io::{io::Io, runtime::IoRuntimeTask};
 use client::{ClientData, ClientState, ProxyClient, SocketClient, WarnPkt};
 use game_base::{
     connecting_log::ConnectingLog,
@@ -98,6 +98,7 @@ use libtw2_net::net::PeerId;
 use libtw2_packer::{IntUnpacker, Unpacker};
 use log::{Level, debug, log_enabled, warn};
 use map::{file::MapFileReader, map::Map};
+use master_server_types::{addr::Protocol, legacy_server_list::LegacyServerList};
 use math::{
     colors::{legacy_color_to_rgba, rgba_to_legacy_color},
     math::{
@@ -362,9 +363,117 @@ struct Client {
     last_snapshot: Snapshot,
 
     start_time: Duration,
+    retry_full_server_at: Option<Duration>,
+    retry_full_server_task: Option<IoRuntimeTask<bool>>,
 }
 
 impl Client {
+    fn server_full_disconnect(reason: &str) -> bool {
+        let reason = reason.to_ascii_lowercase();
+        reason.contains("server is full")
+    }
+
+    fn legacy_server_list_has_free_slot(servers_raw: &str, connect_addr: SocketAddr) -> bool {
+        let Ok(servers) = serde_json::from_str::<LegacyServerList>(servers_raw) else {
+            return false;
+        };
+
+        servers.servers.iter().any(|server| {
+            let has_address = server
+                .addresses
+                .iter()
+                .any(|addr| addr.protocol == Protocol::V6 && addr.to_socket_addr() == connect_addr);
+            has_address && server.info.clients.len() < server.info.max_clients as usize
+        })
+    }
+
+    fn start_full_server_retry_task(&mut self) {
+        if self.retry_full_server_task.is_some() {
+            return;
+        }
+
+        let http = self.io.http.clone();
+        let connect_addr = self.connect_addr;
+        let notifier = self.notifier_server.clone();
+        self.retry_full_server_task = Some(
+            self.io
+                .rt
+                .spawn(async move {
+                    let res = async {
+                        let servers = http
+                            .download_text(
+                                "https://master1.ddnet.org/ddnet/15/servers.json"
+                                    .try_into()
+                                    .unwrap(),
+                            )
+                            .await?;
+                        Ok(Self::legacy_server_list_has_free_slot(
+                            &servers,
+                            connect_addr,
+                        ))
+                    }
+                    .await;
+                    notifier.notify_one();
+                    res
+                })
+                .cancelable(),
+        );
+    }
+
+    fn retry_full_server_connect(&mut self) -> anyhow::Result<()> {
+        let Some(retry_at) = self.retry_full_server_at else {
+            return Ok(());
+        };
+
+        let now = self.time.now();
+        let Some(task) = &self.retry_full_server_task else {
+            if now >= retry_at {
+                self.start_full_server_retry_task();
+            }
+            return Ok(());
+        };
+        if !task.is_finished() {
+            return Ok(());
+        }
+
+        let should_reconnect = match self.retry_full_server_task.take().unwrap().get() {
+            Ok(has_free_slot) => has_free_slot,
+            Err(err) => {
+                self.log.log(format!(
+                    "Could not check legacy server list for free slots: {err}. \
+                    Trying to reconnect anyway."
+                ));
+                true
+            }
+        };
+        self.retry_full_server_at = Some(now + Duration::from_secs(2));
+
+        if !should_reconnect {
+            return Ok(());
+        }
+
+        let Some((_, player)) = self.players.iter_mut().next() else {
+            self.retry_full_server_at = None;
+            return Ok(());
+        };
+
+        self.log.log("Trying to reconnect to legacy server.");
+        let player_info = std::mem::take(&mut player.data.player_info);
+        let socket = match SocketClient::new(&self.io, self.connect_addr) {
+            Ok(socket) => socket,
+            Err(err) => {
+                self.log
+                    .log(format!("Could not reconnect to legacy server: {err}"));
+                player.data.player_info = player_info;
+                return Ok(());
+            }
+        };
+        *player = ProxyClient::new(player_info, socket, 0, false);
+        self.retry_full_server_at = None;
+        self.retry_full_server_task = None;
+        Ok(())
+    }
+
     fn run(
         io: &Io,
         time: &base::steady_clock::SteadyClock,
@@ -698,6 +807,8 @@ impl Client {
                     log,
 
                     start_time: proxy_start,
+                    retry_full_server_at: None,
+                    retry_full_server_task: None,
                 };
 
                 app.run_loop().unwrap();
@@ -4534,6 +4645,11 @@ impl Client {
 
     fn handle_server_events_and_sleep(&mut self) -> anyhow::Result<()> {
         if let Some(con_id) = self.con_id {
+            let retry_timeout = self
+                .retry_full_server_at
+                .filter(|_| self.retry_full_server_task.is_none())
+                .map(|retry_at| retry_at.saturating_sub(self.time.now()));
+
             let mut event_handler = |socket: &mut SocketClient,
                                      ev: libtw2_net::net::ChunkOrEvent<'_, SocketAddr>,
                                      base: &mut ClientBase,
@@ -4593,7 +4709,22 @@ impl Client {
                             .log(format!("Proxy client got disconnected: {reason}"));
                         socket.skip_disconnect_on_drop = true;
                         if is_main_connection {
-                            self.server_network.kick(&con_id, KickType::Kick(reason));
+                            if Self::server_full_disconnect(&reason) {
+                                self.log.log(
+                                    "Legacy server is full, waiting for a free slot before reconnecting.",
+                                );
+                                self.retry_full_server_at = Some(self.time.now());
+                                self.server_network.send_unordered_to(
+                                    &ServerToClientMessage::QueueInfo(
+                                        "The legacy server is full.\nWaiting for a free slot."
+                                            .try_into()
+                                            .unwrap(),
+                                    ),
+                                    &con_id,
+                                );
+                            } else {
+                                self.server_network.kick(&con_id, KickType::Kick(reason));
+                            }
                         }
                     }
                     Connect(_) => {
@@ -4846,7 +4977,7 @@ impl Client {
                 .values()
                 .map(|p| p.socket.socket.receivers())
                 .collect();
-            let (pkt, index) = self
+            let (pkt, index, receiver_start_index) = self
                 .io
                 .rt
                 .spawn(async move {
@@ -4854,7 +4985,7 @@ impl Client {
                         Pin<Box<dyn Future<Output = Option<(Vec<u8>, SocketAddr)>> + Send>>;
                     let mut futures: Vec<SockFuture> = vec![
                         Box::pin(async move {
-                            net.wait_for_event_async(None).await;
+                            net.wait_for_event_async(retry_timeout).await;
                             None
                         }),
                         Box::pin(async move {
@@ -4862,20 +4993,21 @@ impl Client {
                             None
                         }),
                     ];
+                    let receiver_start_index = futures.len();
                     futures.extend(receivers.into_iter().map(|(v4, v6)| {
                         let future: SockFuture =
                             Box::pin(async move { Socket::recv_from(v4, v6).await });
                         future
                     }));
                     let (res, index, _) = futures::future::select_all(futures).await;
-                    Ok((res, index))
+                    Ok((res, index, receiver_start_index))
                 })
                 .get()
                 .unwrap();
             if let Some((data, addr)) = pkt
-                && index > 1
+                && index >= receiver_start_index
             {
-                let index = index - 2;
+                let index = index - receiver_start_index;
 
                 let other_active = if index > 0 {
                     self.players
@@ -4905,12 +5037,16 @@ impl Client {
         } else {
             let notify = self.notifier_server.clone();
             let finish_notify = self.finish_notifier.clone();
+            let retry_timeout = self
+                .retry_full_server_at
+                .filter(|_| self.retry_full_server_task.is_none())
+                .map(|retry_at| retry_at.saturating_sub(self.time.now()));
             let _ = self
                 .io
                 .rt
                 .spawn(async move {
                     tokio::select! {
-                        _ = notify.wait_for_event_async(None) => {}
+                        _ = notify.wait_for_event_async(retry_timeout) => {}
                         _ = finish_notify.notified() => {}
                     }
                     Ok(())
@@ -4923,6 +5059,8 @@ impl Client {
 
     fn run_once(&mut self) -> anyhow::Result<()> {
         self.handle_client_events()?;
+
+        self.retry_full_server_connect()?;
 
         self.handle_server_events_and_sleep()?;
 
