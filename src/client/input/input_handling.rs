@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use base_io::io::Io;
 use binds::binds::{
@@ -209,13 +209,13 @@ impl InputHandling {
         evs: &mut Vec<InputHandlingEvent>,
         config_engine: &mut ConfigEngine,
         config_game: &mut ConfigGame,
+        cur_time: &Duration,
         bind_cmds: &HashMap<&'static str, BindActionsLocalPlayer>,
         entries: &[ConsoleEntry],
     ) {
         let Some((local_player_id, local_player)) = local.active_local_player_mut() else {
             return;
         };
-        let input = &mut local_player.input.inp;
         let actions = local_player.binds.process();
 
         #[derive(Debug, Default)]
@@ -250,6 +250,7 @@ impl InputHandling {
         let mut dummy = CharacterActions::default();
 
         let mut is_zooming = false;
+        let was_zoom_state_none = local_player.zoom_state.is_none();
 
         let mut dummy_fire_aim_character = false;
 
@@ -575,17 +576,22 @@ impl InputHandling {
             local_player.binds.reset_cur_keys();
         }
         if !next_show_spectator_selection {
-            set(input, character);
+            set(&mut local_player.input.inp, character);
         }
 
         local_player.show_scoreboard = next_show_scoreboard;
         local_player.show_chat_all = next_show_chat_all;
 
+        if was_zoom_state_none && local_player.zoom_state.is_some() {
+            local_player.apply_zoom_step(cur_time);
+        }
         if !is_zooming {
             local_player.zoom_state = None;
         }
 
-        input
+        local_player
+            .input
+            .inp
             .state
             .input_method_flags
             .set(CharacterInputMethodFlags::MOUSE_KEYBOARD);
@@ -624,7 +630,7 @@ impl InputHandling {
         if ui.ui_state.is_ui_open {
             flags |= CharacterInputFlags::MENU_UI;
         }
-        input.state.flags.set(flags);
+        local_player.input.inp.state.flags.set(flags);
 
         if let Some((_, local_dummy)) = local.first_inactive_local_players_mut() {
             if dummy.reset {
@@ -853,6 +859,7 @@ impl InputHandling {
         ui: &mut UiContainer,
         config_engine: &mut ConfigEngine,
         config_game: &mut ConfigGame,
+        cur_time: &Duration,
         graphics: &Graphics,
         entries: &[ConsoleEntry],
     ) -> Vec<InputHandlingEvent> {
@@ -903,6 +910,7 @@ impl InputHandling {
                                     &mut res,
                                     config_engine,
                                     config_game,
+                                    cur_time,
                                     &self.bind_cmds,
                                     entries,
                                 );
@@ -916,6 +924,7 @@ impl InputHandling {
                                     &mut res,
                                     config_engine,
                                     config_game,
+                                    cur_time,
                                     &self.bind_cmds,
                                     entries,
                                 );
@@ -925,6 +934,17 @@ impl InputHandling {
                                     panic!("this should have been checked earlier");
                                 };
                                 local_player.binds.handle_key_up(&key_ev.key);
+                                Self::handle_binds_impl(
+                                    ui,
+                                    &mut game_data.local,
+                                    &mut game_data.dummy_control,
+                                    &mut res,
+                                    config_engine,
+                                    config_game,
+                                    cur_time,
+                                    &self.bind_cmds,
+                                    entries,
+                                );
                             }
                         },
                         InputEv::Move(move_ev)

@@ -53,7 +53,7 @@ use url::Url;
 
 use crate::{
     game::data::{ClientConnectedPlayer, SnapshotStorageItem},
-    localplayer::{ClientPlayer, ClientPlayerZoomMode, ServerInputForDiff},
+    localplayer::{ClientPlayer, ServerInputForDiff},
     spatial_chat::spatial_chat::SpatialChatGameWorldTy,
 };
 
@@ -934,28 +934,7 @@ impl ActiveGame {
         }
 
         for (local_player_id, local_player) in self.game_data.local.local_players.iter_mut() {
-            if let Some(state) = &mut local_player.zoom_state {
-                const UPDATE_TIME: Duration = Duration::from_millis(50);
-                const FIRST_UPDATE_TIME: Duration = Duration::from_millis(250);
-                if state
-                    .last_apply_time
-                    .is_none_or(|t| *cur_time >= t + UPDATE_TIME)
-                {
-                    const ZOOM_STEP: f32 = 1.1;
-                    let zoom_factor = match state.mode {
-                        ClientPlayerZoomMode::ZoomingIn => 1.0 / ZOOM_STEP,
-                        ClientPlayerZoomMode::ZoomingOut => ZOOM_STEP,
-                    };
-                    local_player.zoom = (local_player.zoom * zoom_factor).clamp(0.01, 1024.0);
-
-                    let apply_time = state
-                        .last_apply_time
-                        .map(|t| cur_time.saturating_sub(cur_time.saturating_sub(t + UPDATE_TIME)))
-                        .unwrap_or_else(|| cur_time.saturating_add(FIRST_UPDATE_TIME));
-
-                    state.last_apply_time = Some(apply_time);
-                }
-            }
+            local_player.apply_zoom_step(cur_time);
             if let Some(player_info) = self
                 .game_data
                 .cached_character_infos

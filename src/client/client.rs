@@ -3294,6 +3294,7 @@ impl AppWithGraphics for ClientNativeImpl {
                     &mut self.ui_manager.ui,
                     &mut self.config.engine,
                     &mut self.config.game,
+                    &self.cur_time,
                     &self.graphics,
                     &self.local_console.entries,
                 );
