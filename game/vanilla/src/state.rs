@@ -1428,12 +1428,16 @@ pub mod state {
                 cooldown: &GameTickCooldownAndLength,
             ) -> (Option<Duration>, Duration) {
                 (
-                    cooldown
-                        .get()
-                        .map(|l| Duration::from_micros(l.get() * (1000000 / TICKS_PER_SECOND))),
+                    cooldown.get().map(|l| {
+                        Duration::from_micros(l.get().saturating_mul(1000000 / TICKS_PER_SECOND))
+                    }),
                     cooldown
                         .length()
-                        .map(|l| Duration::from_micros(l.get() * (1000000 / TICKS_PER_SECOND)))
+                        .map(|l| {
+                            Duration::from_micros(
+                                l.get().saturating_mul(1000000 / TICKS_PER_SECOND),
+                            )
+                        })
                         .unwrap_or_default(),
                 )
             }

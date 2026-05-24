@@ -89,9 +89,10 @@ use libtw2_gamenet_ddnet::{
         system,
     },
     snap_obj::{
-        self, CHARACTERFLAG_WEAPON_GRENADE, CHARACTERFLAG_WEAPON_GUN, CHARACTERFLAG_WEAPON_HAMMER,
-        CHARACTERFLAG_WEAPON_LASER, CHARACTERFLAG_WEAPON_SHOTGUN, Character, DdnetCharacter,
-        DdnetPlayer, PROJECTILEFLAG_NORMALIZE_VEL, obj_size,
+        self, CHARACTERFLAG_MOVEMENTS_DISABLED, CHARACTERFLAG_WEAPON_GRENADE,
+        CHARACTERFLAG_WEAPON_GUN, CHARACTERFLAG_WEAPON_HAMMER, CHARACTERFLAG_WEAPON_LASER,
+        CHARACTERFLAG_WEAPON_SHOTGUN, Character, DdnetCharacter, DdnetPlayer,
+        PROJECTILEFLAG_NORMALIZE_VEL, obj_size,
     },
 };
 use libtw2_net::net::PeerId;
@@ -1484,37 +1485,58 @@ impl Client {
                             interactions: Default::default(),
                             queued_emoticon: Default::default(),
                         });
-                    if let Some(ddnet_char) = ddnet_char
-                        && ddnet_char.freeze_start.0 != 0
-                        && ddnet_char.freeze_start.0 < ddnet_char.freeze_end.0
-                    {
-                        let remaining = ddnet_char.freeze_end.0.saturating_sub(tick);
-                        let length = ddnet_char
-                            .freeze_end
-                            .0
-                            .saturating_sub(ddnet_char.freeze_start.0)
-                            .unsigned_abs();
-                        let freeze_refresh_guard_end = ddnet_char
-                            .freeze_start
-                            .0
-                            .saturating_add(TICKS_PER_SECOND as i32);
-                        let freeze_refresh_guard = if freeze_refresh_guard_end > tick {
-                            (freeze_refresh_guard_end - tick) as u64
-                        } else {
-                            0
-                        };
-                        reusable_core.debuffs.insert(
-                            CharacterDebuff::Freeze,
-                            BuffProps {
-                                remaining_tick: GameTickCooldownAndLength::new_with_length(
-                                    remaining.unsigned_abs() as u64,
-                                    length as u64,
-                                ),
-                                interact_tick: freeze_refresh_guard.into(),
-                                interact_cursor_dir: Default::default(),
-                                interact_val: 0.0,
-                            },
-                        );
+                    if let Some(ddnet_char) = ddnet_char {
+                        if ddnet_char.freeze_start.0 != 0
+                            && (ddnet_char.freeze_start.0 < ddnet_char.freeze_end.0
+                                || ddnet_char.freeze_end.0 == -1)
+                        {
+                            let remaining = ddnet_char.freeze_end.0.saturating_sub(tick);
+                            let length = ddnet_char
+                                .freeze_end
+                                .0
+                                .saturating_sub(ddnet_char.freeze_start.0)
+                                .unsigned_abs();
+                            let freeze_refresh_guard_end = ddnet_char
+                                .freeze_start
+                                .0
+                                .saturating_add(TICKS_PER_SECOND as i32);
+                            let freeze_refresh_guard = if freeze_refresh_guard_end > tick {
+                                (freeze_refresh_guard_end - tick) as u64
+                            } else {
+                                0
+                            };
+                            let (ty, remaining_tick) = if ddnet_char.freeze_end.0 == -1 {
+                                (CharacterDebuff::DeepFrozen, GameTickType::MAX.into())
+                            } else {
+                                (
+                                    CharacterDebuff::Freeze,
+                                    GameTickCooldownAndLength::new_with_length(
+                                        remaining.unsigned_abs() as u64,
+                                        length as u64,
+                                    ),
+                                )
+                            };
+                            reusable_core.debuffs.insert(
+                                ty,
+                                BuffProps {
+                                    remaining_tick,
+                                    interact_tick: freeze_refresh_guard.into(),
+                                    interact_cursor_dir: Default::default(),
+                                    interact_val: 0.0,
+                                },
+                            );
+                        }
+                        if (ddnet_char.flags & CHARACTERFLAG_MOVEMENTS_DISABLED) != 0 {
+                            reusable_core.debuffs.insert(
+                                CharacterDebuff::LiveFrozen,
+                                BuffProps {
+                                    remaining_tick: GameTickType::MAX.into(),
+                                    interact_tick: 0.into(),
+                                    interact_cursor_dir: Default::default(),
+                                    interact_val: 0.0,
+                                },
+                            );
+                        }
                     }
                     if let Some(collision) = collision {
                         let mut char_tick = character_core.tick;
@@ -1583,7 +1605,13 @@ impl Client {
                                 .flatten()
                                 .or(inp);
                             let use_inp = inp.is_some()
-                                && !reusable_core.debuffs.contains_key(&CharacterDebuff::Freeze);
+                                && !reusable_core.debuffs.contains_key(&CharacterDebuff::Freeze)
+                                && !reusable_core
+                                    .debuffs
+                                    .contains_key(&CharacterDebuff::DeepFrozen)
+                                && !reusable_core
+                                    .debuffs
+                                    .contains_key(&CharacterDebuff::LiveFrozen);
                             let inp = inp.unwrap_or_default();
                             core.physics_tick(
                                 &mut fake_pos,
