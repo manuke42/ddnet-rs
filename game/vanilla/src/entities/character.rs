@@ -806,6 +806,10 @@ pub mod character {
                 self.core.core.collision_disabled = true;
             } else if tile.index == DdraceTileNum::NpcEnable as u8 {
                 self.core.core.collision_disabled = false;
+            } else if tile.index == DdraceTileNum::UnlimitedJumpsEnable as u8 {
+                self.core.core.jumps.endless = true;
+            } else if tile.index == DdraceTileNum::UnlimitedJumpsDisable as u8 {
+                self.core.core.jumps.endless = false;
             } else {
                 return false;
             }
