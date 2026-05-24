@@ -696,24 +696,68 @@ pub mod character {
                 self.die(None, GameWorldActionKillWeapon::World, Default::default());
                 *res = CharacterDamageResult::Death;
             } else if tile.index == DdraceTileNum::Freeze as u8 {
-                // freeze
-                let freeze = self
+                if !self
                     .reusable_core
                     .debuffs
-                    .entry(CharacterDebuff::Freeze)
-                    .or_insert_with_keep_order(|| BuffProps {
-                        remaining_tick: 0.into(),
+                    .contains_key(&CharacterDebuff::DeepFrozen)
+                {
+                    let freeze = self
+                        .reusable_core
+                        .debuffs
+                        .entry(CharacterDebuff::Freeze)
+                        .or_insert_with_keep_order(|| BuffProps {
+                            remaining_tick: 0.into(),
+                            interact_tick: 0.into(),
+                            interact_cursor_dir: Default::default(),
+                            interact_val: 0.0,
+                        });
+                    if freeze.interact_tick.is_none() {
+                        freeze.remaining_tick = (TICKS_PER_SECOND * 3).into();
+                        freeze.interact_tick = TICKS_PER_SECOND.into();
+                    }
+                }
+            } else if tile.index == DdraceTileNum::Unfreeze as u8 {
+                if !self
+                    .reusable_core
+                    .debuffs
+                    .contains_key(&CharacterDebuff::DeepFrozen)
+                {
+                    self.reusable_core.debuffs.remove(&CharacterDebuff::Freeze);
+                }
+            } else if tile.index == DdraceTileNum::DFreeze as u8 {
+                if !self
+                    .reusable_core
+                    .debuffs
+                    .contains_key(&CharacterDebuff::DeepFrozen)
+                {
+                    self.reusable_core.debuffs.insert(
+                        CharacterDebuff::DeepFrozen,
+                        BuffProps {
+                            remaining_tick: GameTickType::MAX.into(),
+                            interact_tick: 0.into(),
+                            interact_cursor_dir: Default::default(),
+                            interact_val: 0.0,
+                        },
+                    );
+                }
+            } else if tile.index == DdraceTileNum::DUnfreeze as u8 {
+                self.reusable_core
+                    .debuffs
+                    .remove(&CharacterDebuff::DeepFrozen);
+            } else if tile.index == DdraceTileNum::LFreeze as u8 {
+                self.reusable_core.debuffs.insert(
+                    CharacterDebuff::LiveFrozen,
+                    BuffProps {
+                        remaining_tick: GameTickType::MAX.into(),
                         interact_tick: 0.into(),
                         interact_cursor_dir: Default::default(),
                         interact_val: 0.0,
-                    });
-                if freeze.interact_tick.is_none() {
-                    freeze.remaining_tick = (TICKS_PER_SECOND * 3).into();
-                    freeze.interact_tick = TICKS_PER_SECOND.into();
-                }
-            } else if tile.index == DdraceTileNum::Unfreeze as u8 {
-                // unfreeze
-                self.reusable_core.debuffs.remove(&CharacterDebuff::Freeze);
+                    },
+                );
+            } else if tile.index == DdraceTileNum::LUnfreeze as u8 {
+                self.reusable_core
+                    .debuffs
+                    .remove(&CharacterDebuff::LiveFrozen);
             } else {
                 return false;
             }
@@ -1001,14 +1045,29 @@ pub mod character {
         /// can fire at all (ninja or weapon)
         fn can_fire(&self) -> bool {
             !self.reusable_core.buffs.contains_key(&CharacterBuff::Ghost)
-                && !self
-                    .reusable_core
-                    .debuffs
-                    .contains_key(&CharacterDebuff::Freeze)
+                && !self.blocks_weapons_and_hook()
         }
 
         fn can_fire_weapon(&self) -> bool {
             !self.reusable_core.buffs.contains_key(&CharacterBuff::Ninja) && self.can_fire()
+        }
+
+        fn blocks_weapons_and_hook(&self) -> bool {
+            self.reusable_core
+                .debuffs
+                .contains_key(&CharacterDebuff::Freeze)
+                || self
+                    .reusable_core
+                    .debuffs
+                    .contains_key(&CharacterDebuff::DeepFrozen)
+        }
+
+        fn blocks_movement(&self) -> bool {
+            self.blocks_weapons_and_hook()
+                || self
+                    .reusable_core
+                    .debuffs
+                    .contains_key(&CharacterDebuff::LiveFrozen)
         }
 
         fn fire_weapon(
@@ -1427,13 +1486,10 @@ pub mod character {
         }
 
         fn handle_weapons(&mut self, pipe: &mut SimulationPipeCharacter) {
-            // don't handle weapon if ninja, ghost or freeze are active
+            // don't handle weapon if ninja, ghost or full freeze are active
             if self.reusable_core.buffs.contains_key(&CharacterBuff::Ninja)
                 || self.reusable_core.buffs.contains_key(&CharacterBuff::Ghost)
-                || self
-                    .reusable_core
-                    .debuffs
-                    .contains_key(&CharacterDebuff::Freeze)
+                || self.blocks_weapons_and_hook()
             {
                 return;
             }
@@ -1595,16 +1651,14 @@ pub mod character {
                 self.core.default_eye = self.player_info.player_info.default_eyes;
             }
 
-            if self
-                .reusable_core
-                .debuffs
-                .contains_key(&CharacterDebuff::Freeze)
-            {
+            if self.blocks_weapons_and_hook() {
                 self.core.input.state.fire.set(false);
                 self.core.input.state.hook.set(false);
+                self.core.core.queued_hooks.clicked = 0;
+            }
+            if self.blocks_movement() {
                 self.core.input.state.dir.set(0);
                 self.core.input.state.jump.set(false);
-                self.core.core.queued_hooks.clicked = 0;
                 self.core.core.jumps.queued = 0;
             }
 
