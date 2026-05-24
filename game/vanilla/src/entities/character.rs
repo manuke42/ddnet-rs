@@ -822,6 +822,30 @@ pub mod character {
                 self.core.core.hook_hit_disabled = false;
             } else if tile.index == DdraceTileNum::NphDisable as u8 {
                 self.core.core.hook_hit_disabled = true;
+            } else if tile.index == DdraceTileNum::TeleGunEnable as u8 {
+                if let Some(weapon) = self.reusable_core.weapons.get_mut(&WeaponType::Gun) {
+                    weapon.upgrades.insert(WeaponUpgrade::Teleport);
+                }
+            } else if tile.index == DdraceTileNum::TeleGunDisable as u8 {
+                if let Some(weapon) = self.reusable_core.weapons.get_mut(&WeaponType::Gun) {
+                    weapon.upgrades.remove(&WeaponUpgrade::Teleport);
+                }
+            } else if tile.index == DdraceTileNum::TeleGrenadeEnable as u8 {
+                if let Some(weapon) = self.reusable_core.weapons.get_mut(&WeaponType::Grenade) {
+                    weapon.upgrades.insert(WeaponUpgrade::Teleport);
+                }
+            } else if tile.index == DdraceTileNum::TeleGrenadeDisable as u8 {
+                if let Some(weapon) = self.reusable_core.weapons.get_mut(&WeaponType::Grenade) {
+                    weapon.upgrades.remove(&WeaponUpgrade::Teleport);
+                }
+            } else if tile.index == DdraceTileNum::TeleLaserEnable as u8 {
+                if let Some(weapon) = self.reusable_core.weapons.get_mut(&WeaponType::Laser) {
+                    weapon.upgrades.insert(WeaponUpgrade::Teleport);
+                }
+            } else if tile.index == DdraceTileNum::TeleLaserDisable as u8 {
+                if let Some(weapon) = self.reusable_core.weapons.get_mut(&WeaponType::Laser) {
+                    weapon.upgrades.remove(&WeaponUpgrade::Teleport);
+                }
             } else {
                 return false;
             }
