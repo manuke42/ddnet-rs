@@ -96,6 +96,7 @@ pub mod events {
             pos: vec2,
             dir: vec2,
             energy: f32,
+            can_hit_others: bool,
             can_hit_own: bool,
         },
     }

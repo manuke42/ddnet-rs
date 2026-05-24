@@ -791,6 +791,10 @@ pub mod character {
                 self.core.core.has_endless = true;
             } else if tile.index == DdraceTileNum::EHookDisable as u8 {
                 self.core.core.has_endless = false;
+            } else if tile.index == DdraceTileNum::HitEnable as u8 {
+                self.core.core.hit_disabled = false;
+            } else if tile.index == DdraceTileNum::HitDisable as u8 {
+                self.core.core.hit_disabled = true;
             } else {
                 return false;
             }
@@ -1358,6 +1362,9 @@ pub mod character {
                         &proj_start_pos,
                         PHYSICAL_SIZE * 0.5,
                         &mut |char| {
+                            if self.core.core.hit_disabled {
+                                return;
+                            }
                             if !matches!(self.game_options.game_ty(), ConfigGameType::Race)
                                 && pipe.collision.intersect_line(
                                     &proj_start_pos,
@@ -1488,6 +1495,7 @@ pub mod character {
                         pos: *self.pos.pos(),
                         dir: direction,
                         energy: pipe.collision.get_tune_at(self.pos.pos()).laser_reach,
+                        can_hit_others: !self.core.core.hit_disabled,
                         can_hit_own: self.game_options.laser_hit_self(),
                     });
                     self.push_sound(

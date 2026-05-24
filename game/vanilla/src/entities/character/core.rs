@@ -106,6 +106,7 @@ pub mod character_core {
         pub solo: bool,
         pub collision_disabled: bool,
         pub hook_hit_disabled: bool,
+        pub hit_disabled: bool,
         pub is_super: bool,
 
         pub has_endless: bool,

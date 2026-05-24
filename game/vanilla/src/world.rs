@@ -767,71 +767,71 @@ pub mod world {
                 ));
 
                 // handle the entity events
-                events.drain(..).for_each(|ev| {
-                    match &ev {
-                        CharacterTickEvent::Projectile {
-                            pos,
-                            dir,
-                            ty,
-                            lifetime,
-                        } => {
-                            if let Some(id_generator) = &self.id_generator {
-                                let proj_id = id_generator.next_id();
-                                let projectile = Projectile::new(
-                                    &proj_id,
-                                    pos,
-                                    dir,
-                                    (lifetime * TICKS_PER_SECOND as f32) as i32,
-                                    1,
-                                    0.0,
-                                    match ty {
-                                        WeaponWithProjectile::Gun
-                                        | WeaponWithProjectile::Shotgun => false,
-                                        WeaponWithProjectile::Grenade => true,
-                                    },
-                                    *ty,
-                                    &pipe.world_pool.projectile_pool,
-                                    &self.game_pending_events,
-                                    &self.simulation_events,
-                                    character.core.side,
-                                );
-                                self.projectiles.insert(
-                                    proj_id,
-                                    WorldProjectile {
-                                        character_id: character.base.game_element_id,
-                                        projectile,
-                                    },
-                                );
-                            }
+                events.drain(..).for_each(|ev| match &ev {
+                    CharacterTickEvent::Projectile {
+                        pos,
+                        dir,
+                        ty,
+                        lifetime,
+                    } => {
+                        if let Some(id_generator) = &self.id_generator {
+                            let proj_id = id_generator.next_id();
+                            let projectile = Projectile::new(
+                                &proj_id,
+                                pos,
+                                dir,
+                                (lifetime * TICKS_PER_SECOND as f32) as i32,
+                                1,
+                                0.0,
+                                match ty {
+                                    WeaponWithProjectile::Gun | WeaponWithProjectile::Shotgun => {
+                                        false
+                                    }
+                                    WeaponWithProjectile::Grenade => true,
+                                },
+                                *ty,
+                                &pipe.world_pool.projectile_pool,
+                                &self.game_pending_events,
+                                &self.simulation_events,
+                                character.core.side,
+                            );
+                            self.projectiles.insert(
+                                proj_id,
+                                WorldProjectile {
+                                    character_id: character.base.game_element_id,
+                                    projectile,
+                                },
+                            );
                         }
-                        CharacterTickEvent::Laser {
-                            pos,
-                            dir,
-                            energy,
-                            can_hit_own,
-                        } => {
-                            if let Some(id_generator) = &self.id_generator {
-                                let id = id_generator.next_id();
-                                let laser = Laser::new(
-                                    &id,
-                                    pos,
-                                    dir,
-                                    *energy,
-                                    true, // TODO:
-                                    *can_hit_own,
-                                    character.core.side,
-                                    &pipe.world_pool.laser_pool,
-                                    &self.game_pending_events,
-                                    &self.simulation_events,
-                                );
-                                self.lasers.insert(
-                                    id,
-                                    WorldLaser {
-                                        character_id: character.base.game_element_id,
-                                        laser,
-                                    },
-                                );
-                            }
+                    }
+                    CharacterTickEvent::Laser {
+                        pos,
+                        dir,
+                        energy,
+                        can_hit_others,
+                        can_hit_own,
+                    } => {
+                        if let Some(id_generator) = &self.id_generator {
+                            let id = id_generator.next_id();
+                            let laser = Laser::new(
+                                &id,
+                                pos,
+                                dir,
+                                *energy,
+                                *can_hit_others,
+                                *can_hit_own,
+                                character.core.side,
+                                &pipe.world_pool.laser_pool,
+                                &self.game_pending_events,
+                                &self.simulation_events,
+                            );
+                            self.lasers.insert(
+                                id,
+                                WorldLaser {
+                                    character_id: character.base.game_element_id,
+                                    laser,
+                                },
+                            );
                         }
                     }
                 });
