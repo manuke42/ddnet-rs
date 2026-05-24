@@ -34,7 +34,9 @@ use game_interface::{
     },
     interface::GameStateServerOptions,
     types::{
-        character_info::{MAX_ASSET_NAME_LEN, NetworkCharacterInfo, NetworkSkinInfo},
+        character_info::{
+            MAX_ASSET_NAME_LEN, MAX_CHARACTER_NAME_LEN, NetworkCharacterInfo, NetworkSkinInfo,
+        },
         emoticons::EmoticonType,
         fixed_zoom_level::FixedZoomLevel,
         flag::FlagType,
@@ -49,13 +51,13 @@ use game_interface::{
         laser::LaserType,
         network_stats::PlayerNetworkStats,
         pickup::PickupType,
-        player_info::PlayerUniqueId,
+        player_info::{PlayerDropReason, PlayerUniqueId},
         render::{
             character::{CharacterBuff, CharacterDebuff, TeeEye},
             game::game_match::MatchSide,
             projectiles::WeaponWithProjectile,
         },
-        resource_key::{NetworkResourceKey, ResourceKeyBase},
+        resource_key::{MtPoolNetworkResourceKey, NetworkResourceKey, ResourceKeyBase},
         snapshot::SnapshotLocalPlayer,
         weapons::WeaponType,
     },
@@ -240,6 +242,15 @@ struct LocalPlayer {
     pub ddnet_player_snap: Option<DdnetPlayer>,
 }
 
+#[derive(Clone)]
+struct PendingLeavePlayer {
+    id: CharacterId,
+    stage_id: StageId,
+    name: MtPoolNetworkString<MAX_CHARACTER_NAME_LEN>,
+    skin: MtPoolNetworkResourceKey<MAX_ASSET_NAME_LEN>,
+    skin_info: NetworkSkinInfo,
+}
+
 #[derive(Debug, Clone)]
 enum ServerInfoTy {
     Partial { requires_password: bool },
@@ -292,6 +303,7 @@ struct ClientBase {
 
     events: events::GameEvents,
     event_id_generator: EventIdGenerator,
+    pending_game_kill_msgs: Vec<game::SvKillMsg>,
 
     capabilities: Capabilities,
 
@@ -629,6 +641,7 @@ impl Client {
                             worlds: GameWorldsEvents::new_without_pool(),
                         },
                         event_id_generator,
+                        pending_game_kill_msgs: Default::default(),
 
                         capabilities: Capabilities::default(),
                         tunes: Default::default(),
@@ -709,6 +722,175 @@ impl Client {
 
     fn sys_msg_to_ping_id(msg: system::PongEx) -> u128 {
         msg.id.as_u128()
+    }
+
+    fn is_legacy_leave_system_chat(message: &[u8]) -> bool {
+        let message = String::from_utf8_lossy(message);
+        message.starts_with('\'') && message.ends_with("' has left the game")
+    }
+
+    /// Read the old snapshot info for a player whose legacy id dropped while
+    /// resolving an ambiguous `WEAPON_GAME` message.
+    fn pending_leave_player_from_snapshot(
+        base: &ClientBase,
+        snapshot: &Snapshot,
+        legacy_id: i32,
+        char_id: CharacterId,
+    ) -> Option<PendingLeavePlayer> {
+        base.legacy_id_in_stage_id
+            .get(&legacy_id)
+            .and_then(|stage_id| {
+                snapshot.stages.get(stage_id).and_then(|stage| {
+                    stage
+                        .world
+                        .characters
+                        .get(&char_id)
+                        .map(|character| PendingLeavePlayer {
+                            id: char_id,
+                            stage_id: *stage_id,
+                            name: MtPoolNetworkString::from_without_pool(
+                                character.player_info.player_info.name.clone(),
+                            ),
+                            skin: MtPoolNetworkResourceKey::from_without_pool(
+                                character.player_info.player_info.skin.clone(),
+                            ),
+                            skin_info: character.player_info.player_info.skin_info,
+                        })
+                })
+            })
+            .or_else(|| {
+                snapshot
+                    .spectator_players
+                    .get(&char_id)
+                    .map(|player| PendingLeavePlayer {
+                        id: char_id,
+                        stage_id: base.stage_0_id,
+                        name: MtPoolNetworkString::from_without_pool(
+                            player.player.player_info.player_info.name.clone(),
+                        ),
+                        skin: MtPoolNetworkResourceKey::from_without_pool(
+                            player.player.player_info.player_info.skin.clone(),
+                        ),
+                        skin_info: player.player.player_info.player_info.skin_info,
+                    })
+            })
+    }
+
+    /// Emit the new protocol's explicit leave notification for a player that was
+    /// inferred to have disconnected from legacy snapshot state.
+    fn push_player_left(base: &mut ClientBase, player: PendingLeavePlayer) {
+        let events = base
+            .events
+            .worlds
+            .entry(player.stage_id)
+            .or_insert_with_keep_order(|| events::GameWorldEvents {
+                events: mt_datatypes::PoolFxLinkedHashMap::new_without_pool(),
+            });
+        events.events.insert(
+            base.event_id_generator.next_id(),
+            events::GameWorldEvent::Notification(GameWorldNotificationEvent::System(
+                GameWorldSystemMessage::PlayerLeft {
+                    id: player.id,
+                    name: player.name,
+                    skin: player.skin,
+                    skin_info: player.skin_info,
+                    reason: PlayerDropReason::Disconnect,
+                },
+            )),
+        );
+    }
+
+    /// Emit explicit leave events for legacy ids that disappeared from the new
+    /// active snapshot while their old snapshot info is still available.
+    fn push_dropped_player_left_events(
+        base: &mut ClientBase,
+        old_snapshot: &Snapshot,
+        dropped_characters: &HashMap<i32, CharacterId>,
+    ) {
+        for (legacy_id, char_id) in dropped_characters {
+            if !base.char_legacy_to_new_id.contains_key(legacy_id)
+                && let Some(player) = Self::pending_leave_player_from_snapshot(
+                    base,
+                    old_snapshot,
+                    *legacy_id,
+                    *char_id,
+                )
+            {
+                Self::push_player_left(base, player);
+            }
+        }
+    }
+
+    /// Resolve delayed `WEAPON_GAME` kill messages after snapshot rebuilding.
+    /// Still-present victims are game kills; dropped victims already emitted leave.
+    fn flush_pending_game_kill_msgs(base: &mut ClientBase) {
+        for msg in std::mem::take(&mut base.pending_game_kill_msgs) {
+            if base.char_legacy_to_new_id.contains_key(&msg.victim) {
+                Self::push_kill_notification(base, msg);
+            }
+        }
+    }
+
+    /// Convert a legacy kill message into the new action-feed event once the
+    /// caller knows it is not an ambiguous disconnect-side `WEAPON_GAME` kill.
+    fn push_kill_notification(base: &mut ClientBase, msg: game::SvKillMsg) {
+        const WEAPON_GAME: i32 = -3;
+        const WEAPON_SELF: i32 = -2;
+        const WEAPON_WORLD: i32 = -1;
+        const WEAPON_HAMMER: i32 = 0;
+        const WEAPON_GUN: i32 = 1;
+        const WEAPON_SHOTGUN: i32 = 2;
+        const WEAPON_GRENADE: i32 = 3;
+        const WEAPON_LASER: i32 = 4;
+        const WEAPON_NINJA: i32 = 5;
+
+        let events = base
+            .events
+            .worlds
+            .entry(base.stage_0_id)
+            .or_insert_with_keep_order(|| events::GameWorldEvents {
+                events: mt_datatypes::PoolFxLinkedHashMap::new_without_pool(),
+            });
+        events.events.insert(
+            base.event_id_generator.next_id(),
+            events::GameWorldEvent::Notification(GameWorldNotificationEvent::Action(
+                events::GameWorldAction::Kill {
+                    killer: base.char_legacy_to_new_id.get(&msg.killer).copied(),
+                    assists: mt_datatypes::PoolVec::new_without_pool(),
+                    victims: mt_datatypes::PoolVec::from_without_pool(
+                        if [WEAPON_WORLD, WEAPON_SELF, WEAPON_GAME].contains(&msg.weapon) {
+                            Default::default()
+                        } else {
+                            base.char_legacy_to_new_id
+                                .get(&msg.victim)
+                                .copied()
+                                .into_iter()
+                                .collect()
+                        },
+                    ),
+                    weapon: match msg.weapon {
+                        WEAPON_HAMMER => events::GameWorldActionKillWeapon::Weapon {
+                            weapon: WeaponType::Hammer,
+                        },
+                        WEAPON_GUN => events::GameWorldActionKillWeapon::Weapon {
+                            weapon: WeaponType::Gun,
+                        },
+                        WEAPON_SHOTGUN => events::GameWorldActionKillWeapon::Weapon {
+                            weapon: WeaponType::Shotgun,
+                        },
+                        WEAPON_GRENADE => events::GameWorldActionKillWeapon::Weapon {
+                            weapon: WeaponType::Grenade,
+                        },
+                        WEAPON_LASER => events::GameWorldActionKillWeapon::Weapon {
+                            weapon: WeaponType::Laser,
+                        },
+                        WEAPON_NINJA => events::GameWorldActionKillWeapon::Ninja,
+                        _ => events::GameWorldActionKillWeapon::World,
+                    },
+                    flags: Default::default(),
+                },
+            )),
+        );
     }
 
     fn player_info_mut<'a>(
@@ -2778,12 +2960,6 @@ impl Client {
 
                     if is_active_connection {
                         base.last_snap_tick = tick;
-                        *snapshot = Snapshot::new(
-                            &base.vanilla_snap_pool,
-                            base.id_generator.peek_next_id(),
-                            None,
-                            Default::default(),
-                        );
 
                         let mut local_player_legacy_id = None;
                         // search legacy id of local player
@@ -2914,7 +3090,21 @@ impl Client {
                                     items.insert(0, (SnapObj::Character(char), *id));
                                 }
                             }
+
+                            Self::push_dropped_player_left_events(
+                                base,
+                                snapshot,
+                                &char_legacy_to_new_id,
+                            );
+                            Self::flush_pending_game_kill_msgs(base);
                         }
+
+                        *snapshot = Snapshot::new(
+                            &base.vanilla_snap_pool,
+                            base.id_generator.peek_next_id(),
+                            None,
+                            Default::default(),
+                        );
 
                         let legacy_id_in_stage_id = &mut base.legacy_id_in_stage_id;
                         legacy_id_in_stage_id.clear();
@@ -3092,6 +3282,10 @@ impl Client {
                 }
             }
             (_, SystemOrGame::Game(Game::SvChat(chat))) => {
+                if chat.client_id == -1 && Self::is_legacy_leave_system_chat(chat.message) {
+                    return;
+                }
+
                 let (name, skin, skin_info) = if let Some(character) = base
                     .legacy_id_in_stage_id
                     .get(&chat.client_id)
@@ -3230,63 +3424,12 @@ impl Client {
                     .insert(emoticon.client_id, (time.now(), emoticon.emoticon));
             }
             (_, SystemOrGame::Game(Game::SvKillMsg(msg))) => {
-                let events = base
-                    .events
-                    .worlds
-                    .entry(base.stage_0_id)
-                    .or_insert_with_keep_order(|| events::GameWorldEvents {
-                        events: mt_datatypes::PoolFxLinkedHashMap::new_without_pool(),
-                    });
                 const WEAPON_GAME: i32 = -3; // team switching etc
-                const WEAPON_SELF: i32 = -2; // console kill command
-                const WEAPON_WORLD: i32 = -1; // death tiles etc
-                const WEAPON_HAMMER: i32 = 0;
-                const WEAPON_GUN: i32 = 1;
-                const WEAPON_SHOTGUN: i32 = 2;
-                const WEAPON_GRENADE: i32 = 3;
-                const WEAPON_LASER: i32 = 4;
-                const WEAPON_NINJA: i32 = 5;
-                events.events.insert(
-                    base.event_id_generator.next_id(),
-                    events::GameWorldEvent::Notification(GameWorldNotificationEvent::Action(
-                        events::GameWorldAction::Kill {
-                            killer: base.char_legacy_to_new_id.get(&msg.killer).copied(),
-                            assists: mt_datatypes::PoolVec::new_without_pool(),
-                            victims: mt_datatypes::PoolVec::from_without_pool(
-                                if [WEAPON_WORLD, WEAPON_SELF, WEAPON_GAME].contains(&msg.weapon) {
-                                    Default::default()
-                                } else {
-                                    base.char_legacy_to_new_id
-                                        .get(&msg.victim)
-                                        .copied()
-                                        .into_iter()
-                                        .collect()
-                                },
-                            ),
-                            weapon: match msg.weapon {
-                                WEAPON_HAMMER => events::GameWorldActionKillWeapon::Weapon {
-                                    weapon: WeaponType::Hammer,
-                                },
-                                WEAPON_GUN => events::GameWorldActionKillWeapon::Weapon {
-                                    weapon: WeaponType::Gun,
-                                },
-                                WEAPON_SHOTGUN => events::GameWorldActionKillWeapon::Weapon {
-                                    weapon: WeaponType::Shotgun,
-                                },
-                                WEAPON_GRENADE => events::GameWorldActionKillWeapon::Weapon {
-                                    weapon: WeaponType::Grenade,
-                                },
-                                WEAPON_LASER => events::GameWorldActionKillWeapon::Weapon {
-                                    weapon: WeaponType::Laser,
-                                },
-                                WEAPON_NINJA => events::GameWorldActionKillWeapon::Ninja,
-                                // WEAPON_WORLD | WEAPON_SELF | WEAPON_GAME
-                                _ => events::GameWorldActionKillWeapon::World,
-                            },
-                            flags: Default::default(),
-                        },
-                    )),
-                );
+                if msg.weapon == WEAPON_GAME {
+                    base.pending_game_kill_msgs.push(msg);
+                } else {
+                    Self::push_kill_notification(base, msg);
+                }
             }
             (_, SystemOrGame::Game(Game::SvTuneParams(tunes))) => {
                 base.tunes.ground_control_speed = tunes.ground_control_speed.to_float();
