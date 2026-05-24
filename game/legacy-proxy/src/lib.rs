@@ -1375,6 +1375,7 @@ impl Client {
                         });
                     if let Some(ddnet_char) = ddnet_char
                         && ddnet_char.freeze_start.0 != 0
+                        && ddnet_char.freeze_start.0 < ddnet_char.freeze_end.0
                     {
                         let remaining = ddnet_char.freeze_end.0.saturating_sub(tick);
                         let length = ddnet_char
