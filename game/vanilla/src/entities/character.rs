@@ -138,6 +138,11 @@ pub mod character {
 
         pub input: CharacterInput,
 
+        pub tele_checkpoint: u8,
+
+        /// If the character is teleported, this is increased.
+        pub non_linear_event: u64,
+
         /// is timeout e.g. by a network disconnect.
         /// this is a hint, not a logic variable.
         pub is_timeout: bool,
@@ -774,6 +779,65 @@ pub mod character {
             self.handle_game_front_tiles(tile, res);
         }
 
+        fn reset_hook(&mut self) {
+            self.phased.hook_mut().set(Hook::None, None);
+        }
+
+        fn teleport_to(&mut self, pos: vec2, reset_vel: bool) {
+            self.pos.move_pos(pos);
+            if reset_vel {
+                self.core.core.vel = vec2::default();
+            }
+            self.reset_hook();
+            self.core.non_linear_event += 1;
+        }
+
+        fn handle_tele_tile(
+            &mut self,
+            tile: &map::map::groups::layers::tiles::TeleTile,
+            collision: &Collision,
+        ) -> bool {
+            match tile.base.index {
+                index if index == DdraceTileNum::TeleCheck as u8 => {
+                    self.core.tele_checkpoint = tile.number;
+                    false
+                }
+                index if index == DdraceTileNum::TeleIn as u8 => {
+                    if let Some(pos) = collision.tele_out(tile.number) {
+                        self.teleport_to(pos, false);
+                        true
+                    } else {
+                        false
+                    }
+                }
+                index if index == DdraceTileNum::TeleInEvil as u8 => {
+                    if let Some(pos) = collision.tele_out(tile.number) {
+                        self.teleport_to(pos, true);
+                        true
+                    } else {
+                        false
+                    }
+                }
+                index if index == DdraceTileNum::TeleCheckIn as u8 => {
+                    if let Some(pos) = collision.latest_tele_check_out(self.core.tele_checkpoint) {
+                        self.teleport_to(pos, false);
+                        true
+                    } else {
+                        false
+                    }
+                }
+                index if index == DdraceTileNum::TeleCheckInEvil as u8 => {
+                    if let Some(pos) = collision.latest_tele_check_out(self.core.tele_checkpoint) {
+                        self.teleport_to(pos, true);
+                        true
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            }
+        }
+
         fn handle_speedup_tile(
             &mut self,
             tile: &map::map::groups::layers::tiles::SpeedupTile,
@@ -836,17 +900,24 @@ pub mod character {
             collision.intersect_line_feedback(&old_pos, &cur_pos, |tile| match tile {
                 HitTile::Game(tile) => {
                     self.handle_game_layer_tiles(tile, &mut res);
+                    true
                 }
                 HitTile::Front(tile) => {
                     self.handle_front_layer_tiles(tile, &mut res);
+                    true
                 }
-                HitTile::Tele(_) => {}
+                HitTile::Tele(tile) => {
+                    self.handle_tele_tile(tile, collision);
+                    true
+                }
                 HitTile::Speedup(tile) => {
                     self.handle_speedup_tile(tile, collision);
+                    true
                 }
-                HitTile::Switch(_) => {}
+                HitTile::Switch(_) => true,
                 HitTile::Tune(_) => {
                     // tune tiles are handled on the fly where needed
+                    true
                 }
             });
             res

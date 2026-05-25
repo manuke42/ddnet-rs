@@ -1441,11 +1441,20 @@ pub mod state {
                         .unwrap_or_default(),
                 )
             }
-            let lerped_pos = character::lerp_core_pos(prev_character, character, intra_tick_ratio);
+            let non_linear_event =
+                prev_character.core.non_linear_event != character.core.non_linear_event;
+            let lerped_pos = if non_linear_event {
+                *prev_character.pos.pos()
+            } else {
+                character::lerp_core_pos(prev_character, character, intra_tick_ratio)
+            };
             CharacterRenderInfo {
                 lerped_pos: lerped_pos / 32.0,
-                lerped_vel: character::lerp_core_vel(prev_character, character, intra_tick_ratio)
-                    / 32.0,
+                lerped_vel: if non_linear_event {
+                    prev_character.core.core.vel
+                } else {
+                    character::lerp_core_vel(prev_character, character, intra_tick_ratio)
+                } / 32.0,
                 lerped_hook: {
                     // try special logic for when a character is hooked first.
                     let hooked_char = prev_character.phased.hook().hooked_char();

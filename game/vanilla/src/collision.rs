@@ -14,6 +14,7 @@ pub mod collision {
             },
         },
     };
+    use rustc_hash::FxHashMap;
     use serde::{Deserialize, Serialize};
 
     use math::math::{
@@ -170,6 +171,8 @@ pub mod collision {
         tele_tiles: Vec<TeleTile>,
         speedup_tiles: Vec<SpeedupTile>,
         switch_tiles: Vec<SwitchTile>,
+        tele_outs: FxHashMap<u8, Vec<vec2>>,
+        tele_check_outs: FxHashMap<u8, Vec<vec2>>,
         width: u32,
         height: u32,
 
@@ -259,6 +262,26 @@ pub mod collision {
                     tune_tiles.shrink_to_fit();
                     tune_tiles
                 };
+            let tele_tiles = tele_layer
+                .map(|l| l.base.tiles.to_vec())
+                .unwrap_or_else(|| vec![Default::default(); game_layer.tiles.len()]);
+            let mut tele_outs: FxHashMap<u8, Vec<vec2>> = Default::default();
+            let mut tele_check_outs: FxHashMap<u8, Vec<vec2>> = Default::default();
+            for (index, tile) in tele_tiles.iter().enumerate() {
+                if tile.number == 0 {
+                    continue;
+                }
+
+                let pos = vec2::new(
+                    (index % width as usize) as f32 * 32.0 + 16.0,
+                    (index / width as usize) as f32 * 32.0 + 16.0,
+                );
+                if tile.base.index == DdraceTileNum::TeleOut as u8 {
+                    tele_outs.entry(tile.number).or_default().push(pos);
+                } else if tile.base.index == DdraceTileNum::TeleCheckOut as u8 {
+                    tele_check_outs.entry(tile.number).or_default().push(pos);
+                }
+            }
 
             Ok(Box::new(Self {
                 width,
@@ -273,13 +296,13 @@ pub mod collision {
                 front_tiles: front_layer
                     .map(|l| l.tiles.to_vec())
                     .unwrap_or_else(|| vec![Default::default(); game_layer.tiles.len()]),
-                tele_tiles: tele_layer
-                    .map(|l| l.base.tiles.to_vec())
-                    .unwrap_or_else(|| vec![Default::default(); game_layer.tiles.len()]),
+                tele_tiles,
                 speedup_tiles: speedup_layer
                     .map(|l| l.tiles.to_vec())
                     .unwrap_or_else(|| vec![Default::default(); game_layer.tiles.len()]),
                 switch_tiles: vec![Default::default(); game_layer.tiles.len()],
+                tele_outs,
+                tele_check_outs,
             }))
         }
 
@@ -316,6 +339,22 @@ pub mod collision {
 
         pub fn check_pointf(&self, x: f32, y: f32) -> bool {
             self.is_solid(round_to_int(x), round_to_int(y))
+        }
+
+        pub fn tele_out(&self, number: u8) -> Option<vec2> {
+            // TODO: needs random tele out
+            self.tele_outs
+                .get(&number)
+                .and_then(|outs| outs.first().copied())
+        }
+
+        pub fn latest_tele_check_out(&self, checkpoint: u8) -> Option<vec2> {
+            // TODO: needs random tele out
+            (1..=checkpoint).rev().find_map(|number| {
+                self.tele_check_outs
+                    .get(&number)
+                    .and_then(|outs| outs.first().copied())
+            })
         }
 
         fn stopper_move_restrictions_raw(tile: &TileBase) -> i32 {
@@ -756,7 +795,7 @@ pub mod collision {
             &self,
             pos0: &vec2,
             pos1: &vec2,
-            mut on_tile: impl FnMut(HitTile<'_>),
+            mut on_tile: impl FnMut(HitTile<'_>) -> bool,
         ) {
             let d = distance(pos0, pos1).max(1.0);
             let end = (d + 1.0) as i32;
@@ -769,28 +808,28 @@ pub mod collision {
 
                 if last_tile_index.is_none_or(|last_tile_index| last_tile_index != tile_index) {
                     let tile = &self.tiles[tile_index];
-                    if tile.index > 0 {
-                        on_tile(HitTile::Game(tile));
+                    if tile.index > 0 && !on_tile(HitTile::Game(tile)) {
+                        break;
                     }
                     let front_tile = &self.front_tiles[tile_index];
-                    if front_tile.index > 0 {
-                        on_tile(HitTile::Front(front_tile));
+                    if front_tile.index > 0 && !on_tile(HitTile::Front(front_tile)) {
+                        break;
                     }
                     let tele_tile = &self.tele_tiles[tile_index];
-                    if tele_tile.base.index > 0 {
-                        on_tile(HitTile::Tele(tele_tile));
+                    if tele_tile.base.index > 0 && !on_tile(HitTile::Tele(tele_tile)) {
+                        break;
                     }
                     let speedup_tile = &self.speedup_tiles[tile_index];
-                    if speedup_tile.base.index > 0 {
-                        on_tile(HitTile::Speedup(speedup_tile));
+                    if speedup_tile.base.index > 0 && !on_tile(HitTile::Speedup(speedup_tile)) {
+                        break;
                     }
                     let switch_tile = &self.switch_tiles[tile_index];
-                    if switch_tile.base.index > 0 {
-                        on_tile(HitTile::Switch(switch_tile));
+                    if switch_tile.base.index > 0 && !on_tile(HitTile::Switch(switch_tile)) {
+                        break;
                     }
                     let tune_tile = &self.tune_tiles[tile_index];
-                    if tune_tile.base.index > 0 {
-                        on_tile(HitTile::Tune(tune_tile));
+                    if tune_tile.base.index > 0 && !on_tile(HitTile::Tune(tune_tile)) {
+                        break;
                     }
                     last_tile_index = Some(tile_index);
                 }
