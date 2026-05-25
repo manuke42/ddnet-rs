@@ -985,6 +985,15 @@ pub mod character {
         fn handle_tiles(&mut self, old_pos: vec2, collision: &Collision) -> CharacterDamageResult {
             let mut res = CharacterDamageResult::None;
             let cur_pos = *self.pos.pos();
+
+            // Handle map global tile settings
+            if collision.endless_hook() {
+                self.core.core.has_endless = true;
+            }
+            if collision.hit_disabled() {
+                self.core.core.hit_disabled = true;
+            }
+
             collision.intersect_line_feedback(&old_pos, &cur_pos, |tile| match tile {
                 HitTile::Game(tile) => {
                     self.handle_game_layer_tiles(tile, &mut res);

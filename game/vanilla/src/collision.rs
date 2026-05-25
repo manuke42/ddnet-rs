@@ -173,6 +173,9 @@ pub mod collision {
         switch_tiles: Vec<SwitchTile>,
         tele_outs: FxHashMap<u8, Vec<vec2>>,
         tele_check_outs: FxHashMap<u8, Vec<vec2>>,
+        old_laser: bool,
+        endless_hook: bool,
+        hit_disabled: bool,
         width: u32,
         height: u32,
 
@@ -265,6 +268,27 @@ pub mod collision {
                     tune_tiles.shrink_to_fit();
                     tune_tiles
                 };
+            let mut old_laser = false;
+            let mut endless_hook = false;
+            let mut hit_disabled = false;
+            for tile in game_layer.tiles.iter().chain(
+                front_layer
+                    .as_ref()
+                    .into_iter()
+                    .flat_map(|layer| layer.tiles.iter()),
+            ) {
+                if tile.index == DdraceTileNum::OldLaser as u8 {
+                    old_laser = true;
+                } else if tile.index == DdraceTileNum::Npc as u8 {
+                    tune_zones[0].player_collision = 0.0;
+                } else if tile.index == DdraceTileNum::EHook as u8 {
+                    endless_hook = true;
+                } else if tile.index == DdraceTileNum::NoHit as u8 {
+                    hit_disabled = true;
+                } else if tile.index == DdraceTileNum::NPH as u8 {
+                    tune_zones[0].player_hooking = 0.0;
+                }
+            }
             let tele_tiles = tele_layer
                 .map(|l| l.base.tiles.to_vec())
                 .unwrap_or_else(|| vec![Default::default(); game_layer.tiles.len()]);
@@ -308,6 +332,9 @@ pub mod collision {
                     .unwrap_or_else(|| vec![Default::default(); game_layer.tiles.len()]),
                 tele_outs,
                 tele_check_outs,
+                old_laser,
+                endless_hook,
+                hit_disabled,
             }))
         }
 
@@ -360,6 +387,18 @@ pub mod collision {
                     .get(&number)
                     .and_then(|outs| outs.first().copied())
             })
+        }
+
+        pub fn old_laser(&self) -> bool {
+            self.old_laser
+        }
+
+        pub fn endless_hook(&self) -> bool {
+            self.endless_hook
+        }
+
+        pub fn hit_disabled(&self) -> bool {
+            self.hit_disabled
         }
 
         fn stopper_move_restrictions_raw(tile: &TileBase) -> i32 {
