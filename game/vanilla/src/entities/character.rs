@@ -787,6 +787,10 @@ pub mod character {
                     };
                     core.jumps.flag = 1;
                 }
+            } else if tile.index == DdraceTileNum::EHookEnable as u8 {
+                self.core.core.has_endless = true;
+            } else if tile.index == DdraceTileNum::EHookDisable as u8 {
+                self.core.core.has_endless = false;
             } else {
                 return false;
             }
