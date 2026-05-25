@@ -802,6 +802,10 @@ pub mod character {
             } else if tile.index == DdraceTileNum::RefillJumps as u8 {
                 self.core.core.jumps.count = 0;
                 self.core.core.jumps.flag = 0;
+            } else if tile.index == DdraceTileNum::NpcDisable as u8 {
+                self.core.core.collision_disabled = true;
+            } else if tile.index == DdraceTileNum::NpcEnable as u8 {
+                self.core.core.collision_disabled = false;
             } else {
                 return false;
             }
