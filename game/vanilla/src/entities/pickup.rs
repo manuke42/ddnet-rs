@@ -134,6 +134,12 @@ pub mod pickup {
             );
 
             if let Some(char) = intersection {
+                let pickup_tick_result =
+                    if matches!(pipe.game_options.game_ty(), ConfigGameType::Race) {
+                        EntityTickResult::None
+                    } else {
+                        EntityTickResult::RemoveEntity
+                    };
                 // player picked us up, is someone was hooking us, let them go
                 // TODO: magic constants
                 match self.core.ty {
@@ -157,7 +163,7 @@ pub mod pickup {
                                     },
                                 },
                             );
-                            EntityTickResult::RemoveEntity
+                            pickup_tick_result
                         } else {
                             EntityTickResult::None
                         }
@@ -182,7 +188,7 @@ pub mod pickup {
                                     },
                                 },
                             );
-                            EntityTickResult::RemoveEntity
+                            pickup_tick_result
                         } else {
                             EntityTickResult::None
                         }
@@ -190,14 +196,15 @@ pub mod pickup {
                     PickupType::PowerupWeapon(weapon) => {
                         let ammo = (!matches!(pipe.game_options.game_ty(), ConfigGameType::Race))
                             .then_some(10);
-                        let res = if let Some(weapon) = char.reusable_core.weapons.get_mut(&weapon)
+                        let collected = if let Some(weapon) =
+                            char.reusable_core.weapons.get_mut(&weapon)
                         {
                             // check if ammo can be refilled
                             if weapon.cur_ammo.is_some_and(|val| val < 10) {
                                 weapon.cur_ammo = ammo;
-                                EntityTickResult::RemoveEntity
+                                true
                             } else {
-                                EntityTickResult::None
+                                false
                             }
                         }
                         // else add the weapon
@@ -210,10 +217,10 @@ pub mod pickup {
                                     upgrades: pipe.char_pool.character_weapon_upgrade_pool.new(),
                                 },
                             );
-                            EntityTickResult::RemoveEntity
+                            true
                         };
 
-                        if res == EntityTickResult::RemoveEntity {
+                        if collected {
                             if let Some(ev) = match weapon {
                                 WeaponType::Hammer | WeaponType::Gun => None,
                                 WeaponType::Shotgun => Some(GameWorldEntitySoundEvent::Shotgun(
@@ -243,21 +250,25 @@ pub mod pickup {
                                 },
                             );
                         }
-                        res
+                        if collected {
+                            pickup_tick_result
+                        } else {
+                            EntityTickResult::None
+                        }
                     }
                     PickupType::PowerupWeaponShield(weapon) => {
-                        let res = if char.reusable_core.weapons.remove(&weapon).is_some() {
+                        let collected = if char.reusable_core.weapons.remove(&weapon).is_some() {
                             if char.core.active_weapon == weapon {
                                 char.core.prev_weapon = char.core.active_weapon;
                                 char.core.active_weapon = WeaponType::Hammer;
                                 char.core.queued_weapon = None;
                             }
-                            EntityTickResult::RemoveEntity
+                            true
                         } else {
-                            EntityTickResult::None
+                            false
                         };
 
-                        if res == EntityTickResult::RemoveEntity {
+                        if collected {
                             self.game_pending_events.push_sound(
                                 Some(char.base.game_element_id),
                                 Some(self.core.pos),
@@ -276,7 +287,11 @@ pub mod pickup {
                                 },
                             );
                         }
-                        res
+                        if collected {
+                            pickup_tick_result
+                        } else {
+                            EntityTickResult::None
+                        }
                     }
                     PickupType::PowerupNinja => {
                         // activate ninja on target player
@@ -297,21 +312,16 @@ pub mod pickup {
                                 },
                             });
                         char.give_ninja();
-                        EntityTickResult::RemoveEntity
+                        pickup_tick_result
                     }
                     PickupType::PowerupNinjaShield => {
-                        let res = if char
+                        let collected = char
                             .reusable_core
                             .buffs
                             .remove(&CharacterBuff::Ninja)
-                            .is_some()
-                        {
-                            EntityTickResult::RemoveEntity
-                        } else {
-                            EntityTickResult::None
-                        };
+                            .is_some();
 
-                        if res == EntityTickResult::RemoveEntity {
+                        if collected {
                             self.game_pending_events.push_sound(
                                 Some(char.base.game_element_id),
                                 Some(self.core.pos),
@@ -330,7 +340,11 @@ pub mod pickup {
                                 },
                             );
                         }
-                        res
+                        if collected {
+                            pickup_tick_result
+                        } else {
+                            EntityTickResult::None
+                        }
                     }
                 }
             } else {
