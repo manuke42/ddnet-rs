@@ -22,6 +22,7 @@ pub mod pickup {
     use serde::{Deserialize, Serialize};
 
     use crate::{
+        config::config::ConfigGameType,
         entities::entity::entity::{DropMode, Entity, EntityInterface, EntityTickResult},
         events::events::PickupEvent,
         simulation_pipe::simulation_pipe::{
@@ -187,11 +188,13 @@ pub mod pickup {
                         }
                     }
                     PickupType::PowerupWeapon(weapon) => {
+                        let ammo = (!matches!(pipe.game_options.game_ty(), ConfigGameType::Race))
+                            .then_some(10);
                         let res = if let Some(weapon) = char.reusable_core.weapons.get_mut(&weapon)
                         {
                             // check if ammo can be refilled
                             if weapon.cur_ammo.is_some_and(|val| val < 10) {
-                                weapon.cur_ammo = Some(10);
+                                weapon.cur_ammo = ammo;
                                 EntityTickResult::RemoveEntity
                             } else {
                                 EntityTickResult::None
@@ -202,7 +205,7 @@ pub mod pickup {
                             char.reusable_core.weapons.insert_sorted(
                                 weapon,
                                 Weapon {
-                                    cur_ammo: Some(10),
+                                    cur_ammo: ammo,
                                     next_ammo_regeneration_tick: 0.into(),
                                     upgrades: pipe.char_pool.character_weapon_upgrade_pool.new(),
                                 },

@@ -25,6 +25,7 @@ pub mod simulation_pipe {
     use crate::events::events::{
         CharacterTickEvent, FlagEvent, LaserEvent, PickupEvent, ProjectileEvent,
     };
+    use crate::types::types::GameOptions;
     use crate::world::world::GameObjectsWorld;
     use crate::{
         entities::character::character::Characters,
@@ -569,6 +570,7 @@ pub mod simulation_pipe {
         pub characters: SimulationPipeOwnerlessCharacters<'a>,
         pub field: &'a CharacterPositionPlayfield,
         pub char_pool: &'a CharacterPool,
+        pub game_options: &'a GameOptions,
     }
 
     impl<'a> SimulationPipePickup<'a> {
@@ -576,11 +578,13 @@ pub mod simulation_pipe {
             characters: &'a mut Characters,
             field: &'a CharacterPositionPlayfield,
             char_pool: &'a CharacterPool,
+            game_options: &'a GameOptions,
         ) -> Self {
             Self {
                 characters: SimulationPipeOwnerlessCharacters { characters },
                 field,
                 char_pool,
+                game_options,
             }
         }
     }

@@ -30,6 +30,7 @@ pub mod world {
 
     use crate::{
         collision::collision::Collision,
+        config::config::ConfigGameType,
         entities::{
             character::{
                 character::{
@@ -728,6 +729,7 @@ pub mod world {
                     &mut self.characters,
                     &self.play_field,
                     &self.world_pool.character_pool,
+                    &self.game_options,
                 )) != EntityTickResult::RemoveEntity
             });
         }
@@ -738,6 +740,7 @@ pub mod world {
                     &mut self.characters,
                     &self.play_field,
                     &self.world_pool.character_pool,
+                    &self.game_options,
                 )) != EntityTickResult::RemoveEntity
             });
         }
@@ -1174,6 +1177,7 @@ pub mod world {
                 character.core.input,
                 &character.player_info,
                 self.get_spawn_pos(character.core.side),
+                matches!(self.game_options.game_ty(), ConfigGameType::Race),
             );
 
             let character = self.characters.to_back(character_id).unwrap();

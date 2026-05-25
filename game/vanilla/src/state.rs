@@ -1122,7 +1122,11 @@ pub mod state {
                         {
                             let reusable_core = &mut character.reusable_core;
                             let gun = Weapon {
-                                cur_ammo: Some(10),
+                                cur_ammo: (!matches!(
+                                    self.game_options.game_ty(),
+                                    ConfigGameType::Race
+                                ))
+                                .then_some(10),
                                 next_ammo_regeneration_tick: 0.into(),
                                 upgrades: stage
                                     .world

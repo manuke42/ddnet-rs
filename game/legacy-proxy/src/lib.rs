@@ -336,6 +336,22 @@ struct ClientBase {
     player_snap_pool: Pool<Vec<u8>>,
 }
 
+impl ClientBase {
+    fn is_race(&self) -> bool {
+        match &self.server_info {
+            ServerInfoTy::Partial { .. } => false,
+            ServerInfoTy::Full(info) => {
+                let game_type = info.game_type.to_lowercase();
+                self.capabilities.is_ddnet
+                    && (game_type == "race"
+                        || game_type.contains("ddrace")
+                        || game_type.contains("block")
+                        || game_type == "gores")
+            }
+        }
+    }
+}
+
 struct Client {
     base: ClientBase,
 
@@ -1343,9 +1359,10 @@ impl Client {
                         }
                     };
                     let mut weapons: FxLinkedHashMap<WeaponType, Weapon> = Default::default();
+                    let weapon_ammo = (!base.is_race()).then_some(10);
                     let def_weapon = Weapon {
                         next_ammo_regeneration_tick: Default::default(),
-                        cur_ammo: Default::default(),
+                        cur_ammo: weapon_ammo,
                         upgrades: PoolFxHashSet::new_without_pool(),
                     };
                     if let Some(ddnet_char) = ddnet_char {
@@ -1907,7 +1924,7 @@ impl Client {
                                             WeaponType::Hammer,
                                             Weapon {
                                                 next_ammo_regeneration_tick: Default::default(),
-                                                cur_ammo: Default::default(),
+                                                cur_ammo: (!base.is_race()).then_some(10),
                                                 upgrades: PoolFxHashSet::new_without_pool(),
                                             },
                                         );
@@ -4872,15 +4889,10 @@ impl Client {
 
                             let first_connect = self.http_server.is_none();
 
-                            let ServerInfoTy::Full(server_info) = &self.base.server_info else {
+                            let ServerInfoTy::Full(_) = &self.base.server_info else {
                                 panic!("server info not received, bug in code.");
                             };
-                            let game_type = server_info.game_type.to_lowercase();
-                            let is_race = game_type == "race"
-                                || game_type.contains("ddrace")
-                                || game_type.contains("block")
-                                || game_type == "gores";
-                            let is_race = is_race && self.base.capabilities.is_ddnet;
+                            let is_race = self.base.is_race();
 
                             let server_info = MsgSvServerInfo {
                                 map: map_name.try_into().unwrap(),

@@ -487,8 +487,15 @@ pub mod character {
             side: Option<MatchSide>,
             game_options: GameOptions,
         ) -> Self {
-            let (core, reusable_core, pos) =
-                Self::respawn(None, character_pool, side, player_input, &player_info, pos);
+            let (core, reusable_core, pos) = Self::respawn(
+                None,
+                character_pool,
+                side,
+                player_input,
+                &player_info,
+                pos,
+                matches!(game_options.game_ty(), ConfigGameType::Race),
+            );
 
             if let CharacterPlayerTy::Player { players, .. } = &ty {
                 players.insert(
@@ -529,9 +536,13 @@ pub mod character {
             }
         }
 
-        fn respawn_weapons(pool: &CharacterPool, reusable_core: &mut CharacterReusableCore) {
+        fn respawn_weapons(
+            pool: &CharacterPool,
+            reusable_core: &mut CharacterReusableCore,
+            infinite_ammo: bool,
+        ) {
             let gun = Weapon {
-                cur_ammo: Some(10),
+                cur_ammo: (!infinite_ammo).then_some(10),
                 next_ammo_regeneration_tick: 0.into(),
                 upgrades: pool.character_weapon_upgrade_pool.new(),
             };
@@ -558,6 +569,7 @@ pub mod character {
             player_input: CharacterInput,
             player_info: &PlayerInfo,
             pos: vec2,
+            infinite_ammo: bool,
         ) -> (CharacterCore, PoolCharacterReusableCore, vec2) {
             let mut core = CharacterCore {
                 side,
@@ -569,7 +581,7 @@ pub mod character {
             };
             let mut reusable_core = character_pool.character_reusable_cores_pool.new();
 
-            Self::respawn_weapons(character_pool, &mut reusable_core);
+            Self::respawn_weapons(character_pool, &mut reusable_core, infinite_ammo);
 
             core.default_eye = player_info.player_info.default_eyes;
             core.eye = core.default_eye;
