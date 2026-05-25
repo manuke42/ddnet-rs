@@ -42,13 +42,14 @@ pub struct BindsProcessResult<F> {
 #[derive(Debug)]
 pub struct Binds<T> {
     keys: KeyTarget<T>,
-    cur_keys_pressed_is_order: BTreeSet<BindKey>,
+    cur_keys_pressed_in_order: BTreeSet<BindKey>,
 
     /// actions caused by a press + release of a key
     click_actions: PoolFxLinkedHashSet<T>,
     press_actions: PoolFxLinkedHashSet<T>,
     unpress_actions: PoolFxLinkedHashSet<T>,
     helper_process_pool: Pool<FxLinkedHashSet<T>>,
+    helper_cur_keys_pressed_in_order: Pool<BTreeSet<BindKey>>,
 }
 
 impl<T> Default for Binds<T> {
@@ -56,11 +57,12 @@ impl<T> Default for Binds<T> {
         let helper_process_pool = Pool::with_capacity(3);
         Self {
             keys: Default::default(),
-            cur_keys_pressed_is_order: Default::default(),
+            cur_keys_pressed_in_order: Default::default(),
             click_actions: helper_process_pool.new(),
             press_actions: helper_process_pool.new(),
             unpress_actions: helper_process_pool.new(),
             helper_process_pool,
+            helper_cur_keys_pressed_in_order: Pool::with_capacity(2),
         }
     }
 }
@@ -68,7 +70,7 @@ impl<T> Default for Binds<T> {
 impl<T: Debug + Clone + Hash + PartialEq + Eq> Binds<T> {
     pub fn handle_key_down(&mut self, code: &BindKey) {
         let BindsProcessResult { cur_actions, .. } = self.process_impl(false);
-        self.cur_keys_pressed_is_order.insert(*code);
+        self.cur_keys_pressed_in_order.insert(*code);
         let BindsProcessResult {
             cur_actions: new_actions,
             ..
@@ -81,7 +83,7 @@ impl<T: Debug + Clone + Hash + PartialEq + Eq> Binds<T> {
 
     pub fn handle_key_up(&mut self, code: &BindKey) {
         let BindsProcessResult { cur_actions, .. } = self.process_impl(false);
-        self.cur_keys_pressed_is_order.remove(code);
+        self.cur_keys_pressed_in_order.remove(code);
         let BindsProcessResult {
             cur_actions: new_actions,
             ..
@@ -97,55 +99,88 @@ impl<T: Debug + Clone + Hash + PartialEq + Eq> Binds<T> {
     }
 
     fn process_impl(&mut self, consume_events: bool) -> BindsProcessResult<T> {
+        enum LongestChainResult<'a, F> {
+            Actions(&'a Vec<F>),
+            NoActions(BindKey),
+            NoKeys,
+        }
         // tries to find the bind with the longest chain possible
         // the first key(s) can be ignored (`can_ignore_keys`), because it might not have any bind at all
         fn find_longest_chain_action<'a, F: Debug>(
-            mut key_iter: std::collections::btree_set::Iter<'a, BindKey>,
+            keys_in_order: &mut BTreeSet<BindKey>,
             keys: &'a KeyTarget<F>,
-            can_ignore_keys: bool,
-        ) -> Option<(&'a Vec<F>, std::collections::btree_set::Iter<'a, BindKey>)> {
-            match key_iter.next() {
+            helper_keys_in_order: &Pool<BTreeSet<BindKey>>,
+        ) -> LongestChainResult<'a, F> {
+            match keys_in_order.pop_first() {
                 Some(next_key) => {
-                    match keys.get(next_key) {
+                    match keys.get(&next_key) {
                         Some(key_binds) => match key_binds {
                             BindTarget::Scancode(cur_scan) => {
-                                find_longest_chain_action(key_iter, cur_scan, false)
-                            }
-                            BindTarget::Actions(actions) => Some((actions, key_iter)),
-                            BindTarget::ScancodeAndActions((cur_scan, actions)) => {
-                                let res =
-                                    find_longest_chain_action(key_iter.clone(), cur_scan, false);
-                                // prefer longest chain if available
-                                if res.is_some() {
-                                    res
-                                } else {
-                                    Some((actions, key_iter))
+                                let mut invalidly_keys_in_order = helper_keys_in_order.new();
+                                while !keys_in_order.is_empty() {
+                                    match find_longest_chain_action(
+                                        keys_in_order,
+                                        cur_scan,
+                                        helper_keys_in_order,
+                                    ) {
+                                        LongestChainResult::Actions(actions) => {
+                                            keys_in_order.extend(invalidly_keys_in_order.iter());
+                                            return LongestChainResult::Actions(actions);
+                                        }
+                                        LongestChainResult::NoActions(bind_key) => {
+                                            invalidly_keys_in_order.insert(bind_key);
+                                        }
+                                        LongestChainResult::NoKeys => {}
+                                    }
                                 }
+                                keys_in_order.extend(invalidly_keys_in_order.iter());
+                                LongestChainResult::NoActions(next_key)
+                            }
+                            BindTarget::Actions(actions) => LongestChainResult::Actions(actions),
+                            BindTarget::ScancodeAndActions((cur_scan, actions)) => {
+                                let mut invalidly_keys_in_order = helper_keys_in_order.new();
+                                while !keys_in_order.is_empty() {
+                                    match find_longest_chain_action(
+                                        keys_in_order,
+                                        cur_scan,
+                                        helper_keys_in_order,
+                                    ) {
+                                        // prefer longest chain if available
+                                        LongestChainResult::Actions(actions) => {
+                                            keys_in_order.extend(invalidly_keys_in_order.iter());
+                                            return LongestChainResult::Actions(actions);
+                                        }
+                                        LongestChainResult::NoActions(bind_key) => {
+                                            invalidly_keys_in_order.insert(bind_key);
+                                        }
+                                        LongestChainResult::NoKeys => {}
+                                    }
+                                }
+                                keys_in_order.extend(invalidly_keys_in_order.iter());
+                                LongestChainResult::Actions(actions)
                             }
                         },
-                        // if nothing was found at this key, try the
-                        None => {
-                            if can_ignore_keys {
-                                find_longest_chain_action(key_iter, keys, true)
-                            } else {
-                                None
-                            }
-                        }
+                        // if nothing was found at this key, add key back
+                        None => LongestChainResult::NoActions(next_key),
                     }
                 }
-                None => None,
+                None => LongestChainResult::NoKeys,
             }
         }
 
         let mut cur_actions = self.helper_process_pool.new();
-        let mut key_iter = self.cur_keys_pressed_is_order.iter();
-        while let Some((actions, key_iter_next)) =
-            find_longest_chain_action(key_iter, &self.keys, true)
-        {
-            key_iter = key_iter_next;
-            actions.iter().for_each(|f| {
-                cur_actions.insert(f.clone());
-            });
+        let mut keys_in_order = self.helper_cur_keys_pressed_in_order.new();
+        (*keys_in_order).clone_from(&self.cur_keys_pressed_in_order);
+        while !keys_in_order.is_empty() {
+            if let LongestChainResult::Actions(actions) = find_longest_chain_action(
+                &mut keys_in_order,
+                &self.keys,
+                &self.helper_cur_keys_pressed_in_order,
+            ) {
+                actions.iter().for_each(|f| {
+                    cur_actions.insert(f.clone());
+                });
+            }
         }
 
         BindsProcessResult {
@@ -226,7 +261,7 @@ impl<T: Debug + Clone + Hash + PartialEq + Eq> Binds<T> {
     }
 
     pub fn reset_cur_keys(&mut self) {
-        self.cur_keys_pressed_is_order.clear();
+        self.cur_keys_pressed_in_order.clear();
     }
 }
 
@@ -243,6 +278,8 @@ mod tests {
         ComboAB,
         FireM1,
         HookM2,
+        SingleAlt,
+        AltWheelUp,
     }
 
     fn key(code: KeyCode) -> BindKey {
@@ -367,6 +404,10 @@ mod tests {
         BindKey::Mouse(button)
     }
 
+    fn extra(extra: MouseExtra) -> BindKey {
+        BindKey::Extra(extra)
+    }
+
     #[test]
     fn mouse_both_pressed_and_released_same_tick() {
         let mut binds = Binds::<Act>::default();
@@ -451,6 +492,99 @@ mod tests {
         let r = binds.process();
         assert!(r.unpress_actions.contains(&Act::HookM2));
         assert!(r.cur_actions.is_empty());
+    }
+
+    #[test]
+    fn alt_left_held_does_not_block_right_mouse_button() {
+        let mut binds = Binds::<Act>::default();
+        binds.register_bind(
+            &[key(KeyCode::AltLeft), extra(MouseExtra::WheelUp)],
+            Act::AltWheelUp,
+        );
+        binds.register_bind(&[mouse(MouseButton::Right)], Act::HookM2);
+
+        binds.handle_key_down(&key(KeyCode::AltLeft));
+        let r = binds.process();
+        assert!(r.press_actions.is_empty());
+        assert!(r.cur_actions.is_empty());
+
+        binds.handle_key_down(&mouse(MouseButton::Right));
+        let r = binds.process();
+        assert!(r.press_actions.contains(&Act::HookM2));
+        assert!(r.cur_actions.contains(&Act::HookM2));
+        assert!(!r.cur_actions.contains(&Act::AltWheelUp));
+        assert!(r.unpress_actions.is_empty());
+
+        binds.handle_key_up(&mouse(MouseButton::Right));
+        let r = binds.process();
+        assert!(r.unpress_actions.contains(&Act::HookM2));
+        assert!(r.click_actions.contains(&Act::HookM2));
+        assert!(r.cur_actions.is_empty());
+    }
+
+    #[test]
+    fn right_mouse_button_held_does_not_block_alt_wheel_up() {
+        let mut binds = Binds::<Act>::default();
+        binds.register_bind(
+            &[key(KeyCode::AltLeft), extra(MouseExtra::WheelUp)],
+            Act::AltWheelUp,
+        );
+        binds.register_bind(&[mouse(MouseButton::Right)], Act::HookM2);
+
+        binds.handle_key_down(&mouse(MouseButton::Right));
+        let r = binds.process();
+        assert!(r.press_actions.contains(&Act::HookM2));
+        assert!(r.cur_actions.contains(&Act::HookM2));
+
+        binds.handle_key_down(&key(KeyCode::AltLeft));
+        let r = binds.process();
+        assert!(r.press_actions.is_empty());
+        assert!(r.cur_actions.contains(&Act::HookM2));
+        assert!(!r.cur_actions.contains(&Act::AltWheelUp));
+
+        // This mirrors input_handling.rs for MouseExtra: a wheel event is a synthetic
+        // down/process/up/process while the non-wheel keys remain held.
+        binds.handle_key_down(&extra(MouseExtra::WheelUp));
+        let r = binds.process();
+        assert!(r.press_actions.contains(&Act::AltWheelUp));
+        assert!(r.cur_actions.contains(&Act::AltWheelUp));
+        assert!(r.cur_actions.contains(&Act::HookM2));
+
+        binds.handle_key_up(&extra(MouseExtra::WheelUp));
+        let r = binds.process();
+        assert!(r.unpress_actions.contains(&Act::AltWheelUp));
+        assert!(r.click_actions.contains(&Act::AltWheelUp));
+        assert!(r.cur_actions.contains(&Act::HookM2));
+        assert!(!r.cur_actions.contains(&Act::AltWheelUp));
+    }
+
+    #[test]
+    fn unrelated_key_does_not_hide_longer_bind_when_prefix_also_has_action() {
+        let mut binds = Binds::<Act>::default();
+        binds.register_bind(&[key(KeyCode::AltLeft)], Act::SingleAlt);
+        binds.register_bind(
+            &[key(KeyCode::AltLeft), extra(MouseExtra::WheelUp)],
+            Act::AltWheelUp,
+        );
+        binds.register_bind(&[mouse(MouseButton::Right)], Act::HookM2);
+
+        binds.handle_key_down(&key(KeyCode::AltLeft));
+        let r = binds.process();
+        assert!(r.press_actions.contains(&Act::SingleAlt));
+        assert!(r.cur_actions.contains(&Act::SingleAlt));
+
+        binds.handle_key_down(&mouse(MouseButton::Right));
+        let r = binds.process();
+        assert!(r.press_actions.contains(&Act::HookM2));
+        assert!(r.cur_actions.contains(&Act::SingleAlt));
+        assert!(r.cur_actions.contains(&Act::HookM2));
+
+        binds.handle_key_down(&extra(MouseExtra::WheelUp));
+        let r = binds.process();
+        assert!(r.press_actions.contains(&Act::AltWheelUp));
+        assert!(r.cur_actions.contains(&Act::AltWheelUp));
+        assert!(r.cur_actions.contains(&Act::HookM2));
+        assert!(!r.cur_actions.contains(&Act::SingleAlt));
     }
 
     #[test]
