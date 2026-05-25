@@ -776,6 +776,17 @@ pub mod character {
                 self.reusable_core
                     .debuffs
                     .remove(&CharacterDebuff::LiveFrozen);
+            } else if tile.index == DdraceTileNum::WallJump as u8 {
+                let core = &mut self.core.core;
+                if core.vel.y > 0.0 && core.colliding != 0 && core.left_wall {
+                    core.left_wall = false;
+                    core.jumps.count = if core.jumps.max >= 2 {
+                        core.jumps.max - 2
+                    } else {
+                        0
+                    };
+                    core.jumps.flag = 1;
+                }
             } else {
                 return false;
             }

@@ -1484,6 +1484,7 @@ impl Client {
                             debuffs: Default::default(),
                             interactions: Default::default(),
                             queued_emoticon: Default::default(),
+                            switch_states: Default::default(),
                         });
                     if let Some(ddnet_char) = ddnet_char {
                         if ddnet_char.freeze_start.0 != 0
