@@ -13,7 +13,7 @@ pub mod character {
 
     use crate::{
         reusable::{CloneWithCopyableElements, ReusableCore},
-        weapons::definitions::weapon_def::WeaponUpgradePool,
+        weapons::definitions::weapon_def::{WeaponUpgrade, WeaponUpgradePool},
     };
     use base::linked_hash_map_view::{
         FxLinkedHashMap, FxLinkedHashSet, LinkedHashMapView, LinkedHashMapViewMut,
@@ -810,6 +810,14 @@ pub mod character {
                 self.core.core.jumps.endless = true;
             } else if tile.index == DdraceTileNum::UnlimitedJumpsDisable as u8 {
                 self.core.core.jumps.endless = false;
+            } else if tile.index == DdraceTileNum::JetpackEnable as u8 {
+                if let Some(gun) = self.reusable_core.weapons.get_mut(&WeaponType::Gun) {
+                    gun.upgrades.insert(WeaponUpgrade::Jetpack);
+                }
+            } else if tile.index == DdraceTileNum::JetpackDisable as u8 {
+                if let Some(gun) = self.reusable_core.weapons.get_mut(&WeaponType::Gun) {
+                    gun.upgrades.remove(&WeaponUpgrade::Jetpack);
+                }
             } else {
                 return false;
             }
