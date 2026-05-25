@@ -14,8 +14,10 @@ pub mod game_objects {
         pub blue_flags: Vec<V>,
 
         pub weapons: [Vec<V>; WeaponType::COUNT],
+        pub weapon_shields: [Vec<V>; WeaponType::COUNT],
 
         pub ninjas: Vec<V>,
+        pub ninja_shields: Vec<V>,
     }
 
     #[derive(Debug, Hiarc, Clone, Copy, PartialEq, Eq)]
@@ -156,6 +158,21 @@ pub mod game_objects {
                         }
                         i if i == EntityTiles::PowerupNinja as u8 => {
                             pickups.ninjas.push(ivec2::new(x as i32, y as i32));
+                        }
+                        i if i == DdraceEntityTiles::ArmorShotgun as u8 => {
+                            pickups.weapon_shields[WeaponType::Shotgun as usize]
+                                .push(ivec2::new(x as i32, y as i32));
+                        }
+                        i if i == DdraceEntityTiles::ArmorGrenade as u8 => {
+                            pickups.weapon_shields[WeaponType::Grenade as usize]
+                                .push(ivec2::new(x as i32, y as i32));
+                        }
+                        i if i == DdraceEntityTiles::ArmorNinja as u8 => {
+                            pickups.ninja_shields.push(ivec2::new(x as i32, y as i32));
+                        }
+                        i if i == DdraceEntityTiles::ArmorLaser as u8 => {
+                            pickups.weapon_shields[WeaponType::Laser as usize]
+                                .push(ivec2::new(x as i32, y as i32));
                         }
                         _ => {
                             // not handled

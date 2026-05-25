@@ -275,7 +275,9 @@ impl GameObjectsRender {
                     self.pickup_sprite_off,
                 )
             }
-            PickupType::PowerupArmor => {
+            PickupType::PowerupArmor
+            | PickupType::PowerupWeaponShield(_)
+            | PickupType::PowerupNinjaShield => {
                 let key = pickup
                     .owner_id
                     .and_then(|id| pipe.character_infos.get(&id))

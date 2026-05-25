@@ -11,7 +11,10 @@ pub mod pickup {
             GamePickupHeartEventSound, GamePickupSoundEvent, GameShotgunEventSound,
             GameWorldEntitySoundEvent,
         },
-        types::{id_types::PickupId, pickup::PickupType, weapons::WeaponType},
+        types::{
+            id_types::PickupId, pickup::PickupType, render::character::CharacterBuff,
+            weapons::WeaponType,
+        },
     };
     use hiarc::Hiarc;
     use math::math::{lerp, vector::vec2};
@@ -81,6 +84,8 @@ pub mod pickup {
                         PickupType::PowerupHealth => return,
                         PickupType::PowerupArmor => return,
                         PickupType::PowerupNinja => return,
+                        PickupType::PowerupWeaponShield(_) => return,
+                        PickupType::PowerupNinjaShield => return,
                         PickupType::PowerupWeapon(weapon_type) => match weapon_type {
                             WeaponType::Hammer => return,
                             WeaponType::Gun => return,
@@ -237,6 +242,39 @@ pub mod pickup {
                         }
                         res
                     }
+                    PickupType::PowerupWeaponShield(weapon) => {
+                        let res = if char.reusable_core.weapons.remove(&weapon).is_some() {
+                            if char.core.active_weapon == weapon {
+                                char.core.prev_weapon = char.core.active_weapon;
+                                char.core.active_weapon = WeaponType::Hammer;
+                                char.core.queued_weapon = None;
+                            }
+                            EntityTickResult::RemoveEntity
+                        } else {
+                            EntityTickResult::None
+                        };
+
+                        if res == EntityTickResult::RemoveEntity {
+                            self.game_pending_events.push_sound(
+                                Some(char.base.game_element_id),
+                                Some(self.core.pos),
+                                GameWorldEntitySoundEvent::Pickup(GamePickupSoundEvent::Armor(
+                                    GamePickupArmorEventSound::Collect,
+                                )),
+                            );
+                            self.simulation_events.push_world(
+                                SimulationEventWorldEntityType::Pickup {
+                                    id: self.base.game_element_id,
+                                    ev: PickupEvent::Pickup {
+                                        pos: self.core.pos,
+                                        by: char.base.game_element_id,
+                                        ty: PickupType::PowerupWeaponShield(weapon),
+                                    },
+                                },
+                            );
+                        }
+                        res
+                    }
                     PickupType::PowerupNinja => {
                         // activate ninja on target player
                         self.game_pending_events.push_sound(
@@ -257,6 +295,39 @@ pub mod pickup {
                             });
                         char.give_ninja();
                         EntityTickResult::RemoveEntity
+                    }
+                    PickupType::PowerupNinjaShield => {
+                        let res = if char
+                            .reusable_core
+                            .buffs
+                            .remove(&CharacterBuff::Ninja)
+                            .is_some()
+                        {
+                            EntityTickResult::RemoveEntity
+                        } else {
+                            EntityTickResult::None
+                        };
+
+                        if res == EntityTickResult::RemoveEntity {
+                            self.game_pending_events.push_sound(
+                                Some(char.base.game_element_id),
+                                Some(self.core.pos),
+                                GameWorldEntitySoundEvent::Pickup(GamePickupSoundEvent::Armor(
+                                    GamePickupArmorEventSound::Collect,
+                                )),
+                            );
+                            self.simulation_events.push_world(
+                                SimulationEventWorldEntityType::Pickup {
+                                    id: self.base.game_element_id,
+                                    ev: PickupEvent::Pickup {
+                                        pos: self.core.pos,
+                                        by: char.base.game_element_id,
+                                        ty: PickupType::PowerupNinjaShield,
+                                    },
+                                },
+                            );
+                        }
+                        res
                     }
                 }
             } else {

@@ -287,11 +287,29 @@ pub mod world {
                         );
                     }
                 }
+                for (index, weapons) in game_object_definitions
+                    .pickups
+                    .weapon_shields
+                    .iter()
+                    .enumerate()
+                {
+                    for pickup in weapons {
+                        add_pick(
+                            pickup,
+                            PickupType::PowerupWeaponShield(
+                                WeaponType::from_u32(index as u32).unwrap(),
+                            ),
+                        );
+                    }
+                }
                 for pickup in &game_object_definitions.pickups.ninjas {
                     inactive_game_objects.pickups.ninjas.push(GameObjectWorld {
                         pos: *pickup,
                         respawn_in_ticks: TICKS_PER_SECOND * 90,
                     });
+                }
+                for pickup in &game_object_definitions.pickups.ninja_shields {
+                    add_pick(pickup, PickupType::PowerupNinjaShield);
                 }
 
                 let add_flag = |flags: &mut Flags, pos: &ivec2, ty: FlagType| {
@@ -1029,6 +1047,22 @@ pub mod world {
                                                     respawn_in_ticks: respawn_ticks,
                                                 })
                                         }
+                                        PickupType::PowerupWeaponShield(weapon) => {
+                                            inactive_game_objects.pickups.weapon_shields
+                                                [*weapon as usize]
+                                                .push(GameObjectWorld {
+                                                    pos,
+                                                    respawn_in_ticks: respawn_ticks,
+                                                })
+                                        }
+                                        PickupType::PowerupNinjaShield => {
+                                            inactive_game_objects.pickups.ninja_shields.push(
+                                                GameObjectWorld {
+                                                    pos,
+                                                    respawn_in_ticks: respawn_ticks,
+                                                },
+                                            )
+                                        }
                                     }
                                 }
                                 PickupEvent::Pickup { .. } => {
@@ -1114,6 +1148,20 @@ pub mod world {
                         let ty = WeaponType::from_usize(ty).unwrap();
                         weapons.retain_mut(|obj| add_pickup(obj, PickupType::PowerupWeapon(ty)));
                     });
+                self.inactive_game_objects
+                    .pickups
+                    .weapon_shields
+                    .iter_mut()
+                    .enumerate()
+                    .for_each(|(ty, weapons)| {
+                        let ty = WeaponType::from_usize(ty).unwrap();
+                        weapons
+                            .retain_mut(|obj| add_pickup(obj, PickupType::PowerupWeaponShield(ty)));
+                    });
+                self.inactive_game_objects
+                    .pickups
+                    .ninja_shields
+                    .retain_mut(|obj| add_pickup(obj, PickupType::PowerupNinjaShield));
             }
         }
 
