@@ -50,7 +50,9 @@ pub mod character {
     use rustc_hash::FxHashSet;
 
     use super::{
-        core::character_core::{Core, CoreEvents, CorePipe, CoreReusable, PHYSICAL_SIZE},
+        core::character_core::{
+            CannotMove, Core, CoreEvents, CorePipe, CoreReusable, PHYSICAL_SIZE,
+        },
         hook::character_hook::{CharacterHook, Hook, HookedCharacters},
         player::player::{PlayerInfo, Players, SpectatorPlayer, SpectatorPlayers},
         pos::character_pos::{CharacterPos, CharacterPositionPlayfield},
@@ -1692,6 +1694,17 @@ pub mod character {
                 core.jumps.flag = 1;
             }
         }
+
+        fn apply_move_restrictions(&mut self) {
+            let core = &mut self.core.core;
+
+            if core.vel.y > 0.0 && (core.move_restrictions & CannotMove::Down as i32) != 0 {
+                core.jumps.flag = 0;
+                core.jumps.count = 0;
+            }
+
+            core.vel = Core::clamp_vel(core.move_restrictions, &core.vel);
+        }
     }
 
     impl EntityInterface<CharacterCore, CharacterReusableCore, SimulationPipeCharacter<'_>>
@@ -1757,6 +1770,7 @@ pub mod character {
                 return EntityTickResult::RemoveEntity;
             }
 
+            self.apply_move_restrictions();
             self.handle_buffs_and_debuffs(pipe);
             self.handle_weapons(pipe);
 

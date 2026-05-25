@@ -9,8 +9,8 @@ pub mod collision {
         layers::{
             physics::MapLayerPhysics,
             tiles::{
-                ROTATION_0, ROTATION_90, SpeedupTile, SwitchTile, TeleTile, TileBase, TuneTile,
-                rotation_180, rotation_270,
+                ROTATION_0, ROTATION_90, SpeedupTile, SwitchTile, TeleTile, TileBase, TileFlags,
+                TuneTile, rotation_180, rotation_270,
             },
         },
     };
@@ -316,6 +316,91 @@ pub mod collision {
 
         pub fn check_pointf(&self, x: f32, y: f32) -> bool {
             self.is_solid(round_to_int(x), round_to_int(y))
+        }
+
+        fn stopper_move_restrictions_raw(tile: &TileBase) -> i32 {
+            const CANTMOVE_LEFT: i32 = 1 << 0;
+            const CANTMOVE_RIGHT: i32 = 1 << 1;
+            const CANTMOVE_UP: i32 = 1 << 2;
+            const CANTMOVE_DOWN: i32 = 1 << 3;
+
+            let flags = tile.flags & (TileFlags::XFLIP | TileFlags::YFLIP | TileFlags::ROTATE);
+            match tile.index {
+                index if index == DdraceTileNum::Stop as u8 => match flags {
+                    ROTATION_0 => CANTMOVE_DOWN,
+                    ROTATION_90 => CANTMOVE_LEFT,
+                    flags if flags == rotation_180() => CANTMOVE_UP,
+                    flags if flags == rotation_270() => CANTMOVE_RIGHT,
+                    flags if flags == TileFlags::YFLIP ^ ROTATION_0 => CANTMOVE_UP,
+                    flags if flags == TileFlags::YFLIP ^ ROTATION_90 => CANTMOVE_RIGHT,
+                    flags if flags == TileFlags::YFLIP ^ rotation_180() => CANTMOVE_DOWN,
+                    flags if flags == TileFlags::YFLIP ^ rotation_270() => CANTMOVE_LEFT,
+                    _ => 0,
+                },
+                index if index == DdraceTileNum::StopS as u8 => match flags {
+                    ROTATION_0 => CANTMOVE_DOWN | CANTMOVE_UP,
+                    ROTATION_90 => CANTMOVE_LEFT | CANTMOVE_RIGHT,
+                    flags if flags == rotation_180() => CANTMOVE_DOWN | CANTMOVE_UP,
+                    flags if flags == rotation_270() => CANTMOVE_LEFT | CANTMOVE_RIGHT,
+                    flags if flags == TileFlags::YFLIP ^ ROTATION_0 => CANTMOVE_DOWN | CANTMOVE_UP,
+                    flags if flags == TileFlags::YFLIP ^ ROTATION_90 => {
+                        CANTMOVE_LEFT | CANTMOVE_RIGHT
+                    }
+                    flags if flags == TileFlags::YFLIP ^ rotation_180() => {
+                        CANTMOVE_DOWN | CANTMOVE_UP
+                    }
+                    flags if flags == TileFlags::YFLIP ^ rotation_270() => {
+                        CANTMOVE_LEFT | CANTMOVE_RIGHT
+                    }
+                    _ => 0,
+                },
+                index if index == DdraceTileNum::StopA as u8 => {
+                    CANTMOVE_LEFT | CANTMOVE_RIGHT | CANTMOVE_UP | CANTMOVE_DOWN
+                }
+                _ => 0,
+            }
+        }
+
+        fn stopper_move_restrictions(tile: &TileBase, direction: usize) -> i32 {
+            const CANTMOVE_LEFT: i32 = 1 << 0;
+            const CANTMOVE_RIGHT: i32 = 1 << 1;
+            const CANTMOVE_UP: i32 = 1 << 2;
+            const CANTMOVE_DOWN: i32 = 1 << 3;
+
+            let restrictions = Self::stopper_move_restrictions_raw(tile);
+            if direction == 0 && tile.index == DdraceTileNum::Stop as u8 {
+                return restrictions;
+            }
+
+            let mask = match direction {
+                1 => CANTMOVE_RIGHT,
+                2 => CANTMOVE_DOWN,
+                3 => CANTMOVE_LEFT,
+                4 => CANTMOVE_UP,
+                _ => 0,
+            };
+            restrictions & mask
+        }
+
+        pub fn get_move_restrictions(&self, pos: &vec2) -> i32 {
+            const DISTANCE: f32 = 18.0;
+            const DIRECTIONS: [vec2; 5] = [
+                vec2 { x: 0.0, y: 0.0 },
+                vec2 { x: 1.0, y: 0.0 },
+                vec2 { x: 0.0, y: 1.0 },
+                vec2 { x: -1.0, y: 0.0 },
+                vec2 { x: 0.0, y: -1.0 },
+            ];
+
+            let mut restrictions = 0;
+            for (direction, offset) in DIRECTIONS.into_iter().enumerate() {
+                let index =
+                    self.tile_indexf(pos.x + offset.x * DISTANCE, pos.y + offset.y * DISTANCE);
+                restrictions |= Self::stopper_move_restrictions(&self.tiles[index], direction);
+                restrictions |=
+                    Self::stopper_move_restrictions(&self.front_tiles[index], direction);
+            }
+            restrictions
         }
 
         #[inline(always)]

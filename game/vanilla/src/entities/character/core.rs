@@ -160,7 +160,7 @@ pub mod character_core {
         }
     }
 
-    enum CannotMove {
+    pub(crate) enum CannotMove {
         Left = 1 << 0,
         Right = 1 << 1,
         Up = 1 << 2,
@@ -248,7 +248,7 @@ pub mod character_core {
                     },
                 ..
             } = &pipe.input;
-            self.move_restrictions = 0; // TODO core.m_pCollision->GetMoveRestrictions(UseInput ? IsSwitchActiveCb : 0, this, core.m_Pos);
+            self.move_restrictions = collision.get_move_restrictions(pos.pos());
 
             // get ground state
             let grounded: bool = collision.check_pointf(
