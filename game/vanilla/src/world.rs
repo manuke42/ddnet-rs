@@ -236,6 +236,21 @@ pub mod world {
         ) -> Self {
             let mut inactive_game_objects = GameObjectsWorld {
                 pickups: Default::default(),
+                ddrace_entities: game_object_definitions
+                    .ddrace_entities
+                    .iter()
+                    .map(
+                        |entity| crate::game_objects::game_objects::DdraceMapEntityDefinition {
+                            pos: GameObjectWorld {
+                                pos: entity.pos,
+                                respawn_in_ticks: 0,
+                            },
+                            kind: entity.kind,
+                            flags: entity.flags,
+                            number: entity.number,
+                        },
+                    )
+                    .collect(),
             };
 
             let mut red_flags = world_pool.flag_pool.flag_pool.new();

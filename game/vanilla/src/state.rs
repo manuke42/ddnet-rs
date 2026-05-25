@@ -611,6 +611,7 @@ pub mod state {
                 game_objects_definitions: Rc::new(game_objects),
                 prev_game_objects_definitions: Rc::new(GameObjectDefinitions {
                     pickups: Default::default(),
+                    ddrace_entities: Default::default(),
                 }),
 
                 // game
