@@ -321,7 +321,7 @@ pub mod character_core {
                 self.jumps.queued = 0;
 
                 // handle hook
-                if self.queued_hooks.clicked > 0 || **hook {
+                if self.queued_hooks.clicked > 0 {
                     if let Hook::None = char_hook.hook() {
                         let cursor = self.queued_hooks.cursor;
                         let cursor = vec2::new(cursor.x as f32, cursor.y as f32);
@@ -339,7 +339,7 @@ pub mod character_core {
                         );
                         // self.triggered_events |= CoreEvent::HookLaunch as i32;
                     }
-                } else {
+                } else if !**hook {
                     char_hook.set(Hook::None, None);
                 }
                 self.queued_hooks.clicked = 0;
