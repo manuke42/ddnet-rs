@@ -6,7 +6,7 @@ pub mod score;
 
 pub mod character {
     use std::{
-        collections::VecDeque,
+        collections::{BTreeMap, VecDeque},
         marker::PhantomData,
         num::{NonZeroI64, NonZeroU64},
     };
@@ -44,7 +44,7 @@ pub mod character {
         },
     };
     use hiarc::{Hiarc, hiarc_safer_rc_refcell};
-    use legacy_map::mapdef_06::DdraceTileNum;
+    use legacy_map::mapdef_06::{DdraceTileNum, TILE_SWITCHTIMEDOPEN};
     use map::map::groups::layers::tiles::Tile;
     use pool::{datatypes::PoolFxLinkedHashMap, mt_pool::Pool as MtPool};
     use rustc_hash::FxHashSet;
@@ -110,6 +110,13 @@ pub mod character {
     #[derive(Debug, Hiarc, Default, Serialize, Deserialize, Copy, Clone)]
     pub struct CharacterCoreMod {}
 
+    #[derive(Debug, Hiarc, Serialize, Deserialize, Copy, Clone)]
+    pub struct CharacterSwitchState {
+        pub active: bool,
+        pub expire_in: Option<GameTickType>,
+        pub expire_to: bool,
+    }
+
     #[derive(Debug, Hiarc, Default, Serialize, Deserialize, Copy, Clone)]
     pub struct CharacterCore {
         pub core: Core,
@@ -169,6 +176,7 @@ pub mod character {
         pub queued_emoticon: VecDeque<(EmoticonType, GameTickCooldown)>,
 
         pub interactions: FxLinkedHashSet<CharacterId>,
+        pub switch_states: BTreeMap<u8, CharacterSwitchState>,
     }
 
     impl CloneWithCopyableElements for CharacterReusableCore {
@@ -179,6 +187,7 @@ pub mod character {
             self.debuffs.copy_clone_from(&other.debuffs);
             self.queued_emoticon.clone_from(&other.queued_emoticon);
             self.interactions.clone_from(&other.interactions);
+            self.switch_states.clone_from(&other.switch_states);
         }
     }
 
@@ -191,6 +200,7 @@ pub mod character {
                 debuffs: Default::default(),
                 interactions: Default::default(),
                 queued_emoticon: Default::default(),
+                switch_states: Default::default(),
             }
         }
         fn reset(&mut self) {
@@ -199,6 +209,7 @@ pub mod character {
             self.buffs.reset();
             self.debuffs.reset();
             self.interactions.reset();
+            self.switch_states.clear();
         }
     }
 
@@ -838,6 +849,57 @@ pub mod character {
             }
         }
 
+        fn set_switch(&mut self, number: u8, active: bool, delay: u8) {
+            let state = if delay == 0 {
+                CharacterSwitchState {
+                    active,
+                    expire_in: None,
+                    expire_to: active,
+                }
+            } else {
+                CharacterSwitchState {
+                    active,
+                    expire_in: Some(delay as GameTickType * TICKS_PER_SECOND + 1),
+                    expire_to: !active,
+                }
+            };
+            self.reusable_core.switch_states.insert(number, state);
+        }
+
+        fn switch_active(&self, number: u8) -> bool {
+            number == 0
+                || self
+                    .reusable_core
+                    .switch_states
+                    .get(&number)
+                    .is_some_and(|state| state.active)
+        }
+
+        fn handle_switch_tile(
+            &mut self,
+            tile: &map::map::groups::layers::tiles::SwitchTile,
+            res: &mut CharacterDamageResult,
+        ) {
+            match tile.base.index {
+                index if index == DdraceTileNum::SwitchOpen as u8 && tile.number > 0 => {
+                    self.set_switch(tile.number, true, 0);
+                }
+                index if index == DdraceTileNum::SwitchClose as u8 && tile.number > 0 => {
+                    self.set_switch(tile.number, false, 0);
+                }
+                index if index == TILE_SWITCHTIMEDOPEN && tile.number > 0 => {
+                    self.set_switch(tile.number, true, tile.delay);
+                }
+                index if index == DdraceTileNum::SwitchTimedClose as u8 && tile.number > 0 => {
+                    self.set_switch(tile.number, false, tile.delay);
+                }
+                _ if self.switch_active(tile.number) => {
+                    self.handle_game_front_tiles(&tile.base, res);
+                }
+                _ => {}
+            }
+        }
+
         fn handle_speedup_tile(
             &mut self,
             tile: &map::map::groups::layers::tiles::SpeedupTile,
@@ -914,7 +976,10 @@ pub mod character {
                     self.handle_speedup_tile(tile, collision);
                     true
                 }
-                HitTile::Switch(_) => true,
+                HitTile::Switch(tile) => {
+                    self.handle_switch_tile(tile, &mut res);
+                    true
+                }
                 HitTile::Tune(_) => {
                     // tune tiles are handled on the fly where needed
                     true
@@ -1729,6 +1794,17 @@ pub mod character {
                 self.core.last_dmg_angle = 0.0;
             }
             self.core.emoticon_tick.tick();
+            self.reusable_core.switch_states.retain(|_, state| {
+                let Some(expire_in) = &mut state.expire_in else {
+                    return true;
+                };
+                *expire_in = expire_in.saturating_sub(1);
+                if *expire_in == 0 {
+                    state.active = state.expire_to;
+                    state.expire_in = None;
+                }
+                true
+            });
 
             self.handle_emoticon_queue();
         }
