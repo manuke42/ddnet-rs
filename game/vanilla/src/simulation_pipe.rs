@@ -21,6 +21,7 @@ pub mod simulation_pipe {
     use crate::entities::character::pos::character_pos::{
         CharacterPos, CharacterPositionPlayfield,
     };
+    use crate::entities::ddrace_entity::ddrace_entity::DdraceEntityCore;
     use crate::entities::flag::flag::Flags;
     use crate::events::events::{
         CharacterTickEvent, FlagEvent, LaserEvent, PickupEvent, ProjectileEvent,
@@ -585,6 +586,46 @@ pub mod simulation_pipe {
                 field,
                 char_pool,
                 game_options,
+            }
+        }
+    }
+
+    pub struct SimulationPipeDdraceProjectile<'a> {
+        pub collision: &'a Collision,
+        pub characters: SimulationPipeOwnerlessCharacters<'a>,
+        pub field: &'a CharacterPositionPlayfield,
+    }
+
+    impl<'a> SimulationPipeDdraceProjectile<'a> {
+        pub fn new(
+            collision: &'a Collision,
+            characters: &'a mut Characters,
+            field: &'a CharacterPositionPlayfield,
+        ) -> Self {
+            Self {
+                collision,
+                characters: SimulationPipeOwnerlessCharacters { characters },
+                field,
+            }
+        }
+    }
+
+    pub struct SimulationPipeDdraceEntity<'a> {
+        pub collision: &'a Collision,
+        pub characters: &'a mut Characters,
+        pub entities: &'a [DdraceEntityCore],
+    }
+
+    impl<'a> SimulationPipeDdraceEntity<'a> {
+        pub fn new(
+            collision: &'a Collision,
+            characters: &'a mut Characters,
+            entities: &'a [DdraceEntityCore],
+        ) -> Self {
+            Self {
+                collision,
+                characters,
+                entities,
             }
         }
     }

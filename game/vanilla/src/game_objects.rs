@@ -2,8 +2,15 @@ pub mod game_objects {
     use game_interface::types::{emoticons::EnumCount, weapons::WeaponType};
     use hiarc::Hiarc;
     use legacy_map::mapdef_06::{DdraceEntityTiles, EntityTiles};
-    use map::map::groups::layers::tiles::{TileBase, TileFlags};
+    use map::map::groups::{
+        MapGroupPhysics,
+        layers::{
+            physics::MapLayerPhysics,
+            tiles::{TileBase, TileFlags},
+        },
+    };
     use math::math::vector::ivec2;
+    use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Hiarc, Default)]
     pub struct GameObjectsPickupDefinitions<V> {
@@ -20,7 +27,7 @@ pub mod game_objects {
         pub ninja_shields: Vec<V>,
     }
 
-    #[derive(Debug, Hiarc, Clone, Copy, PartialEq, Eq)]
+    #[derive(Debug, Hiarc, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
     pub enum DdraceMapEntityKind {
         LaserFastCcw,
         LaserNormalCcw,
@@ -54,7 +61,7 @@ pub mod game_objects {
     }
 
     impl DdraceMapEntityKind {
-        fn from_tile_index(index: u8) -> Option<Self> {
+        pub fn from_tile_index(index: u8) -> Option<Self> {
             Some(match index {
                 index if index == DdraceEntityTiles::LaserFastCcw as u8 => Self::LaserFastCcw,
                 index if index == DdraceEntityTiles::LaserNormalCcw as u8 => Self::LaserNormalCcw,
@@ -96,9 +103,84 @@ pub mod game_objects {
                 _ => return None,
             })
         }
+
+        pub fn laser_angular_speed(self) -> Option<f32> {
+            let pi = std::f32::consts::PI;
+            Some(match self {
+                Self::LaserFastCcw => pi / 90.0,
+                Self::LaserNormalCcw => pi / 180.0,
+                Self::LaserSlowCcw => pi / 360.0,
+                Self::LaserStop => 0.0,
+                Self::LaserSlowCw => -pi / 360.0,
+                Self::LaserNormalCw => -pi / 180.0,
+                Self::LaserFastCw => -pi / 90.0,
+                _ => return None,
+            })
+        }
+
+        pub fn laser_length(self) -> Option<f32> {
+            Some(match self {
+                Self::LaserShort => 96.0,
+                Self::LaserMedium => 192.0,
+                Self::LaserLong => 288.0,
+                _ => return None,
+            })
+        }
+
+        pub fn laser_curve_speed(self) -> Option<f32> {
+            Some(match self {
+                Self::LaserCSlow | Self::LaserOSlow => 1.0,
+                Self::LaserCNormal | Self::LaserONormal => 2.0,
+                Self::LaserCFast | Self::LaserOFast => 3.0,
+                _ => return None,
+            })
+        }
+
+        pub fn laser_curve_starts_open(self) -> bool {
+            matches!(
+                self,
+                Self::LaserOSlow | Self::LaserONormal | Self::LaserOFast
+            )
+        }
+
+        pub fn dragger_strength(self) -> Option<f32> {
+            Some(match self {
+                Self::DraggerWeak | Self::DraggerWeakNoWalls => 1.0,
+                Self::DraggerNormal | Self::DraggerNormalNoWalls => 2.0,
+                Self::DraggerStrong | Self::DraggerStrongNoWalls => 3.0,
+                _ => return None,
+            })
+        }
+
+        pub fn dragger_ignores_walls(self) -> bool {
+            matches!(
+                self,
+                Self::DraggerWeakNoWalls | Self::DraggerNormalNoWalls | Self::DraggerStrongNoWalls
+            )
+        }
+
+        pub fn plasma_freezes(self) -> bool {
+            matches!(self, Self::PlasmaFreeze | Self::PlasmaFreezeExplosive)
+        }
+
+        pub fn plasma_unfreezes(self) -> bool {
+            matches!(self, Self::Plasma)
+        }
+
+        pub fn plasma_explodes(self) -> bool {
+            matches!(self, Self::PlasmaExplosive | Self::PlasmaFreezeExplosive)
+        }
+
+        pub fn is_crazy_shotgun(self) -> bool {
+            matches!(self, Self::CrazyShotgun | Self::CrazyShotgunExplosive)
+        }
+
+        pub fn crazy_shotgun_explodes(self) -> bool {
+            matches!(self, Self::CrazyShotgunExplosive)
+        }
     }
 
-    #[derive(Debug, Hiarc, Clone, Copy)]
+    #[derive(Debug, Hiarc, Clone, Copy, Serialize, Deserialize)]
     pub struct DdraceMapEntityDefinition<V> {
         pub pos: V,
         pub kind: DdraceMapEntityKind,
@@ -114,70 +196,101 @@ pub mod game_objects {
     }
 
     impl GameObjectDefinitionsBase<ivec2> {
-        pub fn new(game_layer_tiles: &[TileBase], width: u32, height: u32) -> Self {
+        pub fn new(physics_group: &MapGroupPhysics) -> Self {
+            let width = physics_group.attr.width.get() as u32;
+            let height = physics_group.attr.height.get() as u32;
             let mut pickups = GameObjectsPickupDefinitions::<ivec2>::default();
             let mut ddrace_entities = Vec::new();
 
-            for y in 0..height {
-                for x in 0..width {
-                    let tiles = game_layer_tiles;
-                    let index = (y * width + x) as usize;
-                    if let Some(kind) = DdraceMapEntityKind::from_tile_index(tiles[index].index) {
-                        ddrace_entities.push(DdraceMapEntityDefinition {
-                            pos: ivec2::new(x as i32, y as i32),
-                            kind,
-                            flags: tiles[index].flags,
-                            number: None,
-                        });
+            let mut collect_tile = |tile: &TileBase, x: u32, y: u32, number: Option<u8>| {
+                if let Some(kind) = DdraceMapEntityKind::from_tile_index(tile.index) {
+                    ddrace_entities.push(DdraceMapEntityDefinition {
+                        pos: ivec2::new(x as i32, y as i32),
+                        kind,
+                        flags: tile.flags,
+                        number,
+                    });
+                }
+
+                if number.is_some() {
+                    return;
+                }
+
+                match tile.index {
+                    i if i == EntityTiles::Health as u8 => {
+                        pickups.hearts.push(ivec2::new(x as i32, y as i32));
                     }
-                    match tiles[index].index {
-                        i if i == EntityTiles::Health as u8 => {
-                            pickups.hearts.push(ivec2::new(x as i32, y as i32));
-                        }
-                        i if i == EntityTiles::Armor as u8 => {
-                            pickups.shields.push(ivec2::new(x as i32, y as i32));
-                        }
-                        i if i == EntityTiles::FlagSpawnRed as u8 => {
-                            pickups.red_flags.push(ivec2::new(x as i32, y as i32));
-                        }
-                        i if i == EntityTiles::FlagSpawnBlue as u8 => {
-                            pickups.blue_flags.push(ivec2::new(x as i32, y as i32));
-                            // TODO remove all as i32, use u16 instead
-                        }
-                        i if i == EntityTiles::WeaponGrenade as u8 => {
-                            pickups.weapons[WeaponType::Grenade as usize]
-                                .push(ivec2::new(x as i32, y as i32));
-                        }
-                        i if i == EntityTiles::WeaponLaser as u8 => {
-                            pickups.weapons[WeaponType::Laser as usize]
-                                .push(ivec2::new(x as i32, y as i32));
-                        }
-                        i if i == EntityTiles::WeaponShotgun as u8 => {
-                            pickups.weapons[WeaponType::Shotgun as usize]
-                                .push(ivec2::new(x as i32, y as i32));
-                        }
-                        i if i == EntityTiles::PowerupNinja as u8 => {
-                            pickups.ninjas.push(ivec2::new(x as i32, y as i32));
-                        }
-                        i if i == DdraceEntityTiles::ArmorShotgun as u8 => {
-                            pickups.weapon_shields[WeaponType::Shotgun as usize]
-                                .push(ivec2::new(x as i32, y as i32));
-                        }
-                        i if i == DdraceEntityTiles::ArmorGrenade as u8 => {
-                            pickups.weapon_shields[WeaponType::Grenade as usize]
-                                .push(ivec2::new(x as i32, y as i32));
-                        }
-                        i if i == DdraceEntityTiles::ArmorNinja as u8 => {
-                            pickups.ninja_shields.push(ivec2::new(x as i32, y as i32));
-                        }
-                        i if i == DdraceEntityTiles::ArmorLaser as u8 => {
-                            pickups.weapon_shields[WeaponType::Laser as usize]
-                                .push(ivec2::new(x as i32, y as i32));
-                        }
-                        _ => {
-                            // not handled
+                    i if i == EntityTiles::Armor as u8 => {
+                        pickups.shields.push(ivec2::new(x as i32, y as i32));
+                    }
+                    i if i == EntityTiles::FlagSpawnRed as u8 => {
+                        pickups.red_flags.push(ivec2::new(x as i32, y as i32));
+                    }
+                    i if i == EntityTiles::FlagSpawnBlue as u8 => {
+                        pickups.blue_flags.push(ivec2::new(x as i32, y as i32));
+                    }
+                    i if i == EntityTiles::WeaponGrenade as u8 => {
+                        pickups.weapons[WeaponType::Grenade as usize]
+                            .push(ivec2::new(x as i32, y as i32));
+                    }
+                    i if i == EntityTiles::WeaponLaser as u8 => {
+                        pickups.weapons[WeaponType::Laser as usize]
+                            .push(ivec2::new(x as i32, y as i32));
+                    }
+                    i if i == EntityTiles::WeaponShotgun as u8 => {
+                        pickups.weapons[WeaponType::Shotgun as usize]
+                            .push(ivec2::new(x as i32, y as i32));
+                    }
+                    i if i == EntityTiles::PowerupNinja as u8 => {
+                        pickups.ninjas.push(ivec2::new(x as i32, y as i32));
+                    }
+                    i if i == DdraceEntityTiles::ArmorShotgun as u8 => {
+                        pickups.weapon_shields[WeaponType::Shotgun as usize]
+                            .push(ivec2::new(x as i32, y as i32));
+                    }
+                    i if i == DdraceEntityTiles::ArmorGrenade as u8 => {
+                        pickups.weapon_shields[WeaponType::Grenade as usize]
+                            .push(ivec2::new(x as i32, y as i32));
+                    }
+                    i if i == DdraceEntityTiles::ArmorNinja as u8 => {
+                        pickups.ninja_shields.push(ivec2::new(x as i32, y as i32));
+                    }
+                    i if i == DdraceEntityTiles::ArmorLaser as u8 => {
+                        pickups.weapon_shields[WeaponType::Laser as usize]
+                            .push(ivec2::new(x as i32, y as i32));
+                    }
+                    _ => {}
+                }
+            };
+
+            for layer in &physics_group.layers {
+                match layer {
+                    MapLayerPhysics::Game(layer) => {
+                        for y in 0..height {
+                            for x in 0..width {
+                                let index = (y * width + x) as usize;
+                                collect_tile(&layer.tiles[index], x, y, None);
+                            }
                         }
                     }
+                    MapLayerPhysics::Front(layer) => {
+                        for y in 0..height {
+                            for x in 0..width {
+                                let index = (y * width + x) as usize;
+                                collect_tile(&layer.tiles[index], x, y, None);
+                            }
+                        }
+                    }
+                    MapLayerPhysics::Switch(layer) => {
+                        for y in 0..height {
+                            for x in 0..width {
+                                let index = (y * width + x) as usize;
+                                let tile = &layer.base.tiles[index];
+                                collect_tile(&tile.base, x, y, Some(tile.number));
+                            }
+                        }
+                    }
+                    _ => {}
                 }
             }
             Self {

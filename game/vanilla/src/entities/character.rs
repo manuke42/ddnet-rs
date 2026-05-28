@@ -948,7 +948,7 @@ pub mod character {
             self.reusable_core.switch_states.insert(number, state);
         }
 
-        fn switch_active(&self, number: u8) -> bool {
+        pub(crate) fn switch_active(&self, number: u8) -> bool {
             number == 0
                 || self
                     .reusable_core

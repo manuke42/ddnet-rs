@@ -392,6 +392,28 @@ pub fn config_mod(attr: TokenStream, tokens: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
+pub fn ddrace_entity_mod(attr: TokenStream, tokens: TokenStream) -> TokenStream {
+    impl_mod(
+        get_tokens_from_file(
+            attr.into_iter().next().unwrap(),
+            "game/vanilla/src/entities/ddrace_entity.rs",
+        ),
+        tokens,
+    )
+}
+
+#[proc_macro_attribute]
+pub fn ddrace_projectile_mod(attr: TokenStream, tokens: TokenStream) -> TokenStream {
+    impl_mod(
+        get_tokens_from_file(
+            attr.into_iter().next().unwrap(),
+            "game/vanilla/src/entities/ddrace_projectile.rs",
+        ),
+        tokens,
+    )
+}
+
+#[proc_macro_attribute]
 pub fn simulation_pipe_mod(attr: TokenStream, tokens: TokenStream) -> TokenStream {
     impl_mod(
         get_tokens_from_file(

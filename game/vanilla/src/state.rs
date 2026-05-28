@@ -97,6 +97,7 @@ pub mod state {
     use crate::entities::character::player::player::{
         Player, PlayerInfo, Players, SpectatorPlayer, SpectatorPlayers,
     };
+    use crate::entities::ddrace_projectile::ddrace_projectile;
     use crate::entities::flag::flag::{Flag, Flags};
     use crate::entities::laser::laser::Laser;
     use crate::entities::pickup::pickup::Pickup;
@@ -510,11 +511,14 @@ pub mod state {
                 Map::read_physics_group_and_config(&MapFileReader::new(map)?)?;
 
             let w = physics_group.attr.width.get() as u32;
-            let h = physics_group.attr.height.get() as u32;
-
             let tiles = physics_group.get_game_layer_tiles().clone();
+            let game_objects = GameObjectDefinitions::new(&physics_group);
 
-            let mut collision = Collision::new(physics_group, true)?;
+            let default_tune = match config.game_type {
+                ConfigGameType::Race => Tunings::race_default(),
+                ConfigGameType::Dm | ConfigGameType::Ctf => Tunings::default(),
+            };
+            let mut collision = Collision::with_default_tune(physics_group, true, default_tune)?;
 
             // Always handle config variables before commands.
             Self::handle_map_config_variables(&mut config, map_config.config_variables);
@@ -545,8 +549,6 @@ pub mod state {
                     );
                 }
             }
-
-            let game_objects = GameObjectDefinitions::new(&tiles, w, h);
 
             let mut spawns: Vec<vec2> = Default::default();
             let mut spawns_red: Vec<vec2> = Default::default();
@@ -1295,6 +1297,22 @@ pub mod state {
                         ))
                     }),
             );
+            res.extend(prev_stage.world.ddrace_projectiles.iter().filter_map(
+                |(&id, prev_proj)| {
+                    let proj = stage.world.ddrace_projectiles.get(&id)?;
+                    Some((
+                        id,
+                        ProjectileRenderInfo {
+                            ty: prev_proj.core.ty,
+                            pos: ddrace_projectile::lerped_pos(prev_proj, proj, ratio) / 32.0,
+                            vel: ddrace_projectile::estimated_fly_direction(prev_proj, proj, ratio)
+                                / 32.0,
+                            owner_id: None,
+                            phased: false,
+                        },
+                    ))
+                },
+            ));
             res
         }
 

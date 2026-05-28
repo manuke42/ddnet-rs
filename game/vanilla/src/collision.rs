@@ -125,6 +125,19 @@ pub mod collision {
         }
     }
 
+    impl Tunings {
+        pub fn race_default() -> Self {
+            Self {
+                gun_curvature: 0.0,
+                gun_speed: 1400.0,
+                shotgun_curvature: 0.0,
+                shotgun_speed: 500.0,
+                shotgun_speeddiff: 0.0,
+                ..Default::default()
+            }
+        }
+    }
+
     #[derive(
         Debug, Hiarc, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
     )]
@@ -188,6 +201,14 @@ pub mod collision {
             physics_group: MapGroupPhysics,
             load_all_layers: bool,
         ) -> anyhow::Result<Box<Self>> {
+            Self::with_default_tune(physics_group, load_all_layers, Tunings::default())
+        }
+
+        pub fn with_default_tune(
+            physics_group: MapGroupPhysics,
+            load_all_layers: bool,
+            default_tune: Tunings,
+        ) -> anyhow::Result<Box<Self>> {
             let width = physics_group.attr.width.get() as u32;
             let height = physics_group.attr.height.get() as u32;
 
@@ -228,7 +249,7 @@ pub mod collision {
                 let tune_tiles = &tune_layer.base.tiles;
                 (
                     {
-                        let mut tune_zones = vec![Tunings::default(); 256];
+                        let mut tune_zones = vec![default_tune; 256];
 
                         for (zone_index, tunes) in tune_layer.tune_zones.iter() {
                             let zone = &mut tune_zones[*zone_index as usize];
@@ -256,7 +277,7 @@ pub mod collision {
                 )
             });
 
-            let mut tune_zones = vec![Tunings::default(); 256];
+            let mut tune_zones = vec![default_tune; 256];
             let tune_tiles: Vec<_> =
                 if let Some((tune_zone_list, tune_tiles)) = tune_zones_and_tiles {
                     tune_zones = tune_zone_list;
@@ -351,6 +372,13 @@ pub mod collision {
             let pos = self.tile_index(x, y);
 
             self.tiles[pos].index
+        }
+
+        #[inline(always)]
+        pub fn get_front_tile(&self, x: i32, y: i32) -> u8 {
+            let pos = self.tile_index(x, y);
+
+            self.front_tiles[pos].index
         }
 
         #[inline(always)]
@@ -733,6 +761,88 @@ pub mod collision {
             } else {
                 DdraceTileNum::Air
             }
+        }
+
+        fn get_front_collision_at(&self, x: f32, y: f32) -> DdraceTileNum {
+            let index = self.get_front_tile(round_to_int(x), round_to_int(y));
+
+            if index == DdraceTileNum::NoLaser as u8 {
+                DdraceTileNum::NoLaser
+            } else {
+                DdraceTileNum::Air
+            }
+        }
+
+        pub fn intersect_no_laser(
+            &self,
+            pos_0: &vec2,
+            pos_1: &vec2,
+            out_collision: &mut vec2,
+            out_before_collision: &mut vec2,
+        ) -> CollisionTile {
+            self.intersect_no_laser_impl(pos_0, pos_1, out_collision, out_before_collision, false)
+        }
+
+        pub fn intersect_no_laser_no_walls(
+            &self,
+            pos_0: &vec2,
+            pos_1: &vec2,
+            out_collision: &mut vec2,
+            out_before_collision: &mut vec2,
+        ) -> CollisionTile {
+            self.intersect_no_laser_impl(pos_0, pos_1, out_collision, out_before_collision, true)
+        }
+
+        fn intersect_no_laser_impl(
+            &self,
+            pos_0: &vec2,
+            pos_1: &vec2,
+            out_collision: &mut vec2,
+            out_before_collision: &mut vec2,
+            no_walls: bool,
+        ) -> CollisionTile {
+            let d = distance(pos_0, pos_1);
+            let end = d.ceil() as i32;
+            let mut last_pos = *pos_0;
+
+            if d == 0.0 {
+                *out_collision = *pos_1;
+                *out_before_collision = *pos_1;
+                return CollisionTile::None;
+            }
+
+            for i in 0..end {
+                let a = i as f32 / d;
+                let pos = mix(pos_0, pos_1, a);
+                let ix = round_to_int(pos.x);
+                let iy = round_to_int(pos.y);
+
+                let tile = self.get_tile(ix, iy);
+                let front_tile = self.get_front_tile(ix, iy);
+                let hits_wall = !no_walls
+                    && (tile == DdraceTileNum::Solid as u8
+                        || tile == DdraceTileNum::NoHook as u8
+                        || tile == DdraceTileNum::NoLaser as u8);
+                let hits_front_no_laser = front_tile == DdraceTileNum::NoLaser as u8;
+
+                if hits_wall
+                    || hits_front_no_laser
+                    || (no_walls && tile == DdraceTileNum::NoLaser as u8)
+                {
+                    *out_collision = pos;
+                    *out_before_collision = last_pos;
+                    return CollisionTile::Solid(if hits_front_no_laser {
+                        self.get_front_collision_at(pos.x, pos.y)
+                    } else {
+                        self.get_collision_at(pos.x, pos.y)
+                    });
+                }
+
+                last_pos = pos;
+            }
+            *out_collision = *pos_1;
+            *out_before_collision = *pos_1;
+            CollisionTile::None
         }
 
         #[inline(always)]

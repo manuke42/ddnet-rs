@@ -15,7 +15,7 @@ pub mod world {
         pooling::GamePooling,
         types::{
             flag::FlagType,
-            game::GameTickType,
+            game::{GameEntityId, GameTickType},
             id_gen::IdGenerator,
             id_types::{CharacterId, LaserId, PickupId, ProjectileId, StageId},
             input::{CharacterInput, CharacterInputConsumableDiff},
@@ -43,6 +43,10 @@ pub mod world {
                 pos::character_pos::{CharacterPos, CharacterPositionPlayfield},
                 score::character_score::CharacterScores,
             },
+            ddrace_entity::ddrace_entity::{DdraceEntities, DdraceEntity, DdraceEntityPool},
+            ddrace_projectile::ddrace_projectile::{
+                DdraceProjectile, DdraceProjectilePool, DdraceProjectiles,
+            },
             entity::entity::{EntityInterface, EntityTickResult},
             flag::flag::{Flag, FlagPool, Flags},
             laser::laser::{Laser, LaserPool, Lasers, WorldLaser},
@@ -53,8 +57,9 @@ pub mod world {
         game_objects::game_objects::{GameObjectDefinitions, GameObjectDefinitionsBase},
         simulation_pipe::simulation_pipe::{
             GameWorldPendingEvents, SimulationEventWorldEntity, SimulationEventWorldEntityType,
-            SimulationPipeFlag, SimulationPipeLaser, SimulationPipePickup,
-            SimulationPipeProjectile, SimulationWorldEvent, SimulationWorldEvents,
+            SimulationPipeDdraceEntity, SimulationPipeDdraceProjectile, SimulationPipeFlag,
+            SimulationPipeLaser, SimulationPipePickup, SimulationPipeProjectile,
+            SimulationWorldEvent, SimulationWorldEvents,
         },
         spawns::GameSpawns,
         state::state::TICKS_PER_SECOND,
@@ -145,6 +150,8 @@ pub mod world {
         pub(crate) flag_pool: FlagPool,
         pub(crate) pickup_pool: PickupPool,
         pub(crate) laser_pool: LaserPool,
+        pub(crate) ddrace_entity_pool: DdraceEntityPool,
+        pub(crate) ddrace_projectile_pool: DdraceProjectilePool,
         pub(crate) character_pool: CharacterPool,
     }
 
@@ -167,6 +174,14 @@ pub mod world {
                 laser_pool: LaserPool {
                     laser_pool: Pool::with_capacity(1024), // TODO: add hint for this
                     laser_reusable_cores_pool: Pool::with_capacity(1024 * 2), // TODO: add hint for this
+                },
+                ddrace_entity_pool: DdraceEntityPool {
+                    ddrace_entity_pool: Pool::with_capacity(1024), // TODO: add hint for this
+                    ddrace_entity_reusable_cores_pool: Pool::with_capacity(1024 * 2), // TODO: add hint for this
+                },
+                ddrace_projectile_pool: DdraceProjectilePool {
+                    projectile_pool: Pool::with_capacity(1024), // TODO: add hint for this
+                    projectile_helper: Pool::with_capacity(1024 * 2), // TODO: add hint for this
                 },
                 character_pool: CharacterPool {
                     character_pool: Pool::with_capacity(max_characters),
@@ -191,10 +206,12 @@ pub mod world {
     #[derive(Debug, Hiarc)]
     pub struct GameWorld {
         pub(crate) projectiles: Projectiles,
+        pub(crate) ddrace_projectiles: DdraceProjectiles,
         pub(crate) red_flags: Flags,
         pub(crate) blue_flags: Flags,
         pub(crate) pickups: Pickups,
         pub(crate) lasers: Lasers,
+        pub(crate) ddrace_entities: DdraceEntities,
         pub(crate) characters: Characters,
 
         /// inactive / non spawned / whatever game objects
@@ -237,26 +254,51 @@ pub mod world {
         ) -> Self {
             let mut inactive_game_objects = GameObjectsWorld {
                 pickups: Default::default(),
-                ddrace_entities: game_object_definitions
-                    .ddrace_entities
-                    .iter()
-                    .map(
-                        |entity| crate::game_objects::game_objects::DdraceMapEntityDefinition {
-                            pos: GameObjectWorld {
-                                pos: entity.pos,
-                                respawn_in_ticks: 0,
-                            },
-                            kind: entity.kind,
-                            flags: entity.flags,
-                            number: entity.number,
-                        },
-                    )
-                    .collect(),
+                ddrace_entities: Default::default(),
             };
 
             let mut red_flags = world_pool.flag_pool.flag_pool.new();
             let mut blue_flags = world_pool.flag_pool.flag_pool.new();
             let mut pickups = world_pool.pickup_pool.pickup_pool.new();
+            let mut ddrace_entities = world_pool.ddrace_entity_pool.ddrace_entity_pool.new();
+            let projectiles = world_pool.projectile_pool.projectile_pool.new();
+            let mut ddrace_projectiles = world_pool.ddrace_projectile_pool.projectile_pool.new();
+            if let Some(id_gen) = spawn_default_entities.then_some(id_gen).flatten() {
+                for entity in &game_object_definitions.ddrace_entities {
+                    let id: GameEntityId = id_gen.next_id();
+                    if entity.kind.is_crazy_shotgun() {
+                        let projectile_id = id.into();
+                        let pos = vec2::new(
+                            entity.pos.x as f32 * 32.0 + 16.0,
+                            entity.pos.y as f32 * 32.0 + 16.0,
+                        );
+                        let dir = DdraceEntity::crazy_shotgun_direction(entity.flags);
+                        let projectile = DdraceProjectile::new(
+                            &projectile_id,
+                            &pos,
+                            &dir,
+                            GameTickType::MAX,
+                            0,
+                            0.0,
+                            entity.kind.crazy_shotgun_explodes(),
+                            true,
+                            true,
+                            true,
+                            if dir.x != 0.0 { 1 } else { 2 },
+                            WeaponWithProjectile::Shotgun,
+                            &world_pool.ddrace_projectile_pool,
+                            &game_pending_events,
+                            &simulation_events,
+                        );
+                        ddrace_projectiles.insert(projectile_id, projectile);
+                    } else {
+                        ddrace_entities.insert(
+                            id,
+                            DdraceEntity::new(&id, entity, &world_pool.ddrace_entity_pool),
+                        );
+                    }
+                }
+            }
 
             if let Some(id_gen) = spawn_default_entities.then_some(id_gen).flatten() {
                 let mut add_pick = |pickup_pos: &ivec2, ty: PickupType| {
@@ -341,11 +383,13 @@ pub mod world {
                 character_tick_helper: Default::default(),
                 character_tick_helper_pool: Pool::with_capacity(2),
 
-                projectiles: world_pool.projectile_pool.projectile_pool.new(),
+                projectiles,
+                ddrace_projectiles,
                 red_flags,
                 blue_flags,
                 pickups,
                 lasers: world_pool.laser_pool.laser_pool.new(),
+                ddrace_entities,
                 characters: world_pool.character_pool.character_pool.new(),
 
                 inactive_game_objects,
@@ -562,6 +606,10 @@ pub mod world {
             &self.projectiles
         }
 
+        pub fn get_ddrace_projectiles(&self) -> &DdraceProjectiles {
+            &self.ddrace_projectiles
+        }
+
         pub fn get_lasers(&self) -> &Lasers {
             &self.lasers
         }
@@ -613,6 +661,41 @@ pub mod world {
                     projectile,
                 },
             );
+        }
+
+        pub fn insert_new_ddrace_projectile(
+            &mut self,
+            projectile_id: ProjectileId,
+            pos: &vec2,
+            direction: &vec2,
+            life_span: GameTickType,
+            damage: u32,
+            force: f32,
+            explosive: bool,
+            no_damage_explosion: bool,
+            can_hit_owner: bool,
+            freeze: bool,
+            bouncing: i32,
+            ty: WeaponWithProjectile,
+        ) {
+            let projectile = DdraceProjectile::new(
+                &projectile_id,
+                pos,
+                direction,
+                life_span,
+                damage,
+                force,
+                explosive,
+                no_damage_explosion,
+                can_hit_owner,
+                freeze,
+                bouncing,
+                ty,
+                &self.world_pool.ddrace_projectile_pool,
+                &self.game_pending_events,
+                &self.simulation_events,
+            );
+            self.ddrace_projectiles.insert(projectile_id, projectile);
         }
 
         pub fn insert_new_laser(
@@ -669,6 +752,13 @@ pub mod world {
                     pipe.collision,
                     &mut self.characters,
                     proj.character_id,
+                    &self.play_field,
+                )) != EntityTickResult::RemoveEntity
+            });
+            self.ddrace_projectiles.retain_with_order(|_, proj| {
+                proj.tick(&mut SimulationPipeDdraceProjectile::new(
+                    pipe.collision,
+                    &mut self.characters,
                     &self.play_field,
                 )) != EntityTickResult::RemoveEntity
             });
@@ -1168,6 +1258,21 @@ pub mod world {
             }
         }
 
+        fn tick_ddrace_entities(&mut self, collision: &Collision) {
+            let entity_cores = self
+                .ddrace_entities
+                .values()
+                .map(|entity| entity.core)
+                .collect::<Vec<_>>();
+            self.ddrace_entities.retain_with_order(|_, entity| {
+                entity.tick(&mut SimulationPipeDdraceEntity::new(
+                    collision,
+                    &mut self.characters,
+                    &entity_cores,
+                )) != EntityTickResult::RemoveEntity
+            });
+        }
+
         fn on_character_spawn(&mut self, character_id: &CharacterId) {
             let character = self.characters.get(character_id).unwrap();
             let (core, reusable_core, pos) = Character::respawn(
@@ -1227,6 +1332,7 @@ pub mod world {
         pub fn tick(&mut self, pipe: &mut SimulationPipeStage) {
             self.check_character_respawn();
             self.check_inactive_game_objects();
+            self.tick_ddrace_entities(pipe.collision);
 
             self.tick_characters(pipe);
             self.tick_projectiles(pipe);

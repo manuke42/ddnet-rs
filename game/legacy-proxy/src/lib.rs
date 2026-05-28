@@ -92,7 +92,8 @@ use libtw2_gamenet_ddnet::{
         self, CHARACTERFLAG_MOVEMENTS_DISABLED, CHARACTERFLAG_WEAPON_GRENADE,
         CHARACTERFLAG_WEAPON_GUN, CHARACTERFLAG_WEAPON_HAMMER, CHARACTERFLAG_WEAPON_LASER,
         CHARACTERFLAG_WEAPON_SHOTGUN, Character, DdnetCharacter, DdnetPlayer,
-        PROJECTILEFLAG_NORMALIZE_VEL, obj_size,
+        PROJECTILEFLAG_BOUNCE_HORIZONTAL, PROJECTILEFLAG_BOUNCE_VERTICAL, PROJECTILEFLAG_EXPLOSIVE,
+        PROJECTILEFLAG_FREEZE, PROJECTILEFLAG_NORMALIZE_VEL, obj_size,
     },
 };
 use libtw2_net::net::PeerId;
@@ -129,7 +130,7 @@ use pool::{
     rc::PoolRc,
     traits::Recyclable,
 };
-use projectile::{get_pos, get_vel};
+use projectile::get_pos;
 use rand::RngCore;
 use sha2::Digest;
 use socket::Socket;
@@ -158,6 +159,7 @@ use vanilla::{
             player::player::{PlayerInfo as VanillaPlayerInfo, SpectatorPlayer},
             pos::character_pos::CharacterPositionPlayfield,
         },
+        ddrace_projectile::ddrace_projectile::DdraceProjectileCore,
         flag::flag::{FlagCore, PoolFlagReusableCore},
         laser::laser::{LaserCore, PoolLaserReusableCore},
         pickup::pickup::{PickupCore, PoolPickupReusableCore},
@@ -169,7 +171,8 @@ use vanilla::{
     simulation_pipe::simulation_pipe::SimulationPipeCharactersGetter,
     snapshot::snapshot::{
         Snapshot, SnapshotCharacter, SnapshotCharacterPhasedState, SnapshotCharacterPlayerTy,
-        SnapshotCharacterSpectateMode, SnapshotCharacters, SnapshotFlag, SnapshotFlags,
+        SnapshotCharacterSpectateMode, SnapshotCharacters, SnapshotDdraceEntities,
+        SnapshotDdraceProjectile, SnapshotDdraceProjectiles, SnapshotFlag, SnapshotFlags,
         SnapshotInactiveObject, SnapshotLaser, SnapshotLasers, SnapshotMatchManager,
         SnapshotPickup, SnapshotPickups, SnapshotPool, SnapshotProjectile, SnapshotProjectiles,
         SnapshotSpectatorPlayer, SnapshotStage, SnapshotWorld,
@@ -1065,7 +1068,13 @@ impl Client {
                         pos: vec2,
                         type_: enums::Weapon,
                         start_tick: snap_obj::Tick,
-                        vel: vec2| {
+                        vel: vec2,
+                        is_explosive: bool,
+                        no_damage_explosion: bool,
+                        can_hit_owner: bool,
+                        freeze: bool,
+                        bouncing: i32,
+                        ownerless_ddnet_proj: bool| {
             let stage_id = base
                 .teams
                 .get(&owner_id)
@@ -1081,40 +1090,64 @@ impl Client {
                 enums::Weapon::Shotgun => (base.tunes.shotgun_curvature, base.tunes.shotgun_speed),
                 enums::Weapon::Grenade => (base.tunes.grenade_curvature, base.tunes.grenade_speed),
             };
-            stage.world.projectiles.insert(
-                proj_id,
-                SnapshotProjectile {
-                    core: ProjectileCore {
-                        pos: get_pos(pos, vel, speed, curvature, now, start_tick),
-                        vel: get_vel(now, start_tick, vel, speed, curvature),
-                        life_span: 100,
-                        damage: 0,
-                        force: 0.0,
-                        is_explosive: match type_ {
-                            enums::Weapon::Hammer
-                            | enums::Weapon::Pistol
-                            | enums::Weapon::Shotgun
-                            | enums::Weapon::Rifle
-                            | enums::Weapon::Ninja => false,
-                            enums::Weapon::Grenade => true,
+            let ty = match type_ {
+                enums::Weapon::Hammer
+                | enums::Weapon::Ninja
+                | enums::Weapon::Rifle
+                | enums::Weapon::Pistol => WeaponWithProjectile::Gun,
+                enums::Weapon::Shotgun => WeaponWithProjectile::Shotgun,
+                enums::Weapon::Grenade => WeaponWithProjectile::Grenade,
+            };
+            let cur_pos = get_pos(pos, vel, speed, curvature, now, start_tick);
+            if no_damage_explosion || freeze || bouncing != 0 || ownerless_ddnet_proj {
+                let elapsed_ticks = (now - start_tick).max(0) as GameTickType;
+                let life_span_ticks = 100 + 1;
+                let life_span = GameTickCooldownAndLength::new_with_length(
+                    life_span_ticks,
+                    life_span_ticks.saturating_add(elapsed_ticks),
+                );
+                stage.world.ddrace_projectiles.insert(
+                    proj_id,
+                    SnapshotDdraceProjectile {
+                        core: DdraceProjectileCore {
+                            pos: cur_pos,
+                            start_pos: pos,
+                            vel,
+                            life_span,
+                            damage: 0,
+                            force: 0.0,
+                            is_explosive,
+                            no_damage_explosion,
+                            can_hit_owner,
+                            freeze,
+                            bouncing,
+                            ty,
                         },
-                        ty: match type_ {
-                            enums::Weapon::Hammer
-                            | enums::Weapon::Ninja
-                            | enums::Weapon::Rifle
-                            | enums::Weapon::Pistol => WeaponWithProjectile::Gun,
-                            enums::Weapon::Shotgun => WeaponWithProjectile::Shotgun,
-                            enums::Weapon::Grenade => WeaponWithProjectile::Grenade,
-                        },
-                        side: None,
+                        game_el_id: proj_id,
                     },
-                    reusable_core: PoolProjectileReusableCore::from_without_pool(
-                        ProjectileReusableCore {},
-                    ),
-                    game_el_id: proj_id,
-                    owner_game_el_id: player_id,
-                },
-            );
+                );
+            } else {
+                stage.world.projectiles.insert(
+                    proj_id,
+                    SnapshotProjectile {
+                        core: ProjectileCore {
+                            pos: cur_pos,
+                            vel,
+                            life_span: 100,
+                            damage: 0,
+                            force: 0.0,
+                            is_explosive,
+                            ty,
+                            side: None,
+                        },
+                        reusable_core: PoolProjectileReusableCore::from_without_pool(
+                            ProjectileReusableCore {},
+                        ),
+                        game_el_id: proj_id,
+                        owner_game_el_id: player_id,
+                    },
+                );
+            }
         };
         let add_laser = |snapshot: &mut Snapshot, id, owner_id: i32, laser: snap_obj::Laser| {
             let stage_id = base
@@ -1197,6 +1230,12 @@ impl Client {
                             projectile.vel_x as f32 / 100.0,
                             projectile.vel_y as f32 / 100.0,
                         ),
+                        matches!(projectile.type_, enums::Weapon::Grenade),
+                        false,
+                        false,
+                        false,
+                        0,
+                        false,
                     );
                 }
                 SnapObj::Laser(laser) => {
@@ -2104,6 +2143,20 @@ impl Client {
                         projectile.type_,
                         projectile.start_tick,
                         vel,
+                        (projectile.flags & PROJECTILEFLAG_EXPLOSIVE) != 0,
+                        projectile.owner < 0,
+                        projectile.owner < 0,
+                        (projectile.flags & PROJECTILEFLAG_FREEZE) != 0,
+                        (if (projectile.flags & PROJECTILEFLAG_BOUNCE_HORIZONTAL) != 0 {
+                            1
+                        } else {
+                            0
+                        }) | (if (projectile.flags & PROJECTILEFLAG_BOUNCE_VERTICAL) != 0 {
+                            2
+                        } else {
+                            0
+                        }),
+                        projectile.owner < 0,
                     );
                 }
                 SnapObj::DdnetPickup(ddnet_pickup) => {
@@ -3289,10 +3342,13 @@ impl Client {
                                 world: SnapshotWorld {
                                     characters: SnapshotCharacters::new_without_pool(),
                                     projectiles: SnapshotProjectiles::new_without_pool(),
+                                    ddrace_projectiles: SnapshotDdraceProjectiles::new_without_pool(
+                                    ),
                                     lasers: SnapshotLasers::new_without_pool(),
                                     pickups: SnapshotPickups::new_without_pool(),
                                     red_flags: SnapshotFlags::new_without_pool(),
                                     blue_flags: SnapshotFlags::new_without_pool(),
+                                    ddrace_entities: SnapshotDdraceEntities::new_without_pool(),
                                     inactive_objects: SnapshotInactiveObject {
                                         blue_flags: PoolVec::new_without_pool(),
                                         hearts: PoolVec::new_without_pool(),
@@ -3305,7 +3361,16 @@ impl Client {
                                             PoolVec::new_without_pool(),
                                             PoolVec::new_without_pool(),
                                         ],
+                                        weapon_shields: [
+                                            PoolVec::new_without_pool(),
+                                            PoolVec::new_without_pool(),
+                                            PoolVec::new_without_pool(),
+                                            PoolVec::new_without_pool(),
+                                            PoolVec::new_without_pool(),
+                                        ],
                                         ninjas: PoolVec::new_without_pool(),
+                                        ninja_shields: PoolVec::new_without_pool(),
+                                        ddrace_entities: PoolVec::new_without_pool(),
                                     },
                                 },
                             }
