@@ -1,6 +1,6 @@
 pub mod pickup {
     use crate::{
-        entities::character::character::WeaponsExt,
+        entities::character::character::{BuffProps, Character, CharacterPool, WeaponsExt},
         reusable::{CloneWithCopyableElements, ReusableCore},
     };
     use base::linked_hash_map_view::FxLinkedHashMap;
@@ -13,7 +13,7 @@ pub mod pickup {
         },
         types::{
             id_types::PickupId, pickup::PickupType, render::character::CharacterBuff,
-            weapons::WeaponType,
+            render::character::CharacterDebuff, weapons::WeaponType,
         },
     };
     use hiarc::Hiarc;
@@ -21,6 +21,7 @@ pub mod pickup {
     use pool::{datatypes::PoolFxLinkedHashMap, pool::Pool, recycle::Recycle, traits::Recyclable};
     use serde::{Deserialize, Serialize};
 
+    use crate::state::state::TICKS_PER_SECOND;
     use crate::{
         config::config::ConfigGameType,
         entities::entity::entity::{DropMode, Entity, EntityInterface, EntityTickResult},
@@ -118,6 +119,238 @@ pub mod pickup {
         pub fn lerped_pos(pickup1: &Pickup, pickup2: &Pickup, ratio: f64) -> vec2 {
             lerp(&pickup1.core.pos, &pickup2.core.pos, ratio as f32)
         }
+
+        fn collected_result(
+            collected: bool,
+            pickup_tick_result: EntityTickResult,
+        ) -> EntityTickResult {
+            if collected {
+                pickup_tick_result
+            } else {
+                EntityTickResult::None
+            }
+        }
+
+        fn emit_pickup(&self, char: &Character, ty: PickupType, sound: GameWorldEntitySoundEvent) {
+            self.game_pending_events.push_sound(
+                Some(char.base.game_element_id),
+                Some(self.core.pos),
+                sound,
+            );
+            self.simulation_events
+                .push_world(SimulationEventWorldEntityType::Pickup {
+                    id: self.base.game_element_id,
+                    ev: PickupEvent::Pickup {
+                        pos: self.core.pos,
+                        by: char.base.game_element_id,
+                        ty,
+                    },
+                });
+        }
+
+        fn emit_heart_pickup(&self, char: &Character) {
+            self.emit_pickup(
+                char,
+                PickupType::PowerupHealth,
+                GameWorldEntitySoundEvent::Pickup(GamePickupSoundEvent::Heart(
+                    GamePickupHeartEventSound::Collect,
+                )),
+            );
+        }
+
+        fn emit_armor_pickup(&self, char: &Character, ty: PickupType) {
+            self.emit_pickup(
+                char,
+                ty,
+                GameWorldEntitySoundEvent::Pickup(GamePickupSoundEvent::Armor(
+                    GamePickupArmorEventSound::Collect,
+                )),
+            );
+        }
+
+        fn pickup_health(
+            &self,
+            char: &mut Character,
+            is_race: bool,
+            pickup_tick_result: EntityTickResult,
+        ) -> EntityTickResult {
+            if is_race {
+                let freeze = char
+                    .reusable_core
+                    .debuffs
+                    .entry(CharacterDebuff::Freeze)
+                    .or_insert_with_keep_order(|| BuffProps {
+                        remaining_tick: 0.into(),
+                        interact_tick: 0.into(),
+                        interact_cursor_dir: Default::default(),
+                        interact_val: 0.0,
+                    });
+                if freeze.interact_tick.is_none() {
+                    freeze.remaining_tick = (3 * TICKS_PER_SECOND).into();
+                    freeze.interact_tick = TICKS_PER_SECOND.into();
+                    self.emit_heart_pickup(char);
+                    pickup_tick_result
+                } else {
+                    EntityTickResult::None
+                }
+            } else if char.core.health < 10 {
+                char.core.health += 1;
+                self.emit_heart_pickup(char);
+                pickup_tick_result
+            } else {
+                EntityTickResult::None
+            }
+        }
+
+        fn pickup_armor(
+            &self,
+            char: &mut Character,
+            is_race: bool,
+            pickup_tick_result: EntityTickResult,
+        ) -> EntityTickResult {
+            if is_race {
+                let mut collected = false;
+                for weapon in [WeaponType::Shotgun, WeaponType::Grenade, WeaponType::Laser] {
+                    collected |= char.reusable_core.weapons.remove(&weapon).is_some();
+                }
+                collected |= char
+                    .reusable_core
+                    .buffs
+                    .remove(&CharacterBuff::Ninja)
+                    .is_some();
+
+                if char.core.active_weapon >= WeaponType::Shotgun {
+                    char.core.prev_weapon = WeaponType::Gun;
+                    char.core.active_weapon = WeaponType::Hammer;
+                    char.core.queued_weapon = None;
+                }
+
+                if collected {
+                    self.emit_armor_pickup(char, PickupType::PowerupArmor);
+                }
+                EntityTickResult::None
+            } else if char.core.armor < 10 {
+                char.core.armor += 1;
+                self.emit_armor_pickup(char, PickupType::PowerupArmor);
+                pickup_tick_result
+            } else {
+                EntityTickResult::None
+            }
+        }
+
+        fn pickup_weapon(
+            &self,
+            char: &mut Character,
+            char_pool: &CharacterPool,
+            weapon: WeaponType,
+            is_race: bool,
+            pickup_tick_result: EntityTickResult,
+        ) -> EntityTickResult {
+            let ammo = (!is_race).then_some(10);
+            let collected = if let Some(weapon) = char.reusable_core.weapons.get_mut(&weapon) {
+                if weapon.cur_ammo.is_some_and(|val| val < 10) {
+                    weapon.cur_ammo = ammo;
+                    true
+                } else {
+                    false
+                }
+            } else {
+                char.reusable_core.weapons.insert_sorted(
+                    weapon,
+                    Weapon {
+                        cur_ammo: ammo,
+                        next_ammo_regeneration_tick: 0.into(),
+                        upgrades: char_pool.character_weapon_upgrade_pool.new(),
+                    },
+                );
+                true
+            };
+
+            if collected {
+                if let Some(ev) = match weapon {
+                    WeaponType::Hammer | WeaponType::Gun => None,
+                    WeaponType::Shotgun => Some(GameWorldEntitySoundEvent::Shotgun(
+                        GameShotgunEventSound::Collect,
+                    )),
+                    WeaponType::Grenade => Some(GameWorldEntitySoundEvent::Grenade(
+                        GameGrenadeEventSound::Collect,
+                    )),
+                    WeaponType::Laser => Some(GameWorldEntitySoundEvent::Laser(
+                        GameLaserEventSound::Collect,
+                    )),
+                } {
+                    self.game_pending_events.push_sound(
+                        Some(char.base.game_element_id),
+                        Some(self.core.pos),
+                        ev,
+                    );
+                }
+                self.simulation_events
+                    .push_world(SimulationEventWorldEntityType::Pickup {
+                        id: self.base.game_element_id,
+                        ev: PickupEvent::Pickup {
+                            pos: self.core.pos,
+                            by: char.base.game_element_id,
+                            ty: PickupType::PowerupWeapon(weapon),
+                        },
+                    });
+            }
+
+            Self::collected_result(collected, pickup_tick_result)
+        }
+
+        fn pickup_weapon_shield(
+            &self,
+            char: &mut Character,
+            weapon: WeaponType,
+            pickup_tick_result: EntityTickResult,
+        ) -> EntityTickResult {
+            let collected = char.reusable_core.weapons.remove(&weapon).is_some();
+            if collected {
+                if char.core.active_weapon == weapon {
+                    char.core.prev_weapon = char.core.active_weapon;
+                    char.core.active_weapon = WeaponType::Hammer;
+                    char.core.queued_weapon = None;
+                }
+                self.emit_armor_pickup(char, PickupType::PowerupWeaponShield(weapon));
+            }
+
+            Self::collected_result(collected, pickup_tick_result)
+        }
+
+        fn pickup_ninja(
+            &self,
+            char: &mut Character,
+            pickup_tick_result: EntityTickResult,
+        ) -> EntityTickResult {
+            self.emit_pickup(
+                char,
+                PickupType::PowerupNinja,
+                GameWorldEntitySoundEvent::Character(GameCharacterSoundEvent::Buff(
+                    GameBuffSoundEvent::Ninja(GameBuffNinjaEventSound::Collect),
+                )),
+            );
+            char.give_ninja();
+            pickup_tick_result
+        }
+
+        fn pickup_ninja_shield(
+            &self,
+            char: &mut Character,
+            pickup_tick_result: EntityTickResult,
+        ) -> EntityTickResult {
+            let collected = char
+                .reusable_core
+                .buffs
+                .remove(&CharacterBuff::Ninja)
+                .is_some();
+
+            if collected {
+                self.emit_armor_pickup(char, PickupType::PowerupNinjaShield);
+            }
+
+            Self::collected_result(collected, pickup_tick_result)
+        }
     }
 
     impl EntityInterface<PickupCore, PickupReusableCore, SimulationPipePickup<'_>> for Pickup {
@@ -134,217 +367,34 @@ pub mod pickup {
             );
 
             if let Some(char) = intersection {
-                let pickup_tick_result =
-                    if matches!(pipe.game_options.game_ty(), ConfigGameType::Race) {
-                        EntityTickResult::None
-                    } else {
-                        EntityTickResult::RemoveEntity
-                    };
+                let is_race = matches!(pipe.game_options.game_ty(), ConfigGameType::Race);
+                let pickup_tick_result = if is_race {
+                    EntityTickResult::None
+                } else {
+                    EntityTickResult::RemoveEntity
+                };
                 // player picked us up, is someone was hooking us, let them go
                 // TODO: magic constants
                 match self.core.ty {
                     PickupType::PowerupHealth => {
-                        if char.core.health < 10 {
-                            char.core.health += 1;
-                            self.game_pending_events.push_sound(
-                                Some(char.base.game_element_id),
-                                Some(self.core.pos),
-                                GameWorldEntitySoundEvent::Pickup(GamePickupSoundEvent::Heart(
-                                    GamePickupHeartEventSound::Collect,
-                                )),
-                            );
-                            self.simulation_events.push_world(
-                                SimulationEventWorldEntityType::Pickup {
-                                    id: self.base.game_element_id,
-                                    ev: PickupEvent::Pickup {
-                                        pos: self.core.pos,
-                                        by: char.base.game_element_id,
-                                        ty: PickupType::PowerupHealth,
-                                    },
-                                },
-                            );
-                            pickup_tick_result
-                        } else {
-                            EntityTickResult::None
-                        }
+                        self.pickup_health(char, is_race, pickup_tick_result)
                     }
                     PickupType::PowerupArmor => {
-                        if char.core.armor < 10 {
-                            char.core.armor += 1;
-                            self.game_pending_events.push_sound(
-                                Some(char.base.game_element_id),
-                                Some(self.core.pos),
-                                GameWorldEntitySoundEvent::Pickup(GamePickupSoundEvent::Armor(
-                                    GamePickupArmorEventSound::Collect,
-                                )),
-                            );
-                            self.simulation_events.push_world(
-                                SimulationEventWorldEntityType::Pickup {
-                                    id: self.base.game_element_id,
-                                    ev: PickupEvent::Pickup {
-                                        pos: self.core.pos,
-                                        by: char.base.game_element_id,
-                                        ty: PickupType::PowerupArmor,
-                                    },
-                                },
-                            );
-                            pickup_tick_result
-                        } else {
-                            EntityTickResult::None
-                        }
+                        self.pickup_armor(char, is_race, pickup_tick_result)
                     }
-                    PickupType::PowerupWeapon(weapon) => {
-                        let ammo = (!matches!(pipe.game_options.game_ty(), ConfigGameType::Race))
-                            .then_some(10);
-                        let collected = if let Some(weapon) =
-                            char.reusable_core.weapons.get_mut(&weapon)
-                        {
-                            // check if ammo can be refilled
-                            if weapon.cur_ammo.is_some_and(|val| val < 10) {
-                                weapon.cur_ammo = ammo;
-                                true
-                            } else {
-                                false
-                            }
-                        }
-                        // else add the weapon
-                        else {
-                            char.reusable_core.weapons.insert_sorted(
-                                weapon,
-                                Weapon {
-                                    cur_ammo: ammo,
-                                    next_ammo_regeneration_tick: 0.into(),
-                                    upgrades: pipe.char_pool.character_weapon_upgrade_pool.new(),
-                                },
-                            );
-                            true
-                        };
-
-                        if collected {
-                            if let Some(ev) = match weapon {
-                                WeaponType::Hammer | WeaponType::Gun => None,
-                                WeaponType::Shotgun => Some(GameWorldEntitySoundEvent::Shotgun(
-                                    GameShotgunEventSound::Collect,
-                                )),
-                                WeaponType::Grenade => Some(GameWorldEntitySoundEvent::Grenade(
-                                    GameGrenadeEventSound::Collect,
-                                )),
-                                WeaponType::Laser => Some(GameWorldEntitySoundEvent::Laser(
-                                    GameLaserEventSound::Collect,
-                                )),
-                            } {
-                                self.game_pending_events.push_sound(
-                                    Some(char.base.game_element_id),
-                                    Some(self.core.pos),
-                                    ev,
-                                );
-                            }
-                            self.simulation_events.push_world(
-                                SimulationEventWorldEntityType::Pickup {
-                                    id: self.base.game_element_id,
-                                    ev: PickupEvent::Pickup {
-                                        pos: self.core.pos,
-                                        by: char.base.game_element_id,
-                                        ty: PickupType::PowerupWeapon(weapon),
-                                    },
-                                },
-                            );
-                        }
-                        if collected {
-                            pickup_tick_result
-                        } else {
-                            EntityTickResult::None
-                        }
-                    }
+                    PickupType::PowerupWeapon(weapon) => self.pickup_weapon(
+                        char,
+                        pipe.char_pool,
+                        weapon,
+                        is_race,
+                        pickup_tick_result,
+                    ),
                     PickupType::PowerupWeaponShield(weapon) => {
-                        let collected = if char.reusable_core.weapons.remove(&weapon).is_some() {
-                            if char.core.active_weapon == weapon {
-                                char.core.prev_weapon = char.core.active_weapon;
-                                char.core.active_weapon = WeaponType::Hammer;
-                                char.core.queued_weapon = None;
-                            }
-                            true
-                        } else {
-                            false
-                        };
-
-                        if collected {
-                            self.game_pending_events.push_sound(
-                                Some(char.base.game_element_id),
-                                Some(self.core.pos),
-                                GameWorldEntitySoundEvent::Pickup(GamePickupSoundEvent::Armor(
-                                    GamePickupArmorEventSound::Collect,
-                                )),
-                            );
-                            self.simulation_events.push_world(
-                                SimulationEventWorldEntityType::Pickup {
-                                    id: self.base.game_element_id,
-                                    ev: PickupEvent::Pickup {
-                                        pos: self.core.pos,
-                                        by: char.base.game_element_id,
-                                        ty: PickupType::PowerupWeaponShield(weapon),
-                                    },
-                                },
-                            );
-                        }
-                        if collected {
-                            pickup_tick_result
-                        } else {
-                            EntityTickResult::None
-                        }
+                        self.pickup_weapon_shield(char, weapon, pickup_tick_result)
                     }
-                    PickupType::PowerupNinja => {
-                        // activate ninja on target player
-                        self.game_pending_events.push_sound(
-                            Some(char.base.game_element_id),
-                            Some(self.core.pos),
-                            GameWorldEntitySoundEvent::Character(GameCharacterSoundEvent::Buff(
-                                GameBuffSoundEvent::Ninja(GameBuffNinjaEventSound::Collect),
-                            )),
-                        );
-                        self.simulation_events
-                            .push_world(SimulationEventWorldEntityType::Pickup {
-                                id: self.base.game_element_id,
-                                ev: PickupEvent::Pickup {
-                                    pos: self.core.pos,
-                                    by: char.base.game_element_id,
-                                    ty: PickupType::PowerupNinja,
-                                },
-                            });
-                        char.give_ninja();
-                        pickup_tick_result
-                    }
+                    PickupType::PowerupNinja => self.pickup_ninja(char, pickup_tick_result),
                     PickupType::PowerupNinjaShield => {
-                        let collected = char
-                            .reusable_core
-                            .buffs
-                            .remove(&CharacterBuff::Ninja)
-                            .is_some();
-
-                        if collected {
-                            self.game_pending_events.push_sound(
-                                Some(char.base.game_element_id),
-                                Some(self.core.pos),
-                                GameWorldEntitySoundEvent::Pickup(GamePickupSoundEvent::Armor(
-                                    GamePickupArmorEventSound::Collect,
-                                )),
-                            );
-                            self.simulation_events.push_world(
-                                SimulationEventWorldEntityType::Pickup {
-                                    id: self.base.game_element_id,
-                                    ev: PickupEvent::Pickup {
-                                        pos: self.core.pos,
-                                        by: char.base.game_element_id,
-                                        ty: PickupType::PowerupNinjaShield,
-                                    },
-                                },
-                            );
-                        }
-                        if collected {
-                            pickup_tick_result
-                        } else {
-                            EntityTickResult::None
-                        }
+                        self.pickup_ninja_shield(char, pickup_tick_result)
                     }
                 }
             } else {

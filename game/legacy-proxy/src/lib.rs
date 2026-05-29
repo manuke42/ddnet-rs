@@ -1184,6 +1184,23 @@ impl Client {
                 },
             );
         };
+        let pickup_type_from_legacy = |pickup: &snap_obj::Pickup| match pickup.type_ {
+            0 => PickupType::PowerupHealth,
+            1 => PickupType::PowerupArmor,
+            2 => PickupType::PowerupWeapon(match pickup.subtype {
+                0 => WeaponType::Hammer,
+                1 => WeaponType::Gun,
+                2 => WeaponType::Shotgun,
+                3 => WeaponType::Grenade,
+                _ => WeaponType::Laser,
+            }),
+            3 => PickupType::PowerupNinja,
+            4 => PickupType::PowerupWeaponShield(WeaponType::Shotgun),
+            5 => PickupType::PowerupWeaponShield(WeaponType::Grenade),
+            6 => PickupType::PowerupNinjaShield,
+            7 => PickupType::PowerupWeaponShield(WeaponType::Laser),
+            _ => PickupType::PowerupArmor,
+        };
         let add_pickup = |snapshot: &mut Snapshot, id, pickup: snap_obj::Pickup| {
             let stage = snapshot.stages.get_mut(&player_stage).unwrap();
             let pickup_id = base.pickup_legacy_to_new_id.get(&id).copied().unwrap();
@@ -1193,20 +1210,7 @@ impl Client {
                 SnapshotPickup {
                     core: PickupCore {
                         pos,
-                        ty: match pickup.type_ {
-                            0 => PickupType::PowerupHealth,
-                            1 => PickupType::PowerupArmor,
-                            2 => PickupType::PowerupWeapon(match pickup.subtype {
-                                0 => WeaponType::Hammer,
-                                1 => WeaponType::Gun,
-                                2 => WeaponType::Shotgun,
-                                3 => WeaponType::Grenade,
-                                _ => WeaponType::Laser,
-                            }),
-                            3 => PickupType::PowerupNinja,
-                            // TODO: armor shields
-                            _ => PickupType::PowerupArmor,
-                        },
+                        ty: pickup_type_from_legacy(&pickup),
                     },
                     reusable_core: PoolPickupReusableCore::new_without_pool(),
                     game_el_id: pickup_id,
