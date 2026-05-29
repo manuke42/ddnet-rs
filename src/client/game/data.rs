@@ -315,9 +315,14 @@ impl GameData {
             ),
             (
                 &[BindKey::Key(PhysicalKey::Code(KeyCode::Digit3))],
-                vec![BindAction::LocalPlayer(BindActionsLocalPlayer::Character(
-                    BindActionsCharacter::Weapon(WeaponType::Shotgun),
-                ))],
+                vec![
+                    BindAction::LocalPlayer(BindActionsLocalPlayer::Character(
+                        BindActionsCharacter::Weapon(WeaponType::Shotgun),
+                    )),
+                    BindAction::LocalPlayer(BindActionsLocalPlayer::Character(
+                        BindActionsCharacter::Weapon(WeaponType::Puller),
+                    )),
+                ],
             ),
             (
                 &[BindKey::Key(PhysicalKey::Code(KeyCode::Digit4))],

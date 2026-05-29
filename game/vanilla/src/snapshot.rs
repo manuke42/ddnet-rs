@@ -246,20 +246,8 @@ pub mod snapshot {
                     shields: world_pool.inactive_objects.new(),
                     red_flags: world_pool.inactive_objects.new(),
                     blue_flags: world_pool.inactive_objects.new(),
-                    weapons: [
-                        world_pool.inactive_objects.new(),
-                        world_pool.inactive_objects.new(),
-                        world_pool.inactive_objects.new(),
-                        world_pool.inactive_objects.new(),
-                        world_pool.inactive_objects.new(),
-                    ],
-                    weapon_shields: [
-                        world_pool.inactive_objects.new(),
-                        world_pool.inactive_objects.new(),
-                        world_pool.inactive_objects.new(),
-                        world_pool.inactive_objects.new(),
-                        world_pool.inactive_objects.new(),
-                    ],
+                    weapons: std::array::from_fn(|_| world_pool.inactive_objects.new()),
+                    weapon_shields: std::array::from_fn(|_| world_pool.inactive_objects.new()),
                     ninjas: world_pool.inactive_objects.new(),
                     ninja_shields: world_pool.inactive_objects.new(),
                     ddrace_entities: world_pool.inactive_ddrace_entities.new(),
@@ -586,26 +574,16 @@ pub mod snapshot {
                     &stage.world.inactive_game_objects.pickups.blue_flags,
                     &mut inactive_blue_flags,
                 );
-                let mut weapons: [_; WeaponType::COUNT] = [
-                    self.world_pool.inactive_objects.new(),
-                    self.world_pool.inactive_objects.new(),
-                    self.world_pool.inactive_objects.new(),
-                    self.world_pool.inactive_objects.new(),
-                    self.world_pool.inactive_objects.new(),
-                ];
+                let mut weapons: [_; WeaponType::COUNT] =
+                    std::array::from_fn(|_| self.world_pool.inactive_objects.new());
                 for (i, weapon) in weapons.iter_mut().enumerate() {
                     add_inactive_obj(
                         &stage.world.inactive_game_objects.pickups.weapons[i],
                         weapon,
                     );
                 }
-                let mut weapon_shields: [_; WeaponType::COUNT] = [
-                    self.world_pool.inactive_objects.new(),
-                    self.world_pool.inactive_objects.new(),
-                    self.world_pool.inactive_objects.new(),
-                    self.world_pool.inactive_objects.new(),
-                    self.world_pool.inactive_objects.new(),
-                ];
+                let mut weapon_shields: [_; WeaponType::COUNT] =
+                    std::array::from_fn(|_| self.world_pool.inactive_objects.new());
                 for (i, weapon_shield) in weapon_shields.iter_mut().enumerate() {
                     add_inactive_obj(
                         &stage.world.inactive_game_objects.pickups.weapon_shields[i],

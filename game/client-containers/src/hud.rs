@@ -122,7 +122,8 @@ impl LoadHud {
         insert_part("freeze_empty_right", converted.freeze_empty_right)?;
         insert_part("disabled_hook_others", converted.disabled_hook_others)?;
         insert_part("disabled_hammer", converted.disabled_hammer)?;
-        insert_part("disabled_shotgun", converted.disabled_shotgun)?;
+        insert_part("disabled_shotgun", converted.disabled_shotgun.clone())?;
+        insert_part("disabled_puller", converted.disabled_shotgun)?;
         insert_part("disabled_grenade", converted.disabled_grenade)?;
         insert_part("disabled_laser", converted.disabled_laser)?;
         insert_part("disabled_gun", converted.disabled_gun)?;
@@ -286,6 +287,24 @@ impl LoadHud {
                         default_files,
                         hud_name,
                         &["ddrace"],
+                        "disabled_gun",
+                    )?
+                    .img,
+                    load_file_part_and_upload(
+                        graphics_mt,
+                        files,
+                        default_files,
+                        hud_name,
+                        &["ddrace"],
+                        "disabled_puller",
+                    )?
+                    .img,
+                    load_file_part_and_upload(
+                        graphics_mt,
+                        files,
+                        default_files,
+                        hud_name,
+                        &["ddrace"],
                         "disabled_shotgun",
                     )?
                     .img,
@@ -305,15 +324,6 @@ impl LoadHud {
                         hud_name,
                         &["ddrace"],
                         "disabled_laser",
-                    )?
-                    .img,
-                    load_file_part_and_upload(
-                        graphics_mt,
-                        files,
-                        default_files,
-                        hud_name,
-                        &["ddrace"],
-                        "disabled_gun",
                     )?
                     .img,
                 ],

@@ -48,7 +48,7 @@ use super::{
     tee::TeeRenderHand,
     weapons::{
         WeaponGrenadeSpec, WeaponGunSpec, WeaponHammerSpec, WeaponLaserSpec, WeaponNinjaSpec,
-        WeaponShotgunSpec,
+        WeaponPullerSpec, WeaponShotgunSpec,
     },
 };
 
@@ -122,7 +122,10 @@ impl ToolkitRender {
 
         WeaponType::iter().for_each(|weapon| {
             let (scale_x, scale_y);
-            if weapon == WeaponType::Gun || weapon == WeaponType::Shotgun {
+            if weapon == WeaponType::Gun
+                || weapon == WeaponType::Shotgun
+                || weapon == WeaponType::Puller
+            {
                 // TODO: hardcoded for now to get the same particle size as before
                 (scale_x, scale_y) = get_sprite_scale_impl(3, 2);
             } else {
@@ -455,6 +458,7 @@ impl ToolkitRender {
                 WeaponType::Hammer => panic!("this weapon should be handled earlier"),
                 WeaponType::Gun => WeaponGunSpec::get(),
                 WeaponType::Shotgun => WeaponShotgunSpec::get(),
+                WeaponType::Puller => WeaponPullerSpec::get(),
                 WeaponType::Grenade => WeaponGrenadeSpec::get(),
                 WeaponType::Laser => WeaponLaserSpec::get(),
             };
@@ -475,10 +479,15 @@ impl ToolkitRender {
         );
 
         // muzzle if weapon is firing
-        if current_weapon == WeaponType::Gun || current_weapon == WeaponType::Shotgun {
+        if current_weapon == WeaponType::Gun
+            || current_weapon == WeaponType::Shotgun
+            || current_weapon == WeaponType::Puller
+        {
             // check if we're firing stuff
             let (muzzles, spec) = if current_weapon == WeaponType::Gun {
                 (&weapons.gun.muzzles.muzzles, WeaponGunSpec::get())
+            } else if current_weapon == WeaponType::Puller {
+                (&weapons.puller.muzzles.muzzles, WeaponPullerSpec::get())
             } else {
                 (&weapons.shotgun.muzzles.muzzles, WeaponShotgunSpec::get())
             };
@@ -531,6 +540,13 @@ impl ToolkitRender {
                 scale: 1.0,
             }),
             WeaponType::Shotgun => Some(TeeRenderHand {
+                pos: weapon_pos - render_pos,
+                dir: dir_normalized,
+                rot_offset: -PI / 2.0,
+                offset_after_rot: vec2::new(-5.0, 4.0) / 32.0,
+                scale: 1.0,
+            }),
+            WeaponType::Puller => Some(TeeRenderHand {
                 pos: weapon_pos - render_pos,
                 dir: dir_normalized,
                 rot_offset: -PI / 2.0,

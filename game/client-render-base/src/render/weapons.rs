@@ -65,6 +65,21 @@ impl WeaponShotgunSpec {
     }
 }
 
+pub struct WeaponPullerSpec;
+impl WeaponPullerSpec {
+    pub fn get() -> WeaponSpec {
+        WeaponSpec {
+            fire_delay: 500,
+            visual_size: 3.0,
+            offset_x: 0.75,
+            offset_y: -2.0 / 32.0,
+            muzzle_offset_x: (70.0 + 13.3128) / 32.0,
+            muzzle_offset_y: 6.0 / 32.0,
+            ..Default::default()
+        }
+    }
+}
+
 pub struct WeaponGrenadeSpec;
 impl WeaponGrenadeSpec {
     pub fn get() -> WeaponSpec {

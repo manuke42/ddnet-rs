@@ -89,6 +89,7 @@ pub mod laser {
             game_el_id: &LaserId,
             pos: &vec2,
             dir: &vec2,
+            ty: LaserType,
             start_energy: f32,
 
             can_hit_others: bool,
@@ -103,7 +104,7 @@ pub mod laser {
             let core = LaserCore {
                 pos: *pos,
                 from: *pos,
-                ty: LaserType::Rifle,
+                ty,
                 bounces: 0,
                 dir: *dir,
                 energy: start_energy,
@@ -196,45 +197,10 @@ pub mod laser {
             self.core.pos = pos;
             self.core.energy = -1.0;
 
-            if let LaserType::Shotgun = self.core.ty {
-                /* TODO: ddrace
-                vec2 Temp;
-
-                float Strength;
-                if(!m_TuneZone)
-                    Strength = GameServer()->Tuning()->m_ShotgunStrength;
-                else
-                    Strength = GameServer()->TuningList()[m_TuneZone].m_ShotgunStrength;
-
-                vec2 &HitPos = pHit->Core()->m_Pos;
-                if(!g_Config.m_SvOldLaser)
-                {
-                    if(m_PrevPos != HitPos)
-                    {
-                        Temp = pHit->Core()->m_Vel + normalize(m_PrevPos - HitPos) * Strength;
-                        pHit->Core()->m_Vel = ClampVel(pHit->m_MoveRestrictions, Temp);
-                    }
-                    else
-                    {
-                        pHit->Core()->m_Vel = StackedLaserShotgunBugSpeed;
-                    }
-                }
-                else if(g_Config.m_SvOldLaser && pOwnerChar)
-                {
-                    if(pOwnerChar->Core()->m_Pos != HitPos)
-                    {
-                        Temp = pHit->Core()->m_Vel + normalize(pOwnerChar->Core()->m_Pos - HitPos) * Strength;
-                        pHit->Core()->m_Vel = ClampVel(pHit->m_MoveRestrictions, Temp);
-                    }
-                    else
-                    {
-                        pHit->Core()->m_Vel = StackedLaserShotgunBugSpeed;
-                    }
-                }
-                else
-                {
-                    pHit->Core()->m_Vel = ClampVel(pHit->m_MoveRestrictions, pHit->Core()->m_Vel);
-                }*/
+            if let LaserType::Puller = self.core.ty {
+                let strength = pipe.collision.get_tune_at(&self.core.pos).shotgun_strength;
+                let pull_dir = normalize(&(*from - *char.pos.pos()));
+                char.core.core.vel += pull_dir * strength;
             } else if let LaserType::Rifle = self.core.ty {
                 let dmg_amount = pipe.collision.get_tune_at(&self.core.pos).laser_damage;
                 let hitted_char_id = char.base.game_element_id;

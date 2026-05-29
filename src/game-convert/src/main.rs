@@ -88,6 +88,7 @@ fn main() {
         std::fs::create_dir_all(args.output.join("weapons/default/hammer")).unwrap();
         std::fs::create_dir_all(args.output.join("weapons/default/gun")).unwrap();
         std::fs::create_dir_all(args.output.join("weapons/default/shotgun")).unwrap();
+        std::fs::create_dir_all(args.output.join("weapons/default/puller")).unwrap();
         std::fs::create_dir_all(args.output.join("weapons/default/grenade")).unwrap();
         std::fs::create_dir_all(args.output.join("weapons/default/laser")).unwrap();
         std::fs::create_dir_all(args.output.join("huds/default/vanilla")).unwrap();
@@ -110,10 +111,18 @@ fn main() {
     );
     write_part(
         &mut write_mode,
-        converted.cursor_shotgun,
+        converted.cursor_shotgun.clone(),
         &args.output,
         "weapons/default",
         "shotgun/cursor",
+    );
+    // Since legacy has no puller, it gets shotgun.
+    write_part(
+        &mut write_mode,
+        converted.cursor_shotgun,
+        &args.output,
+        "weapons/default",
+        "puller/cursor",
     );
     write_part(
         &mut write_mode,
@@ -153,10 +162,18 @@ fn main() {
     );
     write_part(
         &mut write_mode,
-        converted.weapon_shotgun,
+        converted.weapon_shotgun.clone(),
         &args.output,
         "weapons/default",
         "shotgun/weapon",
+    );
+    // Since legacy has no puller, it gets shotgun.
+    write_part(
+        &mut write_mode,
+        converted.weapon_shotgun,
+        &args.output,
+        "weapons/default",
+        "puller/weapon",
     );
     write_part(
         &mut write_mode,
@@ -189,10 +206,18 @@ fn main() {
     );
     write_part(
         &mut write_mode,
-        converted.projectile_shotgun,
+        converted.projectile_shotgun.clone(),
         &args.output,
         "weapons/default",
         "shotgun/projectile",
+    );
+    // Since legacy has no puller, it gets shotgun.
+    write_part(
+        &mut write_mode,
+        converted.projectile_shotgun,
+        &args.output,
+        "weapons/default",
+        "puller/projectile",
     );
     write_part(
         &mut write_mode,
@@ -224,6 +249,7 @@ fn main() {
         });
     converted
         .muzzle_shotgun
+        .clone()
         .into_iter()
         .enumerate()
         .for_each(|(index, muzzle)| {
@@ -233,6 +259,20 @@ fn main() {
                 &args.output,
                 "weapons/default",
                 &format!("shotgun/muzzle_{:03}", index + 1),
+            )
+        });
+    // Since legacy has no puller, it gets shotgun.
+    converted
+        .muzzle_shotgun
+        .into_iter()
+        .enumerate()
+        .for_each(|(index, muzzle)| {
+            write_part(
+                &mut write_mode,
+                muzzle,
+                &args.output,
+                "weapons/default",
+                &format!("puller/muzzle_{:03}", index + 1),
             )
         });
     converted
@@ -382,10 +422,18 @@ fn main() {
     if let Some(lose_shotgun) = converted.lose_shotgun {
         write_part(
             &mut write_mode,
-            lose_shotgun,
+            lose_shotgun.clone(),
             &args.output,
             "games/default",
             "lose_shotgun",
+        );
+        // Since legacy has no puller, it gets shotgun.
+        write_part(
+            &mut write_mode,
+            lose_shotgun,
+            &args.output,
+            "games/default",
+            "lose_puller",
         );
     }
     if let Some(lose_grenade) = converted.lose_grenade {

@@ -2,7 +2,9 @@ use std::collections::BTreeMap;
 
 use game_interface::types::{
     character_info::MAX_ASSET_NAME_LEN,
+    emoticons::IntoEnumIterator,
     resource_key::{NetworkResourceKey, ResourceKey},
+    weapons::WeaponType,
 };
 use graphics::handles::texture::texture::TextureContainer;
 use math::math::vector::vec2;
@@ -32,7 +34,7 @@ pub fn hud_list(
     super::super::super::list::list::render(
         ui,
         entries_sorted.iter().map(|(name, &ty)| (name.as_str(), ty)),
-        100.0,
+        150.0,
         |_, name| {
             let valid: Result<NetworkResourceKey<MAX_ASSET_NAME_LEN>, _> = name.try_into();
             valid.map(|_| ()).map_err(|err| err.into())
@@ -40,7 +42,7 @@ pub fn hud_list(
         |_, name| player.hud == name,
         |s| s,
         |ui, _, name, pos, asset_size| {
-            let item_size = asset_size / 2.0;
+            let item_size = asset_size / 4.0;
             let pos = pos
                 + vec2::new(
                     item_size / 2.0 - (asset_size / 2.0),
@@ -50,8 +52,8 @@ pub fn hud_list(
             let hud = pipe.user_data.hud_container.get_or_default(&key);
 
             let mut render_texture = |texture: &TextureContainer, index: usize| {
-                let x = (index % 2) as f32;
-                let y = (index / 2) as f32;
+                let x = (index % 4) as f32;
+                let y = (index / 4) as f32;
                 render_texture_for_ui(
                     pipe.user_data.stream_handle,
                     pipe.user_data.canvas_handle,
@@ -73,7 +75,11 @@ pub fn hud_list(
             render_texture(&hud.vanilla.shield, index);
             index += 1;
             render_texture(&hud.vanilla.shield_empty, index);
-            //index += 1;
+            index += 1;
+            for weapon in WeaponType::iter() {
+                render_texture(&hud.ddrace.disabled_weapons[weapon as usize], index);
+                index += 1;
+            }
         },
         |_, name| {
             next_name = Some(name.to_string());

@@ -26,6 +26,7 @@ pub enum WeaponType {
     Hammer = 0,
     Gun,
     Shotgun,
+    Puller,
     Grenade,
     Laser,
 }

@@ -34,6 +34,7 @@ pub mod character {
             },
             id_types::{CharacterId, StageId},
             input::{CharacterInput, CharacterInputConsumableDiff, cursor::CharacterInputCursor},
+            laser::LaserType,
             network_stats::PlayerNetworkStats,
             render::{
                 character::{CharacterBuff, CharacterDebuff, TeeEye},
@@ -1373,6 +1374,7 @@ pub mod character {
 
             let full_auto = self.core.active_weapon == WeaponType::Grenade
                 || self.core.active_weapon == WeaponType::Shotgun
+                || self.core.active_weapon == WeaponType::Puller
                 || self.core.active_weapon == WeaponType::Laser;
 
             let auto_fired = full_auto && *self.core.input.state.fire;
@@ -1545,6 +1547,28 @@ pub mod character {
                         .shotgun_fire_delay;
                     ((fire_delay * TICKS_PER_SECOND as f32 / 1000.0).ceil() as GameTickType).into()
                 }
+                WeaponType::Puller => {
+                    pipe.entity_events.push(CharacterTickEvent::Laser {
+                        pos: *self.pos.pos(),
+                        dir: direction,
+                        ty: LaserType::Puller,
+                        energy: pipe.collision.get_tune_at(self.pos.pos()).laser_reach,
+                        can_hit_others: !self.core.core.hit_disabled,
+                        can_hit_own: true,
+                    });
+                    self.push_sound(
+                        *self.pos.pos(),
+                        GameWorldEntitySoundEvent::Character(GameCharacterSoundEvent::Sound(
+                            GameCharacterEventSound::PullerFire,
+                        )),
+                    );
+
+                    let fire_delay = pipe
+                        .collision
+                        .get_tune_at(&proj_start_pos)
+                        .shotgun_fire_delay;
+                    ((fire_delay * TICKS_PER_SECOND as f32 / 1000.0).ceil() as GameTickType).into()
+                }
                 WeaponType::Grenade => {
                     let tunings = pipe.collision.get_tune_at(&proj_start_pos);
                     pipe.entity_events.push(CharacterTickEvent::Projectile {
@@ -1566,6 +1590,7 @@ pub mod character {
                     pipe.entity_events.push(CharacterTickEvent::Laser {
                         pos: *self.pos.pos(),
                         dir: direction,
+                        ty: LaserType::Rifle,
                         energy: pipe.collision.get_tune_at(self.pos.pos()).laser_reach,
                         can_hit_others: !self.core.core.hit_disabled,
                         can_hit_own: self.game_options.laser_hit_self(),
@@ -1797,6 +1822,7 @@ pub mod character {
                 WeaponType::Hammer => None,
                 WeaponType::Gun => Some(TICKS_PER_SECOND / 2),
                 WeaponType::Shotgun => None,
+                WeaponType::Puller => None,
                 WeaponType::Grenade => None,
                 WeaponType::Laser => None,
             };

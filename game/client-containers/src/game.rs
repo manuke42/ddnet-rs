@@ -34,6 +34,7 @@ pub struct Game {
     pub lose_laser: TextureContainer,
     pub lose_ninja: TextureContainer,
     pub lose_shotgun: TextureContainer,
+    pub lose_puller: TextureContainer,
 }
 
 #[derive(Debug)]
@@ -53,6 +54,7 @@ pub struct LoadGame {
     pub lose_laser: ContainerItemLoadData,
     pub lose_ninja: ContainerItemLoadData,
     pub lose_shotgun: ContainerItemLoadData,
+    pub lose_puller: ContainerItemLoadData,
 
     game_name: String,
 }
@@ -159,6 +161,15 @@ impl LoadGame {
                 "lose_shotgun",
             )?
             .img,
+            lose_puller: load_file_part_and_upload(
+                graphics_mt,
+                &files,
+                default_files,
+                game_name,
+                &[],
+                "lose_puller",
+            )?
+            .img,
 
             game_name: game_name.to_string(),
         })
@@ -249,6 +260,11 @@ impl ContainerLoad<Game> for LoadGame {
             lose_shotgun: Self::load_file_into_texture(
                 texture_handle,
                 self.lose_shotgun,
+                &self.game_name,
+            ),
+            lose_puller: Self::load_file_into_texture(
+                texture_handle,
+                self.lose_puller,
                 &self.game_name,
             ),
         }

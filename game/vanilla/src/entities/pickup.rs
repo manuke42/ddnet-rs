@@ -8,8 +8,8 @@ pub mod pickup {
         events::{
             GameBuffNinjaEventSound, GameBuffSoundEvent, GameCharacterSoundEvent,
             GameGrenadeEventSound, GameLaserEventSound, GamePickupArmorEventSound,
-            GamePickupHeartEventSound, GamePickupSoundEvent, GameShotgunEventSound,
-            GameWorldEntitySoundEvent,
+            GamePickupHeartEventSound, GamePickupSoundEvent, GamePullerEventSound,
+            GameShotgunEventSound, GameWorldEntitySoundEvent,
         },
         types::{
             id_types::PickupId, pickup::PickupType, render::character::CharacterBuff,
@@ -93,6 +93,9 @@ pub mod pickup {
                             WeaponType::Gun => return,
                             WeaponType::Shotgun => {
                                 GameWorldEntitySoundEvent::Shotgun(GameShotgunEventSound::Spawn)
+                            }
+                            WeaponType::Puller => {
+                                GameWorldEntitySoundEvent::Puller(GamePullerEventSound::Spawn)
                             }
                             WeaponType::Grenade => {
                                 GameWorldEntitySoundEvent::Grenade(GameGrenadeEventSound::Spawn)
@@ -210,7 +213,12 @@ pub mod pickup {
         ) -> EntityTickResult {
             if is_race {
                 let mut collected = false;
-                for weapon in [WeaponType::Shotgun, WeaponType::Grenade, WeaponType::Laser] {
+                for weapon in [
+                    WeaponType::Shotgun,
+                    WeaponType::Puller,
+                    WeaponType::Grenade,
+                    WeaponType::Laser,
+                ] {
                     collected |= char.reusable_core.weapons.remove(&weapon).is_some();
                 }
                 collected |= char
@@ -271,6 +279,9 @@ pub mod pickup {
                     WeaponType::Hammer | WeaponType::Gun => None,
                     WeaponType::Shotgun => Some(GameWorldEntitySoundEvent::Shotgun(
                         GameShotgunEventSound::Collect,
+                    )),
+                    WeaponType::Puller => Some(GameWorldEntitySoundEvent::Puller(
+                        GamePullerEventSound::Collect,
                     )),
                     WeaponType::Grenade => Some(GameWorldEntitySoundEvent::Grenade(
                         GameGrenadeEventSound::Collect,

@@ -47,7 +47,7 @@ pub enum BindActionsLocalPlayer {
     ZoomReset,
 }
 
-const LOCAL_PLAYER_ACTIONS: [(&str, BindActionsLocalPlayer); 46] = [
+const LOCAL_PLAYER_ACTIONS: [(&str, BindActionsLocalPlayer); 48] = [
     (
         "+left",
         BindActionsLocalPlayer::Character(BindActionsCharacter::MoveLeft),
@@ -102,6 +102,10 @@ const LOCAL_PLAYER_ACTIONS: [(&str, BindActionsLocalPlayer); 46] = [
         BindActionsLocalPlayer::Character(BindActionsCharacter::Weapon(WeaponType::Laser)),
     ),
     (
+        "+weapon6",
+        BindActionsLocalPlayer::Character(BindActionsCharacter::Weapon(WeaponType::Puller)),
+    ),
+    (
         "+dummy.left",
         BindActionsLocalPlayer::Dummy(BindActionsCharacter::MoveLeft),
     ),
@@ -153,6 +157,10 @@ const LOCAL_PLAYER_ACTIONS: [(&str, BindActionsLocalPlayer); 46] = [
     (
         "+dummy.weapon5",
         BindActionsLocalPlayer::Dummy(BindActionsCharacter::Weapon(WeaponType::Laser)),
+    ),
+    (
+        "+dummy.weapon6",
+        BindActionsLocalPlayer::Dummy(BindActionsCharacter::Weapon(WeaponType::Puller)),
     ),
     // weapons end
     (

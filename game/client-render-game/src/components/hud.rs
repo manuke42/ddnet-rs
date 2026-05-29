@@ -258,6 +258,12 @@ impl RenderHud {
                     .from_rect(0.0, 0.0, GRID_SIZE, GRID_SIZE)
                     .with_uv_from_points(&vec2::new(0.0, 0.0), &vec2::new(1.0, 1.0)),
             );
+            let disabled_puller_hit_offset = quads.len();
+            quads.push(
+                Quad::new()
+                    .from_rect(0.0, 0.0, GRID_SIZE, GRID_SIZE)
+                    .with_uv_from_points(&vec2::new(0.0, 0.0), &vec2::new(1.0, 1.0)),
+            );
             let disabled_grenade_hit_offset = quads.len();
             quads.push(
                 Quad::new()
@@ -333,6 +339,7 @@ impl RenderHud {
                     disabled_hammer_hit_offset,
                     disabled_gun_hit_offset,
                     disabled_shotgun_hit_offset,
+                    disabled_puller_hit_offset,
                     disabled_grenade_hit_offset,
                     disabled_laser_hit_offset,
                 ],
@@ -431,6 +438,7 @@ impl RenderHud {
             WeaponType::Hammer => None,
             WeaponType::Gun => Some(&weapons.gun.projectile),
             WeaponType::Shotgun => Some(&weapons.shotgun.projectile),
+            WeaponType::Puller => Some(&weapons.puller.projectile),
             WeaponType::Grenade => Some(&weapons.grenade.projectile),
             WeaponType::Laser => Some(&weapons.laser.projectile),
         };
@@ -503,16 +511,18 @@ impl RenderHud {
         // render weapons
         {
             let mut x = x;
-            let weapon_widths = [
+            let weapon_widths: [f32; WeaponType::COUNT] = [
                 GRID_SIZE * 1.3333,
                 GRID_SIZE,
                 GRID_SIZE,
                 GRID_SIZE,
                 GRID_SIZE,
+                GRID_SIZE,
             ];
-            let weapon_initial_offsets = [
+            let weapon_initial_offsets: [f32; WeaponType::COUNT] = [
                 -GRID_SIZE / 4.0,
                 -GRID_SIZE / 3.0,
+                -GRID_SIZE / 12.0,
                 -GRID_SIZE / 12.0,
                 -GRID_SIZE / 12.0,
                 -GRID_SIZE / 6.0,

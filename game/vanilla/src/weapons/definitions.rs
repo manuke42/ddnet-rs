@@ -24,12 +24,13 @@ pub mod weapon_def {
         pub upgrades: PoolFxHashSet<WeaponUpgrade>,
     }
 
-    pub const WEAPON_VISUAL_SIZES: [f32; WeaponType::COUNT] = [3.0, 2.0, 3.0, 3.0, 92.0 / 32.0];
+    pub const WEAPON_VISUAL_SIZES: [f32; WeaponType::COUNT] =
+        [3.0, 2.0, 3.0, 3.0, 3.0, 92.0 / 32.0];
     pub const NINJA_PICKUP_VISUAL_SIZE: f32 = 4.0;
     pub const NINJA_WEAPON_VISUAL_SIZE: f32 = 3.0;
 
     pub const WEAPON_SCALES: [(usize, usize); WeaponType::COUNT] =
-        [(4, 3), (4, 2), (8, 2), (7, 2), (7, 3)];
+        [(4, 3), (4, 2), (8, 2), (8, 2), (7, 2), (7, 3)];
     pub const NINJA_PICKUP_VISUAL_SCALE: (usize, usize) = (8, 2);
 
     pub fn get_weapon_visual_scale(weapon: &WeaponType) -> f32 {

@@ -96,6 +96,7 @@ pub enum GameCharacterEventSound {
     GrenadeFire,
     LaserFire,
     ShotgunFire,
+    PullerFire,
     GroundJump,
     AirJump,
     HookHitPlayer {
@@ -182,6 +183,17 @@ pub enum GameShotgunEventSound {
 pub enum GameShotgunEventEffect {}
 
 #[derive(Debug, Hiarc, Clone, Copy, Serialize, Deserialize)]
+pub enum GamePullerEventSound {
+    /// pickup spawned
+    Spawn,
+    /// a pickup was collected by a character
+    Collect,
+}
+
+#[derive(Debug, Hiarc, Clone, Copy, Serialize, Deserialize)]
+pub enum GamePullerEventEffect {}
+
+#[derive(Debug, Hiarc, Clone, Copy, Serialize, Deserialize)]
 pub enum GameFlagEventCollectTy {
     Friendly,
     Opponent,
@@ -240,6 +252,7 @@ pub enum GameWorldEntitySoundEvent {
     Grenade(GameGrenadeEventSound),
     Laser(GameLaserEventSound),
     Shotgun(GameShotgunEventSound),
+    Puller(GamePullerEventSound),
     Flag(GameFlagEventSound),
     Pickup(GamePickupSoundEvent),
 }
@@ -250,6 +263,7 @@ pub enum GameWorldEntityEffectEvent {
     Grenade(GameGrenadeEventEffect),
     Laser(GameLaserEventEffect),
     Shotgun(GameShotgunEventEffect),
+    Puller(GamePullerEventEffect),
     Flag(GameFlagEventEffect),
     Pickup(GamePickupEffectEvent),
 }

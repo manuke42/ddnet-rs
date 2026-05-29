@@ -329,6 +329,12 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>) {
                     )),
                 );
                 inp(
+                    "Puller (DDNet shotgun):",
+                    BindAction::LocalPlayer(BindActionsLocalPlayer::Character(
+                        BindActionsCharacter::Weapon(WeaponType::Puller),
+                    )),
+                );
+                inp(
                     "Grenade:",
                     BindAction::LocalPlayer(BindActionsLocalPlayer::Character(
                         BindActionsCharacter::Weapon(WeaponType::Grenade),

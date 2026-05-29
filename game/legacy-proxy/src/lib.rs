@@ -975,6 +975,7 @@ impl Client {
         const WEAPON_LASER: i32 = 4;
         const WEAPON_NINJA: i32 = 5;
 
+        let is_race = base.is_race();
         let events = base
             .events
             .worlds
@@ -1007,7 +1008,11 @@ impl Client {
                             weapon: WeaponType::Gun,
                         },
                         WEAPON_SHOTGUN => events::GameWorldActionKillWeapon::Weapon {
-                            weapon: WeaponType::Shotgun,
+                            weapon: if is_race {
+                                WeaponType::Puller
+                            } else {
+                                WeaponType::Shotgun
+                            },
                         },
                         WEAPON_GRENADE => events::GameWorldActionKillWeapon::Weapon {
                             weapon: WeaponType::Grenade,
@@ -1062,6 +1067,7 @@ impl Client {
         collision: Option<&Collision>,
         cur_time: Duration,
     ) {
+        let is_race = base.is_race();
         let add_proj = |snapshot: &mut Snapshot,
                         id,
                         owner_id: i32,
@@ -1190,12 +1196,22 @@ impl Client {
             2 => PickupType::PowerupWeapon(match pickup.subtype {
                 0 => WeaponType::Hammer,
                 1 => WeaponType::Gun,
-                2 => WeaponType::Shotgun,
+                2 => {
+                    if is_race {
+                        WeaponType::Puller
+                    } else {
+                        WeaponType::Shotgun
+                    }
+                }
                 3 => WeaponType::Grenade,
                 _ => WeaponType::Laser,
             }),
             3 => PickupType::PowerupNinja,
-            4 => PickupType::PowerupWeaponShield(WeaponType::Shotgun),
+            4 => PickupType::PowerupWeaponShield(if is_race {
+                WeaponType::Puller
+            } else {
+                WeaponType::Shotgun
+            }),
             5 => PickupType::PowerupWeaponShield(WeaponType::Grenade),
             6 => PickupType::PowerupNinjaShield,
             7 => PickupType::PowerupWeaponShield(WeaponType::Laser),
@@ -1384,7 +1400,13 @@ impl Client {
                     let active_weapon = match character.weapon {
                         enums::WEAPON_HAMMER => WeaponType::Hammer,
                         enums::WEAPON_PISTOL => WeaponType::Gun,
-                        enums::WEAPON_SHOTGUN => WeaponType::Shotgun,
+                        enums::WEAPON_SHOTGUN => {
+                            if is_race {
+                                WeaponType::Puller
+                            } else {
+                                WeaponType::Shotgun
+                            }
+                        }
                         enums::WEAPON_GRENADE => WeaponType::Grenade,
                         enums::WEAPON_RIFLE => WeaponType::Laser,
                         // Weapon ninja
@@ -1402,7 +1424,7 @@ impl Client {
                         }
                     };
                     let mut weapons: FxLinkedHashMap<WeaponType, Weapon> = Default::default();
-                    let weapon_ammo = (!base.is_race()).then_some(10);
+                    let weapon_ammo = (!is_race).then_some(10);
                     let def_weapon = Weapon {
                         next_ammo_regeneration_tick: Default::default(),
                         cur_ammo: weapon_ammo,
@@ -1416,7 +1438,14 @@ impl Client {
                             weapons.insert(WeaponType::Gun, def_weapon.clone());
                         }
                         if (ddnet_char.flags & CHARACTERFLAG_WEAPON_SHOTGUN) != 0 {
-                            weapons.insert(WeaponType::Shotgun, def_weapon.clone());
+                            weapons.insert(
+                                if is_race {
+                                    WeaponType::Puller
+                                } else {
+                                    WeaponType::Shotgun
+                                },
+                                def_weapon.clone(),
+                            );
                         }
                         if (ddnet_char.flags & CHARACTERFLAG_WEAPON_GRENADE) != 0 {
                             weapons.insert(WeaponType::Grenade, def_weapon.clone());
@@ -1710,6 +1739,7 @@ impl Client {
                             WeaponType::Hammer => TICKS_PER_SECOND / 3,
                             WeaponType::Gun => TICKS_PER_SECOND / 8,
                             WeaponType::Shotgun => TICKS_PER_SECOND / 2,
+                            WeaponType::Puller => TICKS_PER_SECOND / 2,
                             WeaponType::Grenade => TICKS_PER_SECOND / 2,
                             WeaponType::Laser => (TICKS_PER_SECOND * 800) / 1000,
                         } as i32;
@@ -1967,7 +1997,7 @@ impl Client {
                                             WeaponType::Hammer,
                                             Weapon {
                                                 next_ammo_regeneration_tick: Default::default(),
-                                                cur_ammo: (!base.is_race()).then_some(10),
+                                                cur_ammo: (!is_race).then_some(10),
                                                 upgrades: PoolFxHashSet::new_without_pool(),
                                             },
                                         );
@@ -2315,9 +2345,11 @@ impl Client {
                                 }
                                 enums::Sound::ShotgunFire => {
                                     events::GameWorldEntitySoundEvent::Character(
-                                        events::GameCharacterSoundEvent::Sound(
-                                            events::GameCharacterEventSound::ShotgunFire,
-                                        ),
+                                        events::GameCharacterSoundEvent::Sound(if is_race {
+                                            events::GameCharacterEventSound::PullerFire
+                                        } else {
+                                            events::GameCharacterEventSound::ShotgunFire
+                                        }),
                                     )
                                 }
                                 enums::Sound::GrenadeFire => {
@@ -2494,9 +2526,15 @@ impl Client {
                                     )
                                 }
                                 enums::Sound::PickupShotgun => {
-                                    events::GameWorldEntitySoundEvent::Shotgun(
-                                        events::GameShotgunEventSound::Collect,
-                                    )
+                                    if is_race {
+                                        events::GameWorldEntitySoundEvent::Puller(
+                                            events::GamePullerEventSound::Collect,
+                                        )
+                                    } else {
+                                        events::GameWorldEntitySoundEvent::Shotgun(
+                                            events::GameShotgunEventSound::Collect,
+                                        )
+                                    }
                                 }
                                 enums::Sound::PickupNinja => {
                                     events::GameWorldEntitySoundEvent::Character(
@@ -3358,20 +3396,12 @@ impl Client {
                                         hearts: PoolVec::new_without_pool(),
                                         shields: PoolVec::new_without_pool(),
                                         red_flags: PoolVec::new_without_pool(),
-                                        weapons: [
-                                            PoolVec::new_without_pool(),
-                                            PoolVec::new_without_pool(),
-                                            PoolVec::new_without_pool(),
-                                            PoolVec::new_without_pool(),
-                                            PoolVec::new_without_pool(),
-                                        ],
-                                        weapon_shields: [
-                                            PoolVec::new_without_pool(),
-                                            PoolVec::new_without_pool(),
-                                            PoolVec::new_without_pool(),
-                                            PoolVec::new_without_pool(),
-                                            PoolVec::new_without_pool(),
-                                        ],
+                                        weapons: std::array::from_fn(|_| {
+                                            PoolVec::new_without_pool()
+                                        }),
+                                        weapon_shields: std::array::from_fn(|_| {
+                                            PoolVec::new_without_pool()
+                                        }),
                                         ninjas: PoolVec::new_without_pool(),
                                         ninja_shields: PoolVec::new_without_pool(),
                                         ddrace_entities: PoolVec::new_without_pool(),

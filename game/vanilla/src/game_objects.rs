@@ -237,15 +237,15 @@ pub mod game_objects {
                         pickups.weapons[WeaponType::Laser as usize]
                             .push(ivec2::new(x as i32, y as i32));
                     }
-                    i if i == EntityTiles::WeaponShotgun as u8 => {
-                        pickups.weapons[WeaponType::Shotgun as usize]
+                    i if i == EntityTiles::WeaponShotgunOrPullerInRace as u8 => {
+                        pickups.weapons[WeaponType::Puller as usize]
                             .push(ivec2::new(x as i32, y as i32));
                     }
                     i if i == EntityTiles::PowerupNinja as u8 => {
                         pickups.ninjas.push(ivec2::new(x as i32, y as i32));
                     }
-                    i if i == DdraceEntityTiles::ArmorShotgun as u8 => {
-                        pickups.weapon_shields[WeaponType::Shotgun as usize]
+                    i if i == DdraceEntityTiles::ArmorPuller as u8 => {
+                        pickups.weapon_shields[WeaponType::Puller as usize]
                             .push(ivec2::new(x as i32, y as i32));
                     }
                     i if i == DdraceEntityTiles::ArmorGrenade as u8 => {

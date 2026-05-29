@@ -149,9 +149,16 @@ fn main() {
     );
     write_part(
         &mut write_mode,
-        converted.disabled_shotgun,
+        converted.disabled_shotgun.clone(),
         &args.output,
         "huds/default/ddrace/disabled_shotgun",
+    );
+    // Since legacy has no puller, it gets shotgun
+    write_part(
+        &mut write_mode,
+        converted.disabled_shotgun,
+        &args.output,
+        "huds/default/ddrace/disabled_puller",
     );
     write_part(
         &mut write_mode,

@@ -133,6 +133,7 @@ pub mod collision {
                 shotgun_curvature: 0.0,
                 shotgun_speed: 500.0,
                 shotgun_speeddiff: 0.0,
+                laser_bounce_num: 1000.0,
                 ..Default::default()
             }
         }

@@ -2,8 +2,8 @@ pub mod events {
     use game_interface::{
         events::GameWorldActionKillWeapon,
         types::{
-            flag::FlagType, game::GameTickCooldown, id_types::CharacterId, pickup::PickupType,
-            render::projectiles::WeaponWithProjectile,
+            flag::FlagType, game::GameTickCooldown, id_types::CharacterId, laser::LaserType,
+            pickup::PickupType, render::projectiles::WeaponWithProjectile,
         },
     };
     use hiarc::Hiarc;
@@ -95,6 +95,7 @@ pub mod events {
         Laser {
             pos: vec2,
             dir: vec2,
+            ty: LaserType,
             energy: f32,
             can_hit_others: bool,
             can_hit_own: bool,

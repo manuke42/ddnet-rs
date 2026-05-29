@@ -1143,6 +1143,9 @@ pub mod state {
                                 .insert(WeaponType::Shotgun, gun.clone());
                             reusable_core
                                 .weapons
+                                .insert(WeaponType::Puller, gun.clone());
+                            reusable_core
+                                .weapons
                                 .insert(WeaponType::Grenade, gun.clone());
                             reusable_core.weapons.insert(WeaponType::Laser, gun);
 
