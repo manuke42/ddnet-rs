@@ -59,6 +59,7 @@ pub mod projectile {
         pub is_explosive: bool,
         pub ty: WeaponWithProjectile,
         pub side: Option<MatchSide>,
+        pub can_hit_others: bool,
     }
 
     #[derive(Debug, Hiarc, Clone)]
@@ -94,6 +95,7 @@ pub mod projectile {
             game_pending_events: &GameWorldPendingEvents,
             simulation_events: &SimulationWorldEvents,
             side: Option<MatchSide>,
+            can_hit_others: bool,
         ) -> Self {
             let core = ProjectileCore {
                 pos: *pos,
@@ -104,6 +106,7 @@ pub mod projectile {
                 is_explosive: explosive,
                 ty,
                 side,
+                can_hit_others,
             };
             Self {
                 base: Entity::new(game_el_id),
@@ -164,15 +167,24 @@ pub mod projectile {
             // deal damage
             let radius = 135;
             let inner_radius = 48.0;
-            let characters = pipe.characters_helper.get_characters();
-            let intersections =
-                GameWorld::intersect_characters(pipe.field, characters, &self.core.pos, radius);
-
             self.helper_ids.clear();
-            self.helper_ids.extend(intersections.map(|character| {
-                let diff = *character.pos.pos() - self.core.pos;
-                (character.base.game_element_id, diff)
-            }));
+            if self.core.can_hit_others {
+                let characters = pipe.characters_helper.get_characters();
+                let intersections =
+                    GameWorld::intersect_characters(pipe.field, characters, &self.core.pos, radius);
+                self.helper_ids.extend(intersections.map(|character| {
+                    let diff = *character.pos.pos() - self.core.pos;
+                    (character.base.game_element_id, diff)
+                }));
+            } else {
+                let characters = pipe.characters_helper.get_owner_character_view();
+                let intersections =
+                    GameWorld::intersect_characters(pipe.field, characters, &self.core.pos, radius);
+                self.helper_ids.extend(intersections.map(|character| {
+                    let diff = *character.pos.pos() - self.core.pos;
+                    (character.base.game_element_id, diff)
+                }));
+            }
 
             for (id, diff) in self.helper_ids.drain(..) {
                 let mut force_dir = vec2::new(0.0, 1.0);
@@ -241,13 +253,17 @@ pub mod projectile {
 
             self.core.life_span -= 1;
 
-            let intersection = GameWorld::intersect_character_on_line(
-                pipe.field,
-                pipe.characters_helper.get_characters_except_owner(),
-                &prev_pos,
-                &cur_pos,
-                6.0,
-            );
+            let intersection = if self.core.can_hit_others {
+                GameWorld::intersect_character_on_line(
+                    pipe.field,
+                    pipe.characters_helper.get_characters_except_owner(),
+                    &prev_pos,
+                    &cur_pos,
+                    6.0,
+                )
+            } else {
+                None
+            };
 
             let res = if intersection.is_some()
                 || !matches!(collide, CollisionTile::None)

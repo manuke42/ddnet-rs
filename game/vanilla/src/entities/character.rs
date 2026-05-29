@@ -805,9 +805,9 @@ pub mod character {
             } else if tile.index == DdraceTileNum::EHookDisable as u8 {
                 self.core.core.has_endless = false;
             } else if tile.index == DdraceTileNum::HitEnable as u8 {
-                self.core.core.hit_disabled = false;
+                self.core.core.set_all_weapon_hit_disabled(false);
             } else if tile.index == DdraceTileNum::HitDisable as u8 {
-                self.core.core.hit_disabled = true;
+                self.core.core.set_all_weapon_hit_disabled(true);
             } else if tile.index == DdraceTileNum::SoloEnable as u8 {
                 self.core.core.solo = true;
             } else if tile.index == DdraceTileNum::SoloDisable as u8 {
@@ -976,6 +976,35 @@ pub mod character {
                 index if index == DdraceTileNum::SwitchTimedClose as u8 && tile.number > 0 => {
                     self.set_switch(tile.number, false, tile.delay);
                 }
+                index
+                    if index == DdraceTileNum::HitEnable as u8
+                        || index == DdraceTileNum::HitDisable as u8 =>
+                {
+                    let disabled = index == DdraceTileNum::HitDisable as u8;
+                    match tile.delay {
+                        0 => self
+                            .core
+                            .core
+                            .set_weapon_hit_disabled(WeaponType::Hammer, disabled),
+                        2 => {
+                            self.core
+                                .core
+                                .set_weapon_hit_disabled(WeaponType::Shotgun, disabled);
+                            self.core
+                                .core
+                                .set_weapon_hit_disabled(WeaponType::Puller, disabled);
+                        }
+                        3 => self
+                            .core
+                            .core
+                            .set_weapon_hit_disabled(WeaponType::Grenade, disabled),
+                        4 => self
+                            .core
+                            .core
+                            .set_weapon_hit_disabled(WeaponType::Laser, disabled),
+                        _ => {}
+                    }
+                }
                 _ if self.switch_active(tile.number) => {
                     self.handle_game_front_tiles(&tile.base, res);
                 }
@@ -1048,7 +1077,7 @@ pub mod character {
                 self.core.core.has_endless = true;
             }
             if collision.hit_disabled() {
-                self.core.core.hit_disabled = true;
+                self.core.core.set_all_weapon_hit_disabled(true);
             }
 
             collision.intersect_line_feedback(&old_pos, &cur_pos, |tile| match tile {
@@ -1436,7 +1465,7 @@ pub mod character {
                         &proj_start_pos,
                         PHYSICAL_SIZE * 0.5,
                         &mut |char| {
-                            if self.core.core.hit_disabled {
+                            if self.core.core.weapon_hit_disabled(WeaponType::Hammer) {
                                 return;
                             }
                             if !matches!(self.game_options.game_ty(), ConfigGameType::Race)
@@ -1505,6 +1534,7 @@ pub mod character {
                         dir: direction,
                         ty: WeaponWithProjectile::Gun,
                         lifetime: tunings.gun_lifetime,
+                        can_hit_others: true,
                     });
                     self.push_sound(
                         *self.pos.pos(),
@@ -1531,6 +1561,10 @@ pub mod character {
                             dir: vec2::new(a.cos(), a.sin()) * speed,
                             ty: WeaponWithProjectile::Shotgun,
                             lifetime: tunings.shotgun_lifetime,
+                            can_hit_others: !self
+                                .core
+                                .core
+                                .weapon_hit_disabled(WeaponType::Shotgun),
                         });
                     }
 
@@ -1553,7 +1587,7 @@ pub mod character {
                         dir: direction,
                         ty: LaserType::Puller,
                         energy: pipe.collision.get_tune_at(self.pos.pos()).laser_reach,
-                        can_hit_others: !self.core.core.hit_disabled,
+                        can_hit_others: !self.core.core.weapon_hit_disabled(WeaponType::Puller),
                         can_hit_own: true,
                     });
                     self.push_sound(
@@ -1576,6 +1610,7 @@ pub mod character {
                         dir: direction,
                         ty: WeaponWithProjectile::Grenade,
                         lifetime: tunings.grenade_lifetime,
+                        can_hit_others: !self.core.core.weapon_hit_disabled(WeaponType::Grenade),
                     });
                     self.push_sound(
                         *self.pos.pos(),
@@ -1592,8 +1627,9 @@ pub mod character {
                         dir: direction,
                         ty: LaserType::Rifle,
                         energy: pipe.collision.get_tune_at(self.pos.pos()).laser_reach,
-                        can_hit_others: !self.core.core.hit_disabled,
-                        can_hit_own: self.game_options.laser_hit_self(),
+                        can_hit_others: !self.core.core.weapon_hit_disabled(WeaponType::Laser),
+                        can_hit_own: self.game_options.laser_hit_self()
+                            || matches!(self.game_options.game_ty(), ConfigGameType::Race),
                     });
                     self.push_sound(
                         *self.pos.pos(),

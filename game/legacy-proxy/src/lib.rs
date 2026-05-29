@@ -89,11 +89,13 @@ use libtw2_gamenet_ddnet::{
         system,
     },
     snap_obj::{
-        self, CHARACTERFLAG_MOVEMENTS_DISABLED, CHARACTERFLAG_WEAPON_GRENADE,
-        CHARACTERFLAG_WEAPON_GUN, CHARACTERFLAG_WEAPON_HAMMER, CHARACTERFLAG_WEAPON_LASER,
-        CHARACTERFLAG_WEAPON_SHOTGUN, Character, DdnetCharacter, DdnetPlayer,
-        PROJECTILEFLAG_BOUNCE_HORIZONTAL, PROJECTILEFLAG_BOUNCE_VERTICAL, PROJECTILEFLAG_EXPLOSIVE,
-        PROJECTILEFLAG_FREEZE, PROJECTILEFLAG_NORMALIZE_VEL, obj_size,
+        self, CHARACTERFLAG_GRENADE_HIT_DISABLED, CHARACTERFLAG_HAMMER_HIT_DISABLED,
+        CHARACTERFLAG_LASER_HIT_DISABLED, CHARACTERFLAG_MOVEMENTS_DISABLED,
+        CHARACTERFLAG_SHOTGUN_HIT_DISABLED, CHARACTERFLAG_WEAPON_GRENADE, CHARACTERFLAG_WEAPON_GUN,
+        CHARACTERFLAG_WEAPON_HAMMER, CHARACTERFLAG_WEAPON_LASER, CHARACTERFLAG_WEAPON_SHOTGUN,
+        Character, DdnetCharacter, DdnetPlayer, PROJECTILEFLAG_BOUNCE_HORIZONTAL,
+        PROJECTILEFLAG_BOUNCE_VERTICAL, PROJECTILEFLAG_EXPLOSIVE, PROJECTILEFLAG_FREEZE,
+        PROJECTILEFLAG_NORMALIZE_VEL, obj_size,
     },
 };
 use libtw2_net::net::PeerId;
@@ -1145,6 +1147,7 @@ impl Client {
                             is_explosive,
                             ty,
                             side: None,
+                            can_hit_others: true,
                         },
                         reusable_core: PoolProjectileReusableCore::from_without_pool(
                             ProjectileReusableCore {},
@@ -1560,6 +1563,26 @@ impl Client {
                     if let Some(ddnet_char) = ddnet_char {
                         core.jumps.max = ddnet_char.jumps;
                         core.jumps.count = ddnet_char.jumped_total;
+                        core.set_weapon_hit_disabled(
+                            WeaponType::Hammer,
+                            (ddnet_char.flags & CHARACTERFLAG_HAMMER_HIT_DISABLED) != 0,
+                        );
+                        core.set_weapon_hit_disabled(
+                            if is_race {
+                                WeaponType::Puller
+                            } else {
+                                WeaponType::Shotgun
+                            },
+                            (ddnet_char.flags & CHARACTERFLAG_SHOTGUN_HIT_DISABLED) != 0,
+                        );
+                        core.set_weapon_hit_disabled(
+                            WeaponType::Grenade,
+                            (ddnet_char.flags & CHARACTERFLAG_GRENADE_HIT_DISABLED) != 0,
+                        );
+                        core.set_weapon_hit_disabled(
+                            WeaponType::Laser,
+                            (ddnet_char.flags & CHARACTERFLAG_LASER_HIT_DISABLED) != 0,
+                        );
                         inp.cursor.set(CharacterInputCursor::from_vec2(&dvec2::new(
                             ddnet_char.target_x as f64 / 32.0,
                             ddnet_char.target_y as f64 / 32.0,

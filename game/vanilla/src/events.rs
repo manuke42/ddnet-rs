@@ -91,6 +91,7 @@ pub mod events {
             dir: vec2,
             ty: WeaponWithProjectile,
             lifetime: f32,
+            can_hit_others: bool,
         },
         Laser {
             pos: vec2,

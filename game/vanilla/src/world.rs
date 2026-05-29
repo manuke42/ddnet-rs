@@ -654,6 +654,7 @@ pub mod world {
                 &self.game_pending_events,
                 &self.simulation_events,
                 side,
+                true,
             );
             self.projectiles.insert(
                 projectile_id,
@@ -901,6 +902,7 @@ pub mod world {
                         dir,
                         ty,
                         lifetime,
+                        can_hit_others,
                     } => {
                         if let Some(id_generator) = &self.id_generator {
                             let proj_id = id_generator.next_id();
@@ -922,6 +924,7 @@ pub mod world {
                                 &self.game_pending_events,
                                 &self.simulation_events,
                                 character.core.side,
+                                *can_hit_others,
                             );
                             self.projectiles.insert(
                                 proj_id,

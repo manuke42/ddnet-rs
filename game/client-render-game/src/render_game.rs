@@ -2228,11 +2228,6 @@ impl RenderGame {
             GameWorldEntityEffectEvent::Grenade(ev) => {
                 self.handle_grenade_effect_event(cur_time, pos, ev, owner_id);
             }
-            GameWorldEntityEffectEvent::Laser(_)
-            | GameWorldEntityEffectEvent::Shotgun(_)
-            | GameWorldEntityEffectEvent::Puller(_)
-            | GameWorldEntityEffectEvent::Flag(_)
-            | GameWorldEntityEffectEvent::Pickup(_) => {}
         }
     }
 

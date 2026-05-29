@@ -34,6 +34,7 @@ pub mod state {
         NetworkSkinInfo,
     };
     use game_interface::types::emoticons::EmoticonType;
+    use game_interface::types::emoticons::IntoEnumIterator;
     use game_interface::types::fixed_zoom_level::FixedZoomLevel;
     use game_interface::types::game::{GameTickCooldown, GameTickCooldownAndLength, GameTickType};
     use game_interface::types::id_gen::{IdGenerator, IdGeneratorIdType};
@@ -2251,7 +2252,11 @@ pub mod state {
                             .contains_key(&CharacterDebuff::LiveFrozen),
                         can_finish: true,
                         owned_weapons,
-                        disabled_weapons: PoolFxLinkedHashSet::new_without_pool(),
+                        disabled_weapons: PoolFxLinkedHashSet::from_without_pool(
+                            WeaponType::iter()
+                                .filter(|weapon| player_char.core.core.weapon_hit_disabled(*weapon))
+                                .collect(),
+                        ),
                         tele_weapons,
                         solo: player_char.core.core.solo,
                         invincible: player_char.core.core.is_super,

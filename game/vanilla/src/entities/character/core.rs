@@ -11,6 +11,7 @@ pub mod character_core {
             id_types::CharacterId,
             input::{CharacterInput, CharacterInputState},
             render::character::{HookCollisionLine, HookCollisionLineColor},
+            weapons::{EnumCount, WeaponType},
         },
     };
     use hiarc::Hiarc;
@@ -107,11 +108,36 @@ pub mod character_core {
         pub collision_disabled: bool,
         pub hook_hit_disabled: bool,
         pub hit_disabled: bool,
+        pub weapon_hit_disabled: [bool; WeaponType::COUNT],
         pub is_super: bool,
 
         pub has_endless: bool,
 
         pub move_restrictions: i32,
+    }
+
+    impl Core {
+        pub fn set_all_weapon_hit_disabled(&mut self, disabled: bool) {
+            self.hit_disabled = disabled;
+            self.weapon_hit_disabled[WeaponType::Hammer as usize] = disabled;
+            self.weapon_hit_disabled[WeaponType::Shotgun as usize] = disabled;
+            self.weapon_hit_disabled[WeaponType::Puller as usize] = disabled;
+            self.weapon_hit_disabled[WeaponType::Grenade as usize] = disabled;
+            self.weapon_hit_disabled[WeaponType::Laser as usize] = disabled;
+        }
+
+        pub fn set_weapon_hit_disabled(&mut self, weapon: WeaponType, disabled: bool) {
+            self.weapon_hit_disabled[weapon as usize] = disabled;
+            self.hit_disabled = self.weapon_hit_disabled[WeaponType::Hammer as usize]
+                && self.weapon_hit_disabled[WeaponType::Shotgun as usize]
+                && self.weapon_hit_disabled[WeaponType::Puller as usize]
+                && self.weapon_hit_disabled[WeaponType::Grenade as usize]
+                && self.weapon_hit_disabled[WeaponType::Laser as usize];
+        }
+
+        pub fn weapon_hit_disabled(&self, weapon: WeaponType) -> bool {
+            self.hit_disabled || self.weapon_hit_disabled[weapon as usize]
+        }
     }
 
     pub struct CorePipe<'a> {
