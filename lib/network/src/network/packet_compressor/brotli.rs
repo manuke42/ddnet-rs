@@ -1,8 +1,13 @@
+use std::io::{Read, Write};
+
 use anyhow::anyhow;
 use async_trait::async_trait;
 use pool::mt_pool::Pool;
 
-use crate::network::{connection::NetworkConnectionId, plugins::NetworkPluginPacket};
+use crate::network::{
+    connection::NetworkConnectionId, packet_compressor::types::DecompressionByteLimit,
+    plugins::NetworkPluginPacket,
+};
 
 use super::header::CompressHeader;
 
@@ -28,6 +33,7 @@ impl BrotliNetworkPacketCompressor {
                 .with_limit(64.try_into().unwrap())
                 .with_capacity(64)
                 .build(),
+            limit: Default::default(),
         }
     }
 

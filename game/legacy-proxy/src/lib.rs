@@ -3570,11 +3570,7 @@ impl Client {
                     .legacy_id_in_stage_id
                     .get(&chat.client_id)
                     .and_then(|s| snapshot.stages.get(s))
-                    .and_then(|s| {
-                        base.char_legacy_to_new_id
-                            .get(&chat.client_id)
-                            .map(|c| (s, c))
-                    })
+                    .zip(base.char_legacy_to_new_id.get(&chat.client_id))
                     .and_then(|(s, c)| s.world.characters.get(c))
                 {
                     let p = &character.player_info.player_info;

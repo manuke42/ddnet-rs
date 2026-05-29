@@ -1613,13 +1613,11 @@ pub mod state {
                 animation_ticks_passed: prev_stage.match_manager.game_match.state.passed_ticks(),
                 game_ticks_passed: prev_stage.match_manager.game_match.state.passed_ticks(),
 
-                emoticon: prev_character.core.cur_emoticon.and_then(|emoticon| {
-                    prev_character
-                        .core
-                        .emoticon_tick
-                        .action_ticks()
-                        .map(|tick| (tick, emoticon))
-                }),
+                emoticon: prev_character
+                    .core
+                    .emoticon_tick
+                    .action_ticks()
+                    .zip(prev_character.core.cur_emoticon),
                 phased: false,
             }
         }
