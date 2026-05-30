@@ -8,6 +8,7 @@ use base::join_all;
 use hiarc::Hiarc;
 use math::math::vector::{ffixed, fvec2, ufvec2};
 use serde::{Deserialize, Serialize};
+use tracing::instrument;
 
 use crate::{
     file::MapFileReader,
@@ -207,6 +208,7 @@ pub struct MapGroups {
 
 impl MapGroups {
     /// Deserializes the physics group
+    #[instrument(level = "trace", skip_all)]
     pub fn deserialize_physics_group(uncompressed_file: &[u8]) -> anyhow::Result<MapGroupPhysics> {
         deserialize_twmap_bincode::<MapGroupPhysics>(uncompressed_file)
     }
@@ -220,6 +222,7 @@ impl MapGroups {
     }
 
     /// Decompresses the physics group
+    #[instrument(level = "trace", skip_all)]
     pub fn decompress_physics_group(file: &[u8]) -> anyhow::Result<Vec<u8>> {
         crate::utils::decompress(file)
     }
@@ -229,6 +232,7 @@ impl MapGroups {
         crate::utils::compress(uncompressed_file)
     }
 
+    #[instrument(level = "trace", skip_all)]
     fn deserialize_design_groups(uncompressed_file: &[u8]) -> anyhow::Result<Vec<MapGroup>> {
         deserialize_twmap_bincode::<Vec<MapGroup>>(uncompressed_file)
     }
@@ -241,6 +245,7 @@ impl MapGroups {
     }
 
     /// Deserializes the foreground groups
+    #[instrument(level = "trace", skip_all)]
     pub(crate) fn deserialize_foreground_groups(
         uncompressed_file: &[u8],
     ) -> anyhow::Result<Vec<MapGroup>> {
@@ -256,6 +261,7 @@ impl MapGroups {
     }
 
     /// Deserializes the background groups
+    #[instrument(level = "trace", skip_all)]
     pub(crate) fn deserialize_background_groups(
         uncompressed_file: &[u8],
     ) -> anyhow::Result<Vec<MapGroup>> {
@@ -271,6 +277,7 @@ impl MapGroups {
     }
 
     /// Decompresses the background & foreground groups
+    #[instrument(level = "trace", skip_all)]
     pub fn decompress_design_group(file: &[u8]) -> anyhow::Result<Vec<u8>> {
         crate::utils::decompress(file)
     }
@@ -330,6 +337,7 @@ impl MapGroups {
     }
 
     /// Returns the physics group
+    #[instrument(level = "trace", skip_all)]
     pub fn read_physics_group(reader: &MapFileReader) -> anyhow::Result<MapGroupPhysics> {
         let physics_file = tar_entry_to_file(
             reader

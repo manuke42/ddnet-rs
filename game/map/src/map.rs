@@ -226,6 +226,7 @@ impl Map {
     }
 
     /// All maps that the client knows MUST be of type "twmap", even if the version changes etc.
+    #[instrument(level = "trace", skip_all)]
     pub fn read_twmap_header(reader: &MapFileReader) -> anyhow::Result<Header> {
         let file = tar_entry_to_file(
             reader
