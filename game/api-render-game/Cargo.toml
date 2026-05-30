@@ -13,4 +13,4 @@ client-render-game = { path = "../client-render-game" }
 game-config = { path = "../game-config" }
 game-interface = { path = "../game-interface" }
 
-once_cell = "1.21.3"
+once_cell = "1"

@@ -10,10 +10,10 @@ graphics-types = { path = "../graphics-types" }
 hiarc = { path = "../hiarc", features = ["enable_egui"] }
 math = { path = "../math" }
 
-anyhow = { version = "1.0.100", features = ["backtrace"] }
-egui = { version = "0.33.0", default-features = false, features = ["serde"] }
-egui_extras = { version = "0.33.0" }
-serde = { version = "1.0.228", features = ["derive"] }
-tracing = { version = "0.1.41", default-features = false, features = [
+anyhow = { version = "1", features = ["backtrace"] }
+egui = { version = "0.33", default-features = false, features = ["serde"] }
+egui_extras = { version = "0.33" }
+serde = { version = "1", features = ["derive"] }
+tracing = { version = "0.1", default-features = false, features = [
   "attributes",
 ] }

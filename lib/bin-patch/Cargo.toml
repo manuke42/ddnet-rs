@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-anyhow = { version = "1.0.100", features = ["backtrace"] }
+anyhow = { version = "1", features = ["backtrace"] }
 zstd = { version = "0.13", default-features = false, features = [
   "experimental",
   "zdict_builder",
@@ -12,7 +12,7 @@ zstd = { version = "0.13", default-features = false, features = [
 
 [dev-dependencies]
 base = { path = "../base" }
-bidiff = "1.0.0"
-brotli = "8.0.2"
-bsdiff = "0.2.1"
-qbsdiff = "1.4.4"
+bidiff = "1"
+brotli = "8"
+bsdiff = "0.2"
+qbsdiff = "1"

@@ -11,33 +11,33 @@ base-io-traits = { path = "../base-io-traits" }
 hiarc = { path = "../hiarc", features = ["derive"] }
 
 # v5.0.1+ brings a MPL 2.0 dependency, i don't really like this lib anyway
-anyhow = { version = "1.0.100", features = ["backtrace"] }
-async-trait = "0.1.89"
-chrono = { version = "0.4.42", features = ["serde"] }
+anyhow = { version = "1", features = ["backtrace"] }
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
 directories = { version = "=5.0.0" }
 hashlink = { git = "https://github.com/Jupeyy/hashlink/", branch = "ddnet", features = [
   "serde",
   "serde_impl",
 ] }
-log = "0.4.28"
-notify = { version = "8.2.0", default-features = false, features = [
+log = "0.4"
+notify = { version = "8", default-features = false, features = [
   "macos_kqueue",
 ] }
-path-clean = "1.0.1"
-path-slash = "0.2.1"
-tempfile = { version = "3.23.0" }
-tokio = { version = "1.48.0", features = [
+path-clean = "1"
+path-slash = "0.2"
+tempfile = { version = "3" }
+tokio = { version = "1", features = [
   "rt-multi-thread",
   "sync",
   "fs",
   "time",
   "macros",
 ] }
-virtual-fs = { version = "0.601.0", default-features = false, features = [
+virtual-fs = { version = "0.601", default-features = false, features = [
   "host-fs",
 ] }
 
-include_dir = { version = "0.7.4", optional = true }
+include_dir = { version = "0.7", optional = true }
 
 [dev-dependencies]
 base-io = { path = "../base-io" }

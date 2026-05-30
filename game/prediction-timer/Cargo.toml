@@ -6,10 +6,10 @@ edition = "2024"
 [dependencies]
 math = { path = "../../lib/math" }
 
-tracing = { version = "0.1.41", default-features = false, features = [
+tracing = { version = "0.1", default-features = false, features = [
   "attributes",
 ] }
 
 [dev-dependencies]
-rgb = "0.8.52"
-textplots = "0.8.7"
+rgb = "0.8"
+textplots = "0.8"

@@ -22,25 +22,25 @@ hiarc = { path = "../../lib/hiarc", features = [
 math = { path = "../../lib/math" }
 pool = { path = "../../lib/pool", features = ["enable_hiarc"] }
 
-ddnet-accounts-types = { version = "0.1.0" }
+ddnet-accounts-types = { version = "0.1" }
 
-anyhow = { version = "1.0.100", features = ["backtrace"] }
-bincode = { features = ["serde"], version = "2.0.1" }
-bitflags = { version = "2.10.0", features = ["serde"] }
-chrono = { version = "0.4.42", default-features = false, features = ["serde"] }
+anyhow = { version = "1", features = ["backtrace"] }
+bincode = { features = ["serde"], version = "2" }
+bitflags = { version = "2", features = ["serde"] }
+chrono = { version = "0.4", default-features = false, features = ["serde"] }
 hashlink = { git = "https://github.com/Jupeyy/hashlink/", branch = "ddnet", features = [
   "serde",
   "serde_impl",
 ] }
-log = "0.4.28"
-num = "0.4.3"
-num-derive = "0.4.2"
-num-traits = "0.2.19"
-rustc-hash = "2.1.1"
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.145"
-thiserror = "2.0.17"
-tracing = { version = "0.1.41", default-features = false, features = [
+log = "0.4"
+num = "0.4"
+num-derive = "0.4"
+num-traits = "0.2"
+rustc-hash = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tracing = { version = "0.1", default-features = false, features = [
   "attributes",
 ] }
 

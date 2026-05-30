@@ -9,10 +9,10 @@ base-io = { path = "../base-io" }
 base-io-traits = { path = "../base-io-traits" }
 wasm-runtime-types = { path = "../wasm-runtime-types" }
 
-bytes = { version = "1.10.1", features = ["serde"] }
-sendable = "0.6.1"
-url = { version = "2.5.7", features = ["serde"] }
-wasmer = { version = "6.1.0", default-features = false, features = [
+bytes = { version = "1", features = ["serde"] }
+sendable = "0.6"
+url = { version = "2", features = ["serde"] }
+wasmer = { version = "6", default-features = false, features = [
   "sys",
   "cranelift",
 ] }

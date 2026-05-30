@@ -9,6 +9,6 @@ graphics-types = { path = "../graphics-types" }
 hiarc = { path = "../hiarc", features = ["derive"] }
 pool = { path = "../pool" }
 
-anyhow = { version = "1.0.100", features = ["backtrace"] }
-bitflags = { version = "2.10.0", features = ["serde"] }
-thiserror = "2.0.17"
+anyhow = { version = "1", features = ["backtrace"] }
+bitflags = { version = "2", features = ["serde"] }
+thiserror = "2"

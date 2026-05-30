@@ -13,5 +13,5 @@ math = { path = "../../../lib/math" }
 api-auto-mapper = { path = "../../../game/api-auto-mapper" }
 editor-interface = { path = "../../../game/editor-interface" }
 
-log = "0.4.28"
-rustc-hash = "2.1.1"
+log = "0.4"
+rustc-hash = "2"

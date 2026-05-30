@@ -11,8 +11,8 @@ graphics-types = { path = "../graphics-types" }
 hiarc = { path = "../hiarc", features = ["derive"] }
 wasm-runtime-types = { path = "../wasm-runtime-types" }
 
-sendable = "0.6.1"
-wasmer = { version = "6.1.0", default-features = false, features = [
+sendable = "0.6"
+wasmer = { version = "6", default-features = false, features = [
   "sys",
   "cranelift",
 ] }

@@ -12,21 +12,21 @@ hiarc = { path = "../hiarc", features = [
 ] }
 pool = { path = "../pool", features = ["hiarc"] }
 
-anyhow = { version = "1.0.100", features = ["backtrace"] }
-ascii = { version = "1.1.0", features = ["serde"] }
-blake3 = "1.8.2"
+anyhow = { version = "1", features = ["backtrace"] }
+ascii = { version = "1", features = ["serde"] }
+blake3 = "1"
 hashlink = { git = "https://github.com/Jupeyy/hashlink/", branch = "ddnet", features = [
   "serde",
   "serde_impl",
 ] }
-hex = "0.4.3"
-parking_lot = "0.12.5"
-rayon = "1.11.0"
-rustc-hash = "2.1.1"
-serde = { version = "1.0.228", features = ["derive"] }
-thiserror = "2.0.17"
-tracing = { version = "0.1.41", default-features = false, features = [
+hex = "0.4"
+parking_lot = "0.12"
+rayon = "1"
+rustc-hash = "2"
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+tracing = { version = "0.1", default-features = false, features = [
   "attributes",
 ] }
-tracing-subscriber = { version = "0.3.20", features = ["std", "env-filter"] }
-owo-colors = "4.2.3"
+tracing-subscriber = { version = "0.3", features = ["std", "env-filter"] }
+owo-colors = "4"
