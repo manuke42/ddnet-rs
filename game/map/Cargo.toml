@@ -47,6 +47,10 @@ ruzstd = { version = "0.8.2", optional = true }
 [dev-dependencies]
 base-fs = { path = "../../lib/base-fs" }
 base-io = { path = "../../lib/base-io" }
+bitcode = { version = "0.6.9", default-features = false, features = [
+  "serde",
+  "std",
+] }
 brotli = "8.0.2"
 difference = "2.0"
 #rust-lzma = "0.6.0"

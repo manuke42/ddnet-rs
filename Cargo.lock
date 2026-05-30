@@ -1114,6 +1114,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "bitcode"
+version = "0.6.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a6ed1b54d8dc333e7be604d00fa9262f4635485ffea923647b6521a5fff045d"
+dependencies = [
+ "arrayvec 0.7.6",
+ "bytemuck",
+ "glam",
+ "serde",
+]
+
+[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6535,6 +6547,7 @@ dependencies = [
  "base-fs",
  "base-io",
  "bincode",
+ "bitcode",
  "bitflags 2.11.1",
  "brotli",
  "difference",
