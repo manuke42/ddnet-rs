@@ -34,6 +34,8 @@ pub mod stage {
         pub match_manager: MatchManager,
         pub stage_name: NetworkString<MAX_TEAM_NAME_LEN>,
         pub stage_color: ubvec4,
+        pub stage_locked: bool,
+        pub team0_mode: bool,
 
         pub(crate) game_pending_events: GameStagePendingEventsRaii,
         pub(crate) simulation_events: SimulationStageEvents,
@@ -76,6 +78,8 @@ pub mod stage {
                 match_manager: MatchManager::new(game_options, &simulation_events),
                 stage_name,
                 stage_color,
+                stage_locked: false,
+                team0_mode: false,
                 game_pending_events,
                 simulation_events,
 

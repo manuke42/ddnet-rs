@@ -4,21 +4,33 @@ pub mod weapon_def {
     };
     use hiarc::Hiarc;
     use math::math::{length, vector::vec2};
+    use pool::{datatypes::PoolFxHashSet, pool::Pool};
+    use rustc_hash::FxHashSet;
     use serde::{Deserialize, Serialize};
 
-    #[derive(Debug, Hiarc, Copy, Clone, Default, Serialize, Deserialize)]
+    #[derive(Debug, Hiarc, Copy, Clone, Hash, PartialEq, Eq, Serialize, Deserialize)]
+    pub enum WeaponUpgrade {
+        Jetpack,
+        Teleport,
+    }
+
+    pub type WeaponUpgradePool = Pool<FxHashSet<WeaponUpgrade>>;
+
+    #[derive(Debug, Hiarc, Clone, Serialize, Deserialize)]
     pub struct Weapon {
         pub next_ammo_regeneration_tick: GameTickCooldown,
         /// A value of `None` here means unlimited ammo
         pub cur_ammo: Option<u32>,
+        pub upgrades: PoolFxHashSet<WeaponUpgrade>,
     }
 
-    pub const WEAPON_VISUAL_SIZES: [f32; WeaponType::COUNT] = [3.0, 2.0, 3.0, 3.0, 92.0 / 32.0];
+    pub const WEAPON_VISUAL_SIZES: [f32; WeaponType::COUNT] =
+        [3.0, 2.0, 3.0, 3.0, 3.0, 92.0 / 32.0];
     pub const NINJA_PICKUP_VISUAL_SIZE: f32 = 4.0;
     pub const NINJA_WEAPON_VISUAL_SIZE: f32 = 3.0;
 
     pub const WEAPON_SCALES: [(usize, usize); WeaponType::COUNT] =
-        [(4, 3), (4, 2), (8, 2), (7, 2), (7, 3)];
+        [(4, 3), (4, 2), (8, 2), (8, 2), (7, 2), (7, 3)];
     pub const NINJA_PICKUP_VISUAL_SCALE: (usize, usize) = (8, 2);
 
     pub fn get_weapon_visual_scale(weapon: &WeaponType) -> f32 {

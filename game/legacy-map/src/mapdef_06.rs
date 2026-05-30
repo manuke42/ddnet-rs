@@ -67,7 +67,7 @@ pub enum EntityTiles {
     FlagSpawnBlue,
     Armor,
     Health,
-    WeaponShotgun,
+    WeaponShotgunOrPullerInRace,
     WeaponGrenade,
     PowerupNinja,
     WeaponLaser,
@@ -102,7 +102,7 @@ pub enum DdraceEntityTiles {
     CrazyShotgunEx,
     CrazyShotgun,
     //DDNet - Removing specific weapon
-    ArmorShotgun,
+    ArmorPuller,
     ArmorGrenade,
     ArmorNinja,
     ArmorLaser,

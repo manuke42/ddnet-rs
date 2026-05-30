@@ -1,5 +1,5 @@
 pub mod state {
-    use std::num::{NonZero, NonZeroU16, NonZeroU64};
+    use std::num::{NonZero, NonZeroU16, NonZeroU32, NonZeroU64};
     use std::rc::Rc;
     use std::sync::Arc;
     use std::time::Duration;
@@ -34,6 +34,7 @@ pub mod state {
         NetworkSkinInfo,
     };
     use game_interface::types::emoticons::EmoticonType;
+    use game_interface::types::emoticons::IntoEnumIterator;
     use game_interface::types::fixed_zoom_level::FixedZoomLevel;
     use game_interface::types::game::{GameTickCooldown, GameTickCooldownAndLength, GameTickType};
     use game_interface::types::id_gen::{IdGenerator, IdGeneratorIdType};
@@ -61,7 +62,7 @@ pub mod state {
     use map::map::config::ConfigVariables;
     use math::math::lerp;
     use math::math::vector::{ubvec4, vec2};
-    use pool::datatypes::{PoolFxHashMap, PoolFxLinkedHashMap, PoolVec};
+    use pool::datatypes::{PoolFxHashMap, PoolFxLinkedHashMap, PoolFxLinkedHashSet, PoolVec};
     use pool::mt_datatypes::{PoolCow as MtPoolCow, PoolFxLinkedHashMap as MtPoolFxLinkedHashMap};
     use pool::pool::Pool;
 
@@ -72,8 +73,8 @@ pub mod state {
     use game_interface::types::render::character::{
         CharacterBuff, CharacterBuffInfo, CharacterDebuff, CharacterDebuffInfo,
         CharacterHookRenderInfo, CharacterInfo, CharacterPlayerInfo, CharacterRenderInfo,
-        LocalCharacterRenderInfo, LocalCharacterVanilla, PlayerCameraMode, PlayerIngameMode,
-        TeeEye,
+        LocalCharacterDdrace, LocalCharacterRenderInfo, LocalCharacterVanilla, PlayerCameraMode,
+        PlayerIngameMode, TeeEye,
     };
     use game_interface::types::render::flag::FlagRenderInfo;
     use game_interface::types::render::laser::LaserRenderInfo;
@@ -93,10 +94,11 @@ pub mod state {
     use crate::command_chain::{Command, CommandChain};
     use crate::config::config::{ConfigGameType, ConfigVanilla, ConfigVanillaWrapper};
     use crate::entities::character::character::{self, CharacterPlayerTy, CharacterSpectateMode};
-    use crate::entities::character::core::character_core::Core;
+    use crate::entities::character::core::character_core::{Core, PHYSICAL_SIZE};
     use crate::entities::character::player::player::{
         Player, PlayerInfo, Players, SpectatorPlayer, SpectatorPlayers,
     };
+    use crate::entities::ddrace_projectile::ddrace_projectile;
     use crate::entities::flag::flag::{Flag, Flags};
     use crate::entities::laser::laser::Laser;
     use crate::entities::pickup::pickup::Pickup;
@@ -111,7 +113,7 @@ pub mod state {
     use crate::sql::save;
     use crate::stage::stage::Stages;
     use crate::types::types::{GameOptions, GameType};
-    use crate::weapons::definitions::weapon_def::Weapon;
+    use crate::weapons::definitions::weapon_def::{Weapon, WeaponUpgrade};
 
     use super::super::{
         collision::collision::Collision, entities::character::character::Character,
@@ -230,7 +232,7 @@ pub mod state {
         fn get_game_type_from_conf(conf: ConfigGameType) -> GameType {
             match conf {
                 ConfigGameType::Ctf => GameType::Sided,
-                ConfigGameType::Dm => GameType::Solo,
+                ConfigGameType::Dm | ConfigGameType::Race => GameType::Solo,
             }
         }
 
@@ -240,6 +242,7 @@ pub mod state {
             match conf {
                 ConfigGameType::Dm => "dm".try_into().unwrap(),
                 ConfigGameType::Ctf => "ctf".try_into().unwrap(),
+                ConfigGameType::Race => "race".try_into().unwrap(),
             }
         }
 
@@ -509,11 +512,14 @@ pub mod state {
                 Map::read_physics_group_and_config(&MapFileReader::new(map)?)?;
 
             let w = physics_group.attr.width.get() as u32;
-            let h = physics_group.attr.height.get() as u32;
-
             let tiles = physics_group.get_game_layer_tiles().clone();
+            let game_objects = GameObjectDefinitions::new(&physics_group);
 
-            let mut collision = Collision::new(physics_group, true)?;
+            let default_tune = match config.game_type {
+                ConfigGameType::Race => Tunings::race_default(),
+                ConfigGameType::Dm | ConfigGameType::Ctf => Tunings::default(),
+            };
+            let mut collision = Collision::with_default_tune(physics_group, true, default_tune)?;
 
             // Always handle config variables before commands.
             Self::handle_map_config_variables(&mut config, map_config.config_variables);
@@ -544,8 +550,6 @@ pub mod state {
                     );
                 }
             }
-
-            let game_objects = GameObjectDefinitions::new(&tiles, w, h);
 
             let mut spawns: Vec<vec2> = Default::default();
             let mut spawns_red: Vec<vec2> = Default::default();
@@ -610,6 +614,7 @@ pub mod state {
                 game_objects_definitions: Rc::new(game_objects),
                 prev_game_objects_definitions: Rc::new(GameObjectDefinitions {
                     pickups: Default::default(),
+                    ddrace_entities: Default::default(),
                 }),
 
                 // game
@@ -1115,20 +1120,34 @@ pub mod state {
                         let Some(character_info) = self.game.players.player(player_id) else {
                             return Err(anyhow!("The given player was not found in this game"));
                         };
-                        if let Some(character) = self
-                            .game
-                            .stages
-                            .get_mut(&character_info.stage_id())
-                            .and_then(|stage| stage.world.characters.get_mut(player_id))
+                        if let Some(stage) = self.game.stages.get_mut(&character_info.stage_id())
+                            && let Some(character) = stage.world.characters.get_mut(player_id)
                         {
                             let reusable_core = &mut character.reusable_core;
                             let gun = Weapon {
-                                cur_ammo: Some(10),
+                                cur_ammo: (!matches!(
+                                    self.game_options.game_ty(),
+                                    ConfigGameType::Race
+                                ))
+                                .then_some(10),
                                 next_ammo_regeneration_tick: 0.into(),
+                                upgrades: stage
+                                    .world
+                                    .world_pool
+                                    .character_pool
+                                    .character_weapon_upgrade_pool
+                                    .new(),
                             };
-                            reusable_core.weapons.insert(WeaponType::Gun, gun);
-                            reusable_core.weapons.insert(WeaponType::Shotgun, gun);
-                            reusable_core.weapons.insert(WeaponType::Grenade, gun);
+                            reusable_core.weapons.insert(WeaponType::Gun, gun.clone());
+                            reusable_core
+                                .weapons
+                                .insert(WeaponType::Shotgun, gun.clone());
+                            reusable_core
+                                .weapons
+                                .insert(WeaponType::Puller, gun.clone());
+                            reusable_core
+                                .weapons
+                                .insert(WeaponType::Grenade, gun.clone());
                             reusable_core.weapons.insert(WeaponType::Laser, gun);
 
                             Ok("Cheated all weapons!".to_string())
@@ -1282,6 +1301,22 @@ pub mod state {
                         ))
                     }),
             );
+            res.extend(prev_stage.world.ddrace_projectiles.iter().filter_map(
+                |(&id, prev_proj)| {
+                    let proj = stage.world.ddrace_projectiles.get(&id)?;
+                    Some((
+                        id,
+                        ProjectileRenderInfo {
+                            ty: prev_proj.core.ty,
+                            pos: ddrace_projectile::lerped_pos(prev_proj, proj, ratio) / 32.0,
+                            vel: ddrace_projectile::estimated_fly_direction(prev_proj, proj, ratio)
+                                / 32.0,
+                            owner_id: None,
+                            phased: false,
+                        },
+                    ))
+                },
+            ));
             res
         }
 
@@ -1420,20 +1455,33 @@ pub mod state {
                 cooldown: &GameTickCooldownAndLength,
             ) -> (Option<Duration>, Duration) {
                 (
-                    cooldown
-                        .get()
-                        .map(|l| Duration::from_micros(l.get() * (1000000 / TICKS_PER_SECOND))),
+                    cooldown.get().map(|l| {
+                        Duration::from_micros(l.get().saturating_mul(1000000 / TICKS_PER_SECOND))
+                    }),
                     cooldown
                         .length()
-                        .map(|l| Duration::from_micros(l.get() * (1000000 / TICKS_PER_SECOND)))
+                        .map(|l| {
+                            Duration::from_micros(
+                                l.get().saturating_mul(1000000 / TICKS_PER_SECOND),
+                            )
+                        })
                         .unwrap_or_default(),
                 )
             }
-            let lerped_pos = character::lerp_core_pos(prev_character, character, intra_tick_ratio);
+            let non_linear_event =
+                prev_character.core.non_linear_event != character.core.non_linear_event;
+            let lerped_pos = if non_linear_event {
+                *prev_character.pos.pos()
+            } else {
+                character::lerp_core_pos(prev_character, character, intra_tick_ratio)
+            };
             CharacterRenderInfo {
                 lerped_pos: lerped_pos / 32.0,
-                lerped_vel: character::lerp_core_vel(prev_character, character, intra_tick_ratio)
-                    / 32.0,
+                lerped_vel: if non_linear_event {
+                    prev_character.core.core.vel
+                } else {
+                    character::lerp_core_vel(prev_character, character, intra_tick_ratio)
+                } / 32.0,
                 lerped_hook: {
                     // try special logic for when a character is hooked first.
                     let hooked_char = prev_character.phased.hook().hooked_char();
@@ -1541,6 +1589,22 @@ pub mod state {
                                     total_time,
                                 }
                             }),
+                            CharacterDebuff::DeepFrozen => (CharacterDebuff::DeepFrozen, {
+                                let (remaining_time, total_time) =
+                                    remaining_and_total_time(&props.remaining_tick);
+                                CharacterDebuffInfo {
+                                    remaining_time,
+                                    total_time,
+                                }
+                            }),
+                            CharacterDebuff::LiveFrozen => (CharacterDebuff::LiveFrozen, {
+                                let (remaining_time, total_time) =
+                                    remaining_and_total_time(&props.remaining_tick);
+                                CharacterDebuffInfo {
+                                    remaining_time,
+                                    total_time,
+                                }
+                            }),
                         },
                     ));
                     debuffs
@@ -1549,13 +1613,11 @@ pub mod state {
                 animation_ticks_passed: prev_stage.match_manager.game_match.state.passed_ticks(),
                 game_ticks_passed: prev_stage.match_manager.game_match.state.passed_ticks(),
 
-                emoticon: prev_character.core.cur_emoticon.and_then(|emoticon| {
-                    prev_character
-                        .core
-                        .emoticon_tick
-                        .action_ticks()
-                        .map(|tick| (tick, emoticon))
-                }),
+                emoticon: prev_character
+                    .core
+                    .emoticon_tick
+                    .action_ticks()
+                    .zip(prev_character.core.cur_emoticon),
                 phased: false,
             }
         }
@@ -2128,25 +2190,92 @@ pub mod state {
             player_id: &PlayerId,
         ) -> LocalCharacterRenderInfo {
             if let Some(p) = self.game.players.player(player_id) {
-                let player_char = self
-                    .game
-                    .stages
-                    .get(&p.stage_id())
-                    .unwrap()
-                    .world
-                    .characters
-                    .get(player_id)
-                    .unwrap();
+                let stage = self.game.stages.get(&p.stage_id()).unwrap();
+                let player_char = stage.world.characters.get(player_id).unwrap();
 
-                LocalCharacterRenderInfo::Vanilla(LocalCharacterVanilla {
-                    health: player_char.core.health,
-                    armor: player_char.core.armor,
-                    ammo_of_weapon: player_char
+                if matches!(self.game_options.game_ty(), ConfigGameType::Race) {
+                    let jumps = &player_char.core.core.jumps;
+                    let max_jumps = if jumps.endless {
+                        None
+                    } else {
+                        NonZeroU32::new(jumps.max.max(1) as u32)
+                    };
+                    let pos = *player_char.pos.pos();
+                    let grounded = self.collision.check_pointf(
+                        pos.x + PHYSICAL_SIZE / 2.0,
+                        pos.y + PHYSICAL_SIZE / 2.0 + 5.0,
+                    ) || self.collision.check_pointf(
+                        pos.x - PHYSICAL_SIZE / 2.0,
+                        pos.y + PHYSICAL_SIZE / 2.0 + 5.0,
+                    );
+                    let available_jumps = max_jumps
+                        .map(|max| {
+                            let used_jumps = if grounded {
+                                0
+                            } else {
+                                1 + jumps.count.max(0) as u32
+                            };
+                            max.get().saturating_sub(used_jumps)
+                        })
+                        .unwrap_or_default();
+                    let mut owned_weapons = PoolFxLinkedHashSet::new_without_pool();
+                    for weapon in player_char.reusable_core.weapons.keys() {
+                        owned_weapons.insert(*weapon);
+                    }
+                    let jetpack = player_char
                         .reusable_core
                         .weapons
-                        .get(&player_char.core.active_weapon)
-                        .and_then(|w| w.cur_ammo),
-                })
+                        .values()
+                        .any(|weapon| weapon.upgrades.contains(&WeaponUpgrade::Jetpack));
+                    let mut tele_weapons = PoolFxLinkedHashSet::new_without_pool();
+                    for (weapon_ty, weapon) in player_char.reusable_core.weapons.iter() {
+                        if weapon.upgrades.contains(&WeaponUpgrade::Teleport) {
+                            tele_weapons.insert(*weapon_ty);
+                        }
+                    }
+
+                    LocalCharacterRenderInfo::Ddrace(LocalCharacterDdrace {
+                        jumps: available_jumps,
+                        max_jumps,
+                        endless_hook: player_char.core.core.has_endless,
+                        can_hook_others: !player_char.core.core.hook_hit_disabled,
+                        jetpack,
+                        deep_frozen: player_char
+                            .reusable_core
+                            .debuffs
+                            .contains_key(&CharacterDebuff::DeepFrozen),
+                        live_frozen: player_char
+                            .reusable_core
+                            .debuffs
+                            .contains_key(&CharacterDebuff::LiveFrozen),
+                        can_finish: true,
+                        owned_weapons,
+                        disabled_weapons: PoolFxLinkedHashSet::from_without_pool(
+                            WeaponType::iter()
+                                .filter(|weapon| player_char.core.core.weapon_hit_disabled(*weapon))
+                                .collect(),
+                        ),
+                        tele_weapons,
+                        solo: player_char.core.core.solo,
+                        invincible: player_char.core.core.is_super,
+                        dummy_hammer: false,
+                        dummy_copy: false,
+                        stage_locked: stage.stage_locked,
+                        team0_mode: stage.team0_mode,
+                        can_collide: !player_char.core.core.collision_disabled,
+                        checkpoint: None,
+                    })
+                } else {
+                    LocalCharacterRenderInfo::Vanilla(LocalCharacterVanilla {
+                        health: player_char.core.health,
+                        armor: player_char.core.armor,
+                        ammo_of_weapon: player_char
+                            .reusable_core
+                            .weapons
+                            .get(&player_char.core.active_weapon)
+                            .and_then(|w| w.cur_ammo),
+                    })
+                }
             } else {
                 // spectators get nothing
                 LocalCharacterRenderInfo::Unavailable

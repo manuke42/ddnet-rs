@@ -11,6 +11,7 @@ pub mod character_core {
             id_types::CharacterId,
             input::{CharacterInput, CharacterInputState},
             render::character::{HookCollisionLine, HookCollisionLineColor},
+            weapons::{EnumCount, WeaponType},
         },
     };
     use hiarc::Hiarc;
@@ -106,11 +107,37 @@ pub mod character_core {
         pub solo: bool,
         pub collision_disabled: bool,
         pub hook_hit_disabled: bool,
+        pub hit_disabled: bool,
+        pub weapon_hit_disabled: [bool; WeaponType::COUNT],
         pub is_super: bool,
 
         pub has_endless: bool,
 
         pub move_restrictions: i32,
+    }
+
+    impl Core {
+        pub fn set_all_weapon_hit_disabled(&mut self, disabled: bool) {
+            self.hit_disabled = disabled;
+            self.weapon_hit_disabled[WeaponType::Hammer as usize] = disabled;
+            self.weapon_hit_disabled[WeaponType::Shotgun as usize] = disabled;
+            self.weapon_hit_disabled[WeaponType::Puller as usize] = disabled;
+            self.weapon_hit_disabled[WeaponType::Grenade as usize] = disabled;
+            self.weapon_hit_disabled[WeaponType::Laser as usize] = disabled;
+        }
+
+        pub fn set_weapon_hit_disabled(&mut self, weapon: WeaponType, disabled: bool) {
+            self.weapon_hit_disabled[weapon as usize] = disabled;
+            self.hit_disabled = self.weapon_hit_disabled[WeaponType::Hammer as usize]
+                && self.weapon_hit_disabled[WeaponType::Shotgun as usize]
+                && self.weapon_hit_disabled[WeaponType::Puller as usize]
+                && self.weapon_hit_disabled[WeaponType::Grenade as usize]
+                && self.weapon_hit_disabled[WeaponType::Laser as usize];
+        }
+
+        pub fn weapon_hit_disabled(&self, weapon: WeaponType) -> bool {
+            self.hit_disabled || self.weapon_hit_disabled[weapon as usize]
+        }
     }
 
     pub struct CorePipe<'a> {
@@ -160,7 +187,7 @@ pub mod character_core {
         }
     }
 
-    enum CannotMove {
+    pub(crate) enum CannotMove {
         Left = 1 << 0,
         Right = 1 << 1,
         Up = 1 << 2,
@@ -180,7 +207,7 @@ pub mod character_core {
     }
 
     impl Core {
-        fn clamp_vel(move_restriction: i32, vel_param: &vec2) -> vec2 {
+        pub(crate) fn clamp_vel(move_restriction: i32, vel_param: &vec2) -> vec2 {
             let mut vel = *vel_param;
             if vel.x > 0.0 && (move_restriction & CannotMove::Right as i32) != 0 {
                 vel.x = 0.0;
@@ -248,7 +275,7 @@ pub mod character_core {
                     },
                 ..
             } = &pipe.input;
-            self.move_restrictions = 0; // TODO core.m_pCollision->GetMoveRestrictions(UseInput ? IsSwitchActiveCb : 0, this, core.m_Pos);
+            self.move_restrictions = collision.get_move_restrictions(pos.pos());
 
             // get ground state
             let grounded: bool = collision.check_pointf(
@@ -320,7 +347,7 @@ pub mod character_core {
                 self.jumps.queued = 0;
 
                 // handle hook
-                if self.queued_hooks.clicked > 0 || **hook {
+                if self.queued_hooks.clicked > 0 {
                     if let Hook::None = char_hook.hook() {
                         let cursor = self.queued_hooks.cursor;
                         let cursor = vec2::new(cursor.x as f32, cursor.y as f32);
@@ -338,7 +365,7 @@ pub mod character_core {
                         );
                         // self.triggered_events |= CoreEvent::HookLaunch as i32;
                     }
-                } else {
+                } else if !**hook {
                     char_hook.set(Hook::None, None);
                 }
                 self.queued_hooks.clicked = 0;

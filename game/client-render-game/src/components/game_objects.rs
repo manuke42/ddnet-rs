@@ -275,7 +275,9 @@ impl GameObjectsRender {
                     self.pickup_sprite_off,
                 )
             }
-            PickupType::PowerupArmor => {
+            PickupType::PowerupArmor
+            | PickupType::PowerupWeaponShield(_)
+            | PickupType::PowerupNinjaShield => {
                 let key = pickup
                     .owner_id
                     .and_then(|id| pipe.character_infos.get(&id))
@@ -430,7 +432,7 @@ impl GameObjectsRender {
                     owner.laser_info.inner_color.into(),
                     owner.laser_info.outer_color.into(),
                 ),
-                LaserType::Door | LaserType::Freeze | LaserType::Shotgun => (
+                LaserType::Door | LaserType::Freeze | LaserType::Puller => (
                     ColorRgba {
                         r: 1.0,
                         g: 1.0,
@@ -446,7 +448,7 @@ impl GameObjectsRender {
                 ),
             },
             None => match cur.ty {
-                LaserType::Rifle | LaserType::Shotgun | LaserType::Door | LaserType::Freeze => (
+                LaserType::Rifle | LaserType::Puller | LaserType::Door | LaserType::Freeze => (
                     ColorRgba {
                         r: 1.0,
                         g: 1.0,

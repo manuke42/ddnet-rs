@@ -385,6 +385,7 @@ struct ClientNativeImpl {
     config: Config,
     cur_time: Duration,
     last_refresh_rate_time: Duration,
+    focused: bool,
 
     editor: EditorState,
 
@@ -432,6 +433,14 @@ struct ClientNativeImpl {
 }
 
 impl ClientNativeImpl {
+    fn effective_global_sound_volume(&self) -> f64 {
+        if self.focused || self.config.game.snd.enable_when_inactive {
+            self.config.game.snd.global_volume
+        } else {
+            0.0
+        }
+    }
+
     fn check_local_server_error(
         state: &mut LocalServerState,
         notifications: &mut ClientNotifications,
@@ -543,6 +552,7 @@ impl ClientNativeImpl {
 
     #[instrument(level = "trace", skip_all)]
     fn render_menu_background_map(&mut self) {
+        let global_sound_volume = self.effective_global_sound_volume();
         if let Some(map) = self.menu_map.continue_loading() {
             let intra_tick_time = self.time.now();
             let ClientMapFile::Menu { render } = &map else {
@@ -564,7 +574,7 @@ impl ClientNativeImpl {
                         include_last_anim_point: false,
                         camera: &Camera::new(vec2::new(21.0, 15.0), 1.0, None, true),
                         map_sound_volume: self.config.game.snd.render.map_sound_volume
-                            * self.config.game.snd.global_volume,
+                            * global_sound_volume,
                     },
                     buffered_map: &render.data.buffered_map,
                 },
@@ -574,6 +584,7 @@ impl ClientNativeImpl {
 
     #[instrument(level = "trace", skip_all)]
     fn render_game(&mut self, native: &mut dyn NativeImpl) {
+        let global_sound_volume = self.effective_global_sound_volume();
         let remote_console_open = self.game.remote_console_open();
         if let Game::Active(game) = &mut self.game {
             // prepare input
@@ -851,7 +862,7 @@ impl ClientNativeImpl {
                     self.graphics.canvas_handle.pixels_per_point(),
                     1.0,
                     self.config.game.cl.anti_ping,
-                    self.config.game.snd.global_volume,
+                    global_sound_volume,
                 ),
                 ext: main_game.collect_render_ext(),
             };
@@ -1323,6 +1334,7 @@ impl ClientNativeImpl {
 
     #[instrument(level = "trace", skip_all)]
     fn render(&mut self, native: &mut dyn NativeImpl) {
+        let global_sound_volume = self.effective_global_sound_volume();
         // first unload editor => then reload. else native library doesn't get a reload
         if self.editor.should_reload() {
             let is_open = self.editor.is_open();
@@ -1387,7 +1399,7 @@ impl ClientNativeImpl {
                             },
                             &self.config.game.cl.render,
                             &self.config.game.snd.render,
-                            self.config.game.snd.global_volume,
+                            global_sound_volume,
                         )
                         .is_err()
                         || demo_viewer.is_closed()
@@ -3006,6 +3018,7 @@ impl FromNativeLoadingImpl<ClientNativeLoadingImpl> for GraphicsApp<ClientNative
             io,
             config: Config::new(loading.config_game, loading.config_engine),
             last_refresh_rate_time,
+            focused: true,
             editor: Default::default(),
 
             local_console,
@@ -3281,6 +3294,7 @@ impl AppWithGraphics for ClientNativeImpl {
                     &mut self.ui_manager.ui,
                     &mut self.config.engine,
                     &mut self.config.game,
+                    &self.cur_time,
                     &self.graphics,
                     &self.local_console.entries,
                 );
@@ -3622,23 +3636,34 @@ impl AppWithGraphics for ClientNativeImpl {
         let cur_time = self.time.now();
 
         // force limit fps in menus
-        let refresh_rate = if self.ui_manager.ui.ui_state.is_ui_open && self.demo_player.is_none() {
-            (self.config.engine.wnd.refresh_rate_mhz as u64)
-                .div_ceil(1000)
-                .clamp(60, u64::MAX)
-                .min(if self.config.game.cl.refresh_rate > 0 {
-                    self.config.game.cl.refresh_rate
-                } else {
-                    u64::MAX
-                })
-        } else {
-            // use full power during encoding
-            if self.demo_player.as_ref().is_some_and(|p| p.is_encoder()) {
-                0
+        let mut refresh_rate =
+            if self.ui_manager.ui.ui_state.is_ui_open && self.demo_player.is_none() {
+                (self.config.engine.wnd.refresh_rate_mhz as u64)
+                    .div_ceil(1000)
+                    .clamp(60, u64::MAX)
+                    .min(if self.config.game.cl.refresh_rate > 0 {
+                        self.config.game.cl.refresh_rate
+                    } else {
+                        u64::MAX
+                    })
             } else {
-                self.config.game.cl.refresh_rate
+                // use full power during encoding
+                if self.demo_player.as_ref().is_some_and(|p| p.is_encoder()) {
+                    0
+                } else {
+                    self.config.game.cl.refresh_rate
+                }
+            };
+        if !self.focused {
+            let inactive_refresh_rate = self.config.game.cl.refresh_rate_inactive;
+            if inactive_refresh_rate > 0 {
+                refresh_rate = if refresh_rate == 0 {
+                    inactive_refresh_rate
+                } else {
+                    refresh_rate.min(inactive_refresh_rate)
+                };
             }
-        };
+        }
         if let Some(result) = (Duration::from_secs(1).as_nanos() as u64).checked_div(refresh_rate) {
             let time_until_tick_nanos = result;
 
@@ -3674,9 +3699,16 @@ impl AppWithGraphics for ClientNativeImpl {
         game_config_fs::fs::save(&self.config.game, &self.io.clone().into());
     }
 
-    fn focus_changed(&mut self, _focused: bool) {
-        // global binds don't allow keeping keys by tabbing out
+    fn focus_changed(&mut self, focused: bool) {
+        self.focused = focused;
+        // The OS can steal focus for shortcuts like Alt+Tab without sending
+        // release events, so pressed-key state must not survive focus changes.
         self.global_binds.reset_cur_keys();
+        if let Game::WaitingForFirstSnapshot(game) | Game::Active(game) = &mut self.game {
+            for (_, local_player) in game.game_data.local.local_players.iter_mut() {
+                local_player.binds.reset_cur_keys();
+            }
+        }
     }
 
     fn file_dropped(&mut self, file: PathBuf) {

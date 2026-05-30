@@ -72,9 +72,9 @@ use game_interface::{
         GameDebuffFrozenEventSound, GameDebuffSoundEvent, GameEvents, GameFlagEventSound,
         GameGrenadeEventEffect, GameGrenadeEventSound, GameLaserEventSound,
         GamePickupArmorEventSound, GamePickupHeartEventSound, GamePickupSoundEvent,
-        GameShotgunEventSound, GameWorldAction, GameWorldEffectEvent, GameWorldEntityEffectEvent,
-        GameWorldEntitySoundEvent, GameWorldEvent, GameWorldNotificationEvent, GameWorldSoundEvent,
-        GameWorldSystemMessage,
+        GamePullerEventSound, GameShotgunEventSound, GameWorldAction, GameWorldEffectEvent,
+        GameWorldEntityEffectEvent, GameWorldEntitySoundEvent, GameWorldEvent,
+        GameWorldNotificationEvent, GameWorldSoundEvent, GameWorldSystemMessage,
     },
     interface::MAX_PHYSICS_GROUP_NAME_LEN,
     types::{
@@ -1415,6 +1415,22 @@ impl RenderGame {
                         )
                         .detatch();
                 }
+                GameCharacterEventSound::PullerFire => {
+                    self.containers
+                        .weapon_container
+                        .get_or_default_opt(info.map(|i| &i.weapon))
+                        .puller
+                        .weapon
+                        .fire
+                        .random_entry(&mut self.rng)
+                        .play(
+                            SoundPlayProps::new_with_pos_opt(pos)
+                                .with_with_spatial(settings.spatial_sound)
+                                .with_playback_speed(settings.sound_playback_speed)
+                                .with_volume(settings.ingame_sound_volume),
+                        )
+                        .detatch();
+                }
                 GameCharacterEventSound::GroundJump => {
                     self.containers
                         .skin_container
@@ -1874,6 +1890,49 @@ impl RenderGame {
         }
     }
 
+    fn handle_puller_sound_event(
+        &mut self,
+        character_infos: &PoolFxLinkedHashMap<CharacterId, CharacterInfo>,
+        settings: &RenderGameSettings,
+        pos: Option<vec2>,
+        ev: GamePullerEventSound,
+        id: Option<CharacterId>,
+    ) {
+        let info = id.and_then(|id| character_infos.get(&id).map(|c| &c.info));
+        match ev {
+            GamePullerEventSound::Spawn => {
+                self.containers
+                    .weapon_container
+                    .get_or_default_opt(info.map(|i| &i.weapon))
+                    .puller
+                    .spawn
+                    .random_entry(&mut self.rng)
+                    .play(
+                        SoundPlayProps::new_with_pos_opt(pos)
+                            .with_with_spatial(settings.spatial_sound)
+                            .with_playback_speed(settings.sound_playback_speed)
+                            .with_volume(settings.ingame_sound_volume),
+                    )
+                    .detatch();
+            }
+            GamePullerEventSound::Collect => {
+                self.containers
+                    .weapon_container
+                    .get_or_default_opt(info.map(|i| &i.weapon))
+                    .puller
+                    .collect
+                    .random_entry(&mut self.rng)
+                    .play(
+                        SoundPlayProps::new_with_pos_opt(pos)
+                            .with_with_spatial(settings.spatial_sound)
+                            .with_playback_speed(settings.sound_playback_speed)
+                            .with_volume(settings.ingame_sound_volume),
+                    )
+                    .detatch();
+            }
+        }
+    }
+
     fn handle_flag_sound_event(
         &mut self,
         character_infos: &PoolFxLinkedHashMap<CharacterId, CharacterInfo>,
@@ -2108,6 +2167,9 @@ impl RenderGame {
             }
             GameWorldEntitySoundEvent::Shotgun(ev) => {
                 self.handle_shotgun_sound_event(character_infos, settings, pos, ev, owner_id);
+            }
+            GameWorldEntitySoundEvent::Puller(ev) => {
+                self.handle_puller_sound_event(character_infos, settings, pos, ev, owner_id);
             }
             GameWorldEntitySoundEvent::Flag(ev) => {
                 let main_listener_character_info = match local_players.front() {

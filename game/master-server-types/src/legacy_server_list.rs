@@ -1,6 +1,7 @@
-use master_server_types::addr::Addr;
 use serde::Deserialize;
 use serde_with::{DefaultOnError, serde_as};
+
+use crate::addr::Addr;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Skin {

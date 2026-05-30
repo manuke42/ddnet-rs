@@ -6,12 +6,15 @@ pub mod score;
 
 pub mod character {
     use std::{
-        collections::VecDeque,
+        collections::{BTreeMap, VecDeque},
         marker::PhantomData,
         num::{NonZeroI64, NonZeroU64},
     };
 
-    use crate::reusable::{CloneWithCopyableElements, ReusableCore};
+    use crate::{
+        reusable::{CloneWithCopyableElements, ReusableCore},
+        weapons::definitions::weapon_def::{WeaponUpgrade, WeaponUpgradePool},
+    };
     use base::linked_hash_map_view::{
         FxLinkedHashMap, FxLinkedHashSet, LinkedHashMapView, LinkedHashMapViewMut,
     };
@@ -31,6 +34,7 @@ pub mod character {
             },
             id_types::{CharacterId, StageId},
             input::{CharacterInput, CharacterInputConsumableDiff, cursor::CharacterInputCursor},
+            laser::LaserType,
             network_stats::PlayerNetworkStats,
             render::{
                 character::{CharacterBuff, CharacterDebuff, TeeEye},
@@ -41,13 +45,15 @@ pub mod character {
         },
     };
     use hiarc::{Hiarc, hiarc_safer_rc_refcell};
-    use legacy_map::mapdef_06::DdraceTileNum;
+    use legacy_map::mapdef_06::{DdraceTileNum, TILE_SWITCHTIMEDOPEN};
     use map::map::groups::layers::tiles::Tile;
     use pool::{datatypes::PoolFxLinkedHashMap, mt_pool::Pool as MtPool};
     use rustc_hash::FxHashSet;
 
     use super::{
-        core::character_core::{Core, CoreEvents, CorePipe, CoreReusable, PHYSICAL_SIZE},
+        core::character_core::{
+            CannotMove, Core, CoreEvents, CorePipe, CoreReusable, PHYSICAL_SIZE,
+        },
         hook::character_hook::{CharacterHook, Hook, HookedCharacters},
         player::player::{PlayerInfo, Players, SpectatorPlayer, SpectatorPlayers},
         pos::character_pos::{CharacterPos, CharacterPositionPlayfield},
@@ -55,6 +61,7 @@ pub mod character {
     };
     use crate::{
         collision::collision::{Collision, CollisionTile, CollisionTypes, HitTile},
+        config::config::ConfigGameType,
         entities::entity::entity::{DropMode, Entity, EntityInterface, EntityTickResult},
         events::events::{CharacterDespawnType, CharacterEvent, CharacterTickEvent},
         simulation_pipe::simulation_pipe::{
@@ -67,7 +74,7 @@ pub mod character {
     };
 
     use math::math::{
-        PI, angle, distance_squared, length, lerp, mix, normalize,
+        PI, angle, distance_squared, dot, length, lerp, mix, normalize,
         vector::{ivec2, vec2},
     };
     use pool::{mt_datatypes::PoolVec, pool::Pool, recycle::Recycle, traits::Recyclable};
@@ -104,6 +111,13 @@ pub mod character {
     #[derive(Debug, Hiarc, Default, Serialize, Deserialize, Copy, Clone)]
     pub struct CharacterCoreMod {}
 
+    #[derive(Debug, Hiarc, Serialize, Deserialize, Copy, Clone)]
+    pub struct CharacterSwitchState {
+        pub active: bool,
+        pub expire_in: Option<GameTickType>,
+        pub expire_to: bool,
+    }
+
     #[derive(Debug, Hiarc, Default, Serialize, Deserialize, Copy, Clone)]
     pub struct CharacterCore {
         pub core: Core,
@@ -132,6 +146,11 @@ pub mod character {
 
         pub input: CharacterInput,
 
+        pub tele_checkpoint: u8,
+
+        /// If the character is teleported, this is increased.
+        pub non_linear_event: u64,
+
         /// is timeout e.g. by a network disconnect.
         /// this is a hint, not a logic variable.
         pub is_timeout: bool,
@@ -158,16 +177,18 @@ pub mod character {
         pub queued_emoticon: VecDeque<(EmoticonType, GameTickCooldown)>,
 
         pub interactions: FxLinkedHashSet<CharacterId>,
+        pub switch_states: BTreeMap<u8, CharacterSwitchState>,
     }
 
     impl CloneWithCopyableElements for CharacterReusableCore {
         fn copy_clone_from(&mut self, other: &Self) {
             self.core.copy_clone_from(&other.core);
-            self.weapons.copy_clone_from(&other.weapons);
+            self.weapons.clone_from(&other.weapons);
             self.buffs.copy_clone_from(&other.buffs);
             self.debuffs.copy_clone_from(&other.debuffs);
             self.queued_emoticon.clone_from(&other.queued_emoticon);
             self.interactions.clone_from(&other.interactions);
+            self.switch_states.clone_from(&other.switch_states);
         }
     }
 
@@ -180,6 +201,7 @@ pub mod character {
                 debuffs: Default::default(),
                 interactions: Default::default(),
                 queued_emoticon: Default::default(),
+                switch_states: Default::default(),
             }
         }
         fn reset(&mut self) {
@@ -188,6 +210,7 @@ pub mod character {
             self.buffs.reset();
             self.debuffs.reset();
             self.interactions.reset();
+            self.switch_states.clear();
         }
     }
 
@@ -199,6 +222,7 @@ pub mod character {
     pub struct CharacterPool {
         pub(crate) character_pool: Pool<PoolCharacters>,
         pub(crate) character_reusable_cores_pool: Pool<CharacterReusableCore>,
+        pub(crate) character_weapon_upgrade_pool: WeaponUpgradePool,
     }
 
     #[derive(Debug, Hiarc, PartialEq, Eq)]
@@ -464,8 +488,15 @@ pub mod character {
             side: Option<MatchSide>,
             game_options: GameOptions,
         ) -> Self {
-            let (core, reusable_core, pos) =
-                Self::respawn(None, character_pool, side, player_input, &player_info, pos);
+            let (core, reusable_core, pos) = Self::respawn(
+                None,
+                character_pool,
+                side,
+                player_input,
+                &player_info,
+                pos,
+                matches!(game_options.game_ty(), ConfigGameType::Race),
+            );
 
             if let CharacterPlayerTy::Player { players, .. } = &ty {
                 players.insert(
@@ -506,14 +537,20 @@ pub mod character {
             }
         }
 
-        fn respawn_weapons(reusable_core: &mut CharacterReusableCore) {
+        fn respawn_weapons(
+            pool: &CharacterPool,
+            reusable_core: &mut CharacterReusableCore,
+            infinite_ammo: bool,
+        ) {
             let gun = Weapon {
-                cur_ammo: Some(10),
+                cur_ammo: (!infinite_ammo).then_some(10),
                 next_ammo_regeneration_tick: 0.into(),
+                upgrades: pool.character_weapon_upgrade_pool.new(),
             };
             let hammer = Weapon {
                 cur_ammo: None,
                 next_ammo_regeneration_tick: 0.into(),
+                upgrades: pool.character_weapon_upgrade_pool.new(),
             };
             reusable_core.weapons.clear();
             reusable_core.weapons.insert(WeaponType::Hammer, hammer);
@@ -533,6 +570,7 @@ pub mod character {
             player_input: CharacterInput,
             player_info: &PlayerInfo,
             pos: vec2,
+            infinite_ammo: bool,
         ) -> (CharacterCore, PoolCharacterReusableCore, vec2) {
             let mut core = CharacterCore {
                 side,
@@ -544,7 +582,7 @@ pub mod character {
             };
             let mut reusable_core = character_pool.character_reusable_cores_pool.new();
 
-            Self::respawn_weapons(&mut reusable_core);
+            Self::respawn_weapons(character_pool, &mut reusable_core, infinite_ammo);
 
             core.default_eye = player_info.player_info.default_eyes;
             core.eye = core.default_eye;
@@ -689,19 +727,138 @@ pub mod character {
                 self.die(None, GameWorldActionKillWeapon::World, Default::default());
                 *res = CharacterDamageResult::Death;
             } else if tile.index == DdraceTileNum::Freeze as u8 {
-                // freeze
+                if !self
+                    .reusable_core
+                    .debuffs
+                    .contains_key(&CharacterDebuff::DeepFrozen)
+                {
+                    let freeze = self
+                        .reusable_core
+                        .debuffs
+                        .entry(CharacterDebuff::Freeze)
+                        .or_insert_with_keep_order(|| BuffProps {
+                            remaining_tick: 0.into(),
+                            interact_tick: 0.into(),
+                            interact_cursor_dir: Default::default(),
+                            interact_val: 0.0,
+                        });
+                    if freeze.interact_tick.is_none() {
+                        freeze.remaining_tick = (TICKS_PER_SECOND * 3).into();
+                        freeze.interact_tick = TICKS_PER_SECOND.into();
+                    }
+                }
+            } else if tile.index == DdraceTileNum::Unfreeze as u8 {
+                if !self
+                    .reusable_core
+                    .debuffs
+                    .contains_key(&CharacterDebuff::DeepFrozen)
+                {
+                    self.reusable_core.debuffs.remove(&CharacterDebuff::Freeze);
+                }
+            } else if tile.index == DdraceTileNum::DFreeze as u8 {
+                if !self
+                    .reusable_core
+                    .debuffs
+                    .contains_key(&CharacterDebuff::DeepFrozen)
+                {
+                    self.reusable_core.debuffs.insert(
+                        CharacterDebuff::DeepFrozen,
+                        BuffProps {
+                            remaining_tick: GameTickType::MAX.into(),
+                            interact_tick: 0.into(),
+                            interact_cursor_dir: Default::default(),
+                            interact_val: 0.0,
+                        },
+                    );
+                }
+            } else if tile.index == DdraceTileNum::DUnfreeze as u8 {
+                self.reusable_core
+                    .debuffs
+                    .remove(&CharacterDebuff::DeepFrozen);
+            } else if tile.index == DdraceTileNum::LFreeze as u8 {
                 self.reusable_core.debuffs.insert(
-                    CharacterDebuff::Freeze,
+                    CharacterDebuff::LiveFrozen,
                     BuffProps {
-                        remaining_tick: (TICKS_PER_SECOND * 3).into(),
+                        remaining_tick: GameTickType::MAX.into(),
                         interact_tick: 0.into(),
                         interact_cursor_dir: Default::default(),
                         interact_val: 0.0,
                     },
                 );
-            } else if tile.index == DdraceTileNum::Unfreeze as u8 {
-                // unfreeze
-                self.reusable_core.debuffs.remove(&CharacterDebuff::Freeze);
+            } else if tile.index == DdraceTileNum::LUnfreeze as u8 {
+                self.reusable_core
+                    .debuffs
+                    .remove(&CharacterDebuff::LiveFrozen);
+            } else if tile.index == DdraceTileNum::WallJump as u8 {
+                let core = &mut self.core.core;
+                if core.vel.y > 0.0 && core.colliding != 0 && core.left_wall {
+                    core.left_wall = false;
+                    core.jumps.count = if core.jumps.max >= 2 {
+                        core.jumps.max - 2
+                    } else {
+                        0
+                    };
+                    core.jumps.flag = 1;
+                }
+            } else if tile.index == DdraceTileNum::EHookEnable as u8 {
+                self.core.core.has_endless = true;
+            } else if tile.index == DdraceTileNum::EHookDisable as u8 {
+                self.core.core.has_endless = false;
+            } else if tile.index == DdraceTileNum::HitEnable as u8 {
+                self.core.core.set_all_weapon_hit_disabled(false);
+            } else if tile.index == DdraceTileNum::HitDisable as u8 {
+                self.core.core.set_all_weapon_hit_disabled(true);
+            } else if tile.index == DdraceTileNum::SoloEnable as u8 {
+                self.core.core.solo = true;
+            } else if tile.index == DdraceTileNum::SoloDisable as u8 {
+                self.core.core.solo = false;
+            } else if tile.index == DdraceTileNum::RefillJumps as u8 {
+                self.core.core.jumps.count = 0;
+                self.core.core.jumps.flag = 0;
+            } else if tile.index == DdraceTileNum::NpcDisable as u8 {
+                self.core.core.collision_disabled = true;
+            } else if tile.index == DdraceTileNum::NpcEnable as u8 {
+                self.core.core.collision_disabled = false;
+            } else if tile.index == DdraceTileNum::UnlimitedJumpsEnable as u8 {
+                self.core.core.jumps.endless = true;
+            } else if tile.index == DdraceTileNum::UnlimitedJumpsDisable as u8 {
+                self.core.core.jumps.endless = false;
+            } else if tile.index == DdraceTileNum::JetpackEnable as u8 {
+                if let Some(gun) = self.reusable_core.weapons.get_mut(&WeaponType::Gun) {
+                    gun.upgrades.insert(WeaponUpgrade::Jetpack);
+                }
+            } else if tile.index == DdraceTileNum::JetpackDisable as u8 {
+                if let Some(gun) = self.reusable_core.weapons.get_mut(&WeaponType::Gun) {
+                    gun.upgrades.remove(&WeaponUpgrade::Jetpack);
+                }
+            } else if tile.index == DdraceTileNum::NphEnable as u8 {
+                self.core.core.hook_hit_disabled = false;
+            } else if tile.index == DdraceTileNum::NphDisable as u8 {
+                self.core.core.hook_hit_disabled = true;
+            } else if tile.index == DdraceTileNum::TeleGunEnable as u8 {
+                if let Some(weapon) = self.reusable_core.weapons.get_mut(&WeaponType::Gun) {
+                    weapon.upgrades.insert(WeaponUpgrade::Teleport);
+                }
+            } else if tile.index == DdraceTileNum::TeleGunDisable as u8 {
+                if let Some(weapon) = self.reusable_core.weapons.get_mut(&WeaponType::Gun) {
+                    weapon.upgrades.remove(&WeaponUpgrade::Teleport);
+                }
+            } else if tile.index == DdraceTileNum::TeleGrenadeEnable as u8 {
+                if let Some(weapon) = self.reusable_core.weapons.get_mut(&WeaponType::Grenade) {
+                    weapon.upgrades.insert(WeaponUpgrade::Teleport);
+                }
+            } else if tile.index == DdraceTileNum::TeleGrenadeDisable as u8 {
+                if let Some(weapon) = self.reusable_core.weapons.get_mut(&WeaponType::Grenade) {
+                    weapon.upgrades.remove(&WeaponUpgrade::Teleport);
+                }
+            } else if tile.index == DdraceTileNum::TeleLaserEnable as u8 {
+                if let Some(weapon) = self.reusable_core.weapons.get_mut(&WeaponType::Laser) {
+                    weapon.upgrades.insert(WeaponUpgrade::Teleport);
+                }
+            } else if tile.index == DdraceTileNum::TeleLaserDisable as u8 {
+                if let Some(weapon) = self.reusable_core.weapons.get_mut(&WeaponType::Laser) {
+                    weapon.upgrades.remove(&WeaponUpgrade::Teleport);
+                }
             } else {
                 return false;
             }
@@ -716,22 +873,237 @@ pub mod character {
             self.handle_game_front_tiles(tile, res);
         }
 
+        fn reset_hook(&mut self) {
+            self.phased.hook_mut().set(Hook::None, None);
+        }
+
+        fn teleport_to(&mut self, pos: vec2, reset_vel: bool) {
+            self.pos.move_pos(pos);
+            if reset_vel {
+                self.core.core.vel = vec2::default();
+            }
+            self.reset_hook();
+            self.core.non_linear_event += 1;
+        }
+
+        fn handle_tele_tile(
+            &mut self,
+            tile: &map::map::groups::layers::tiles::TeleTile,
+            collision: &Collision,
+        ) -> bool {
+            match tile.base.index {
+                index if index == DdraceTileNum::TeleCheck as u8 => {
+                    self.core.tele_checkpoint = tile.number;
+                    false
+                }
+                index if index == DdraceTileNum::TeleIn as u8 => {
+                    if let Some(pos) = collision.tele_out(tile.number) {
+                        self.teleport_to(pos, false);
+                        true
+                    } else {
+                        false
+                    }
+                }
+                index if index == DdraceTileNum::TeleInEvil as u8 => {
+                    if let Some(pos) = collision.tele_out(tile.number) {
+                        self.teleport_to(pos, true);
+                        true
+                    } else {
+                        false
+                    }
+                }
+                index if index == DdraceTileNum::TeleCheckIn as u8 => {
+                    if let Some(pos) = collision.latest_tele_check_out(self.core.tele_checkpoint) {
+                        self.teleport_to(pos, false);
+                        true
+                    } else {
+                        false
+                    }
+                }
+                index if index == DdraceTileNum::TeleCheckInEvil as u8 => {
+                    if let Some(pos) = collision.latest_tele_check_out(self.core.tele_checkpoint) {
+                        self.teleport_to(pos, true);
+                        true
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            }
+        }
+
+        fn set_switch(&mut self, number: u8, active: bool, delay: u8) {
+            let state = if delay == 0 {
+                CharacterSwitchState {
+                    active,
+                    expire_in: None,
+                    expire_to: active,
+                }
+            } else {
+                CharacterSwitchState {
+                    active,
+                    expire_in: Some(delay as GameTickType * TICKS_PER_SECOND + 1),
+                    expire_to: !active,
+                }
+            };
+            self.reusable_core.switch_states.insert(number, state);
+        }
+
+        pub(crate) fn switch_active(&self, number: u8) -> bool {
+            number == 0
+                || self
+                    .reusable_core
+                    .switch_states
+                    .get(&number)
+                    .is_some_and(|state| state.active)
+        }
+
+        fn handle_switch_tile(
+            &mut self,
+            tile: &map::map::groups::layers::tiles::SwitchTile,
+            res: &mut CharacterDamageResult,
+        ) {
+            match tile.base.index {
+                index if index == DdraceTileNum::SwitchOpen as u8 && tile.number > 0 => {
+                    self.set_switch(tile.number, true, 0);
+                }
+                index if index == DdraceTileNum::SwitchClose as u8 && tile.number > 0 => {
+                    self.set_switch(tile.number, false, 0);
+                }
+                index if index == TILE_SWITCHTIMEDOPEN && tile.number > 0 => {
+                    self.set_switch(tile.number, true, tile.delay);
+                }
+                index if index == DdraceTileNum::SwitchTimedClose as u8 && tile.number > 0 => {
+                    self.set_switch(tile.number, false, tile.delay);
+                }
+                index
+                    if index == DdraceTileNum::HitEnable as u8
+                        || index == DdraceTileNum::HitDisable as u8 =>
+                {
+                    let disabled = index == DdraceTileNum::HitDisable as u8;
+                    match tile.delay {
+                        0 => self
+                            .core
+                            .core
+                            .set_weapon_hit_disabled(WeaponType::Hammer, disabled),
+                        2 => {
+                            self.core
+                                .core
+                                .set_weapon_hit_disabled(WeaponType::Shotgun, disabled);
+                            self.core
+                                .core
+                                .set_weapon_hit_disabled(WeaponType::Puller, disabled);
+                        }
+                        3 => self
+                            .core
+                            .core
+                            .set_weapon_hit_disabled(WeaponType::Grenade, disabled),
+                        4 => self
+                            .core
+                            .core
+                            .set_weapon_hit_disabled(WeaponType::Laser, disabled),
+                        _ => {}
+                    }
+                }
+                _ if self.switch_active(tile.number) => {
+                    self.handle_game_front_tiles(&tile.base, res);
+                }
+                _ => {}
+            }
+        }
+
+        fn handle_speedup_tile(
+            &mut self,
+            tile: &map::map::groups::layers::tiles::SpeedupTile,
+            collision: &Collision,
+        ) {
+            const TILE_SPEED_BOOST_OLD: u8 = DdraceTileNum::Boost as u8;
+            const TILE_SPEED_BOOST: u8 = DdraceTileNum::TeleCheck as u8;
+            const MAX_SPEED_SCALE: f32 = 5.0;
+
+            if tile.force == 0 {
+                return;
+            }
+
+            let angle = tile.angle as f32 * (PI / 180.0);
+            let direction = vec2::new(angle.cos(), angle.sin());
+            let force = tile.force as f32;
+            let mut temp_vel = self.core.core.vel;
+
+            match tile.base.index {
+                TILE_SPEED_BOOST_OLD => {
+                    let max_speed = tile.max_speed as f32;
+                    if tile.force == u8::MAX && tile.max_speed > 0 {
+                        self.core.core.vel = direction * (max_speed / MAX_SPEED_SCALE);
+                        return;
+                    }
+
+                    if tile.max_speed > 0 {
+                        let max_speed = max_speed.max(MAX_SPEED_SCALE);
+                        let speed_left = max_speed / MAX_SPEED_SCALE - dot(&direction, &temp_vel);
+                        temp_vel += direction * speed_left.clamp(-force, force);
+                    } else {
+                        temp_vel += direction * force;
+                    }
+                }
+                TILE_SPEED_BOOST => {
+                    let max_speed = if tile.max_speed == 0 {
+                        let tunings = collision.get_tune_at(self.pos.pos());
+                        let max_ramp_speed = tunings.velramp_range
+                            / (TICKS_PER_SECOND as f32 * tunings.velramp_curvature.max(1.01).ln());
+                        max_ramp_speed.max(tunings.velramp_start / TICKS_PER_SECOND as f32)
+                            * MAX_SPEED_SCALE
+                    } else {
+                        tile.max_speed as f32
+                    };
+
+                    let current_directional_speed = dot(&direction, &self.core.core.vel);
+                    let temp_max_speed = max_speed / MAX_SPEED_SCALE;
+                    temp_vel += direction * (temp_max_speed - current_directional_speed).min(force);
+                }
+                _ => {}
+            }
+
+            self.core.core.vel = Core::clamp_vel(self.core.core.move_restrictions, &temp_vel);
+        }
+
         #[must_use]
         fn handle_tiles(&mut self, old_pos: vec2, collision: &Collision) -> CharacterDamageResult {
             let mut res = CharacterDamageResult::None;
             let cur_pos = *self.pos.pos();
+
+            // Handle map global tile settings
+            if collision.endless_hook() {
+                self.core.core.has_endless = true;
+            }
+            if collision.hit_disabled() {
+                self.core.core.set_all_weapon_hit_disabled(true);
+            }
+
             collision.intersect_line_feedback(&old_pos, &cur_pos, |tile| match tile {
                 HitTile::Game(tile) => {
                     self.handle_game_layer_tiles(tile, &mut res);
+                    true
                 }
                 HitTile::Front(tile) => {
                     self.handle_front_layer_tiles(tile, &mut res);
+                    true
                 }
-                HitTile::Tele(_) => {}
-                HitTile::Speedup(_) => {}
-                HitTile::Switch(_) => {}
+                HitTile::Tele(tile) => {
+                    self.handle_tele_tile(tile, collision);
+                    true
+                }
+                HitTile::Speedup(tile) => {
+                    self.handle_speedup_tile(tile, collision);
+                    true
+                }
+                HitTile::Switch(tile) => {
+                    self.handle_switch_tile(tile, &mut res);
+                    true
+                }
                 HitTile::Tune(_) => {
                     // tune tiles are handled on the fly where needed
+                    true
                 }
             });
             res
@@ -853,6 +1225,10 @@ pub mod character {
         ) -> CharacterDamageResult {
             let core = &mut self_char.core;
             core.core.vel += *force;
+            // Only apply force in race, no dmg
+            if matches!(self_char.game_options.game_ty(), ConfigGameType::Race) {
+                return CharacterDamageResult::None;
+            }
             let old_health = core.health;
             let old_armor = core.armor;
             if dmg_amount > 0 {
@@ -985,14 +1361,29 @@ pub mod character {
         /// can fire at all (ninja or weapon)
         fn can_fire(&self) -> bool {
             !self.reusable_core.buffs.contains_key(&CharacterBuff::Ghost)
-                && !self
-                    .reusable_core
-                    .debuffs
-                    .contains_key(&CharacterDebuff::Freeze)
+                && !self.blocks_weapons_and_hook()
         }
 
         fn can_fire_weapon(&self) -> bool {
             !self.reusable_core.buffs.contains_key(&CharacterBuff::Ninja) && self.can_fire()
+        }
+
+        fn blocks_weapons_and_hook(&self) -> bool {
+            self.reusable_core
+                .debuffs
+                .contains_key(&CharacterDebuff::Freeze)
+                || self
+                    .reusable_core
+                    .debuffs
+                    .contains_key(&CharacterDebuff::DeepFrozen)
+        }
+
+        fn blocks_movement(&self) -> bool {
+            self.blocks_weapons_and_hook()
+                || self
+                    .reusable_core
+                    .debuffs
+                    .contains_key(&CharacterDebuff::LiveFrozen)
         }
 
         fn fire_weapon(
@@ -1012,6 +1403,7 @@ pub mod character {
 
             let full_auto = self.core.active_weapon == WeaponType::Grenade
                 || self.core.active_weapon == WeaponType::Shotgun
+                || self.core.active_weapon == WeaponType::Puller
                 || self.core.active_weapon == WeaponType::Laser;
 
             let auto_fired = full_auto && *self.core.input.state.fire;
@@ -1073,13 +1465,17 @@ pub mod character {
                         &proj_start_pos,
                         PHYSICAL_SIZE * 0.5,
                         &mut |char| {
-                            if pipe.collision.intersect_line(
-                                &proj_start_pos,
-                                char.pos.pos(),
-                                &mut vec2::default(),
-                                &mut vec2::default(),
-                                CollisionTypes::SOLID,
-                            ) != CollisionTile::None
+                            if self.core.core.weapon_hit_disabled(WeaponType::Hammer) {
+                                return;
+                            }
+                            if !matches!(self.game_options.game_ty(), ConfigGameType::Race)
+                                && pipe.collision.intersect_line(
+                                    &proj_start_pos,
+                                    char.pos.pos(),
+                                    &mut vec2::default(),
+                                    &mut vec2::default(),
+                                    CollisionTypes::SOLID,
+                                ) != CollisionTile::None
                             {
                                 return;
                             }
@@ -1138,6 +1534,7 @@ pub mod character {
                         dir: direction,
                         ty: WeaponWithProjectile::Gun,
                         lifetime: tunings.gun_lifetime,
+                        can_hit_others: true,
                     });
                     self.push_sound(
                         *self.pos.pos(),
@@ -1164,6 +1561,10 @@ pub mod character {
                             dir: vec2::new(a.cos(), a.sin()) * speed,
                             ty: WeaponWithProjectile::Shotgun,
                             lifetime: tunings.shotgun_lifetime,
+                            can_hit_others: !self
+                                .core
+                                .core
+                                .weapon_hit_disabled(WeaponType::Shotgun),
                         });
                     }
 
@@ -1180,6 +1581,28 @@ pub mod character {
                         .shotgun_fire_delay;
                     ((fire_delay * TICKS_PER_SECOND as f32 / 1000.0).ceil() as GameTickType).into()
                 }
+                WeaponType::Puller => {
+                    pipe.entity_events.push(CharacterTickEvent::Laser {
+                        pos: *self.pos.pos(),
+                        dir: direction,
+                        ty: LaserType::Puller,
+                        energy: pipe.collision.get_tune_at(self.pos.pos()).laser_reach,
+                        can_hit_others: !self.core.core.weapon_hit_disabled(WeaponType::Puller),
+                        can_hit_own: true,
+                    });
+                    self.push_sound(
+                        *self.pos.pos(),
+                        GameWorldEntitySoundEvent::Character(GameCharacterSoundEvent::Sound(
+                            GameCharacterEventSound::PullerFire,
+                        )),
+                    );
+
+                    let fire_delay = pipe
+                        .collision
+                        .get_tune_at(&proj_start_pos)
+                        .shotgun_fire_delay;
+                    ((fire_delay * TICKS_PER_SECOND as f32 / 1000.0).ceil() as GameTickType).into()
+                }
                 WeaponType::Grenade => {
                     let tunings = pipe.collision.get_tune_at(&proj_start_pos);
                     pipe.entity_events.push(CharacterTickEvent::Projectile {
@@ -1187,6 +1610,7 @@ pub mod character {
                         dir: direction,
                         ty: WeaponWithProjectile::Grenade,
                         lifetime: tunings.grenade_lifetime,
+                        can_hit_others: !self.core.core.weapon_hit_disabled(WeaponType::Grenade),
                     });
                     self.push_sound(
                         *self.pos.pos(),
@@ -1201,8 +1625,11 @@ pub mod character {
                     pipe.entity_events.push(CharacterTickEvent::Laser {
                         pos: *self.pos.pos(),
                         dir: direction,
+                        ty: LaserType::Rifle,
                         energy: pipe.collision.get_tune_at(self.pos.pos()).laser_reach,
-                        can_hit_own: self.game_options.laser_hit_self(),
+                        can_hit_others: !self.core.core.weapon_hit_disabled(WeaponType::Laser),
+                        can_hit_own: self.game_options.laser_hit_self()
+                            || matches!(self.game_options.game_ty(), ConfigGameType::Race),
                     });
                     self.push_sound(
                         *self.pos.pos(),
@@ -1331,6 +1758,7 @@ pub mod character {
             });
             self.reusable_core.debuffs.retain_with_order(|_, buff| {
                 buff.remaining_tick.tick();
+                buff.interact_tick.tick();
                 buff.remaining_tick.is_some()
             });
 
@@ -1409,13 +1837,10 @@ pub mod character {
         }
 
         fn handle_weapons(&mut self, pipe: &mut SimulationPipeCharacter) {
-            // don't handle weapon if ninja, ghost or freeze are active
+            // don't handle weapon if ninja, ghost or full freeze are active
             if self.reusable_core.buffs.contains_key(&CharacterBuff::Ninja)
                 || self.reusable_core.buffs.contains_key(&CharacterBuff::Ghost)
-                || self
-                    .reusable_core
-                    .debuffs
-                    .contains_key(&CharacterDebuff::Freeze)
+                || self.blocks_weapons_and_hook()
             {
                 return;
             }
@@ -1433,6 +1858,7 @@ pub mod character {
                 WeaponType::Hammer => None,
                 WeaponType::Gun => Some(TICKS_PER_SECOND / 2),
                 WeaponType::Shotgun => None,
+                WeaponType::Puller => None,
                 WeaponType::Grenade => None,
                 WeaponType::Laser => None,
             };
@@ -1525,6 +1951,17 @@ pub mod character {
                 self.core.last_dmg_angle = 0.0;
             }
             self.core.emoticon_tick.tick();
+            self.reusable_core.switch_states.retain(|_, state| {
+                let Some(expire_in) = &mut state.expire_in else {
+                    return true;
+                };
+                *expire_in = expire_in.saturating_sub(1);
+                if *expire_in == 0 {
+                    state.active = state.expire_to;
+                    state.expire_in = None;
+                }
+                true
+            });
 
             self.handle_emoticon_queue();
         }
@@ -1561,6 +1998,17 @@ pub mod character {
                 core.jumps.flag = 1;
             }
         }
+
+        fn apply_move_restrictions(&mut self) {
+            let core = &mut self.core.core;
+
+            if core.vel.y > 0.0 && (core.move_restrictions & CannotMove::Down as i32) != 0 {
+                core.jumps.flag = 0;
+                core.jumps.count = 0;
+            }
+
+            core.vel = Core::clamp_vel(core.move_restrictions, &core.vel);
+        }
     }
 
     impl EntityInterface<CharacterCore, CharacterReusableCore, SimulationPipeCharacter<'_>>
@@ -1577,16 +2025,14 @@ pub mod character {
                 self.core.default_eye = self.player_info.player_info.default_eyes;
             }
 
-            if self
-                .reusable_core
-                .debuffs
-                .contains_key(&CharacterDebuff::Freeze)
-            {
+            if self.blocks_weapons_and_hook() {
                 self.core.input.state.fire.set(false);
                 self.core.input.state.hook.set(false);
+                self.core.core.queued_hooks.clicked = 0;
+            }
+            if self.blocks_movement() {
                 self.core.input.state.dir.set(0);
                 self.core.input.state.jump.set(false);
-                self.core.core.queued_hooks.clicked = 0;
                 self.core.core.jumps.queued = 0;
             }
 
@@ -1628,6 +2074,7 @@ pub mod character {
                 return EntityTickResult::RemoveEntity;
             }
 
+            self.apply_move_restrictions();
             self.handle_buffs_and_debuffs(pipe);
             self.handle_weapons(pipe);
 

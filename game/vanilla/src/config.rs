@@ -21,6 +21,7 @@ pub mod config {
         #[default]
         Dm,
         Ctf,
+        Race,
     }
 
     #[config_default]

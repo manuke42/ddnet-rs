@@ -41,6 +41,11 @@ pub mod snapshot {
                     PlayerCharacterInfo, PlayerInfo, Players, SpectatorPlayer, SpectatorPlayers,
                 },
             },
+            ddrace_entity::ddrace_entity::{
+                DdraceEntity, DdraceEntityCore, DdraceEntityReusableCore,
+                PoolDdraceEntityReusableCore,
+            },
+            ddrace_projectile::ddrace_projectile::DdraceProjectileCore,
             entity::entity::{DropMode, EntityInterface},
             flag::flag::{Flag, FlagCore, FlagReusableCore, Flags, PoolFlagReusableCore},
             laser::laser::{LaserCore, LaserReusableCore, PoolLaserReusableCore},
@@ -49,7 +54,7 @@ pub mod snapshot {
                 PoolProjectileReusableCore, ProjectileCore, ProjectileReusableCore,
             },
         },
-        game_objects::game_objects::GameObjectDefinitions,
+        game_objects::game_objects::{DdraceMapEntityDefinition, GameObjectDefinitions},
         match_state::match_state::Match,
         simulation_pipe::simulation_pipe::GamePendingEvents,
         spawns::GameSpawns,
@@ -133,6 +138,18 @@ pub mod snapshot {
     pub type SnapshotProjectiles = PoolFxLinkedHashMap<ProjectileId, SnapshotProjectile>;
 
     #[derive(Debug, Serialize, Deserialize)]
+    pub struct SnapshotDdraceProjectile {
+        pub core: DdraceProjectileCore,
+
+        pub game_el_id: ProjectileId,
+    }
+
+    pub type PoolSnapshotDdraceProjectiles =
+        FxLinkedHashMap<ProjectileId, SnapshotDdraceProjectile>;
+    pub type SnapshotDdraceProjectiles =
+        PoolFxLinkedHashMap<ProjectileId, SnapshotDdraceProjectile>;
+
+    #[derive(Debug, Serialize, Deserialize)]
     pub struct SnapshotLaser {
         pub core: LaserCore,
         pub reusable_core: PoolLaserReusableCore,
@@ -167,6 +184,17 @@ pub mod snapshot {
     pub type SnapshotFlags = PoolFxLinkedHashMap<CtfFlagId, SnapshotFlag>;
 
     #[derive(Debug, Serialize, Deserialize)]
+    pub struct SnapshotDdraceEntity {
+        pub core: DdraceEntityCore,
+        pub reusable_core: PoolDdraceEntityReusableCore,
+
+        pub game_el_id: GameEntityId,
+    }
+
+    pub type PoolSnapshotDdraceEntities = FxLinkedHashMap<GameEntityId, SnapshotDdraceEntity>;
+    pub type SnapshotDdraceEntities = PoolFxLinkedHashMap<GameEntityId, SnapshotDdraceEntity>;
+
+    #[derive(Debug, Serialize, Deserialize)]
     pub struct SnapshotInactiveObject {
         pub hearts: PoolVec<GameObjectWorld>,
         pub shields: PoolVec<GameObjectWorld>,
@@ -175,21 +203,29 @@ pub mod snapshot {
         pub blue_flags: PoolVec<GameObjectWorld>,
 
         pub weapons: [PoolVec<GameObjectWorld>; WeaponType::COUNT],
+        pub weapon_shields: [PoolVec<GameObjectWorld>; WeaponType::COUNT],
 
         pub ninjas: PoolVec<GameObjectWorld>,
+        pub ninja_shields: PoolVec<GameObjectWorld>,
+
+        pub ddrace_entities: PoolVec<DdraceMapEntityDefinition<GameObjectWorld>>,
     }
 
     pub type PoolSnapshotInactiveObjects = Vec<GameObjectWorld>;
     pub type SnapshotInactiveObjects = PoolVec<GameObjectWorld>;
+    pub type PoolSnapshotInactiveDdraceEntities = Vec<DdraceMapEntityDefinition<GameObjectWorld>>;
+    pub type SnapshotInactiveDdraceEntities = PoolVec<DdraceMapEntityDefinition<GameObjectWorld>>;
 
     #[derive(Debug, Serialize, Deserialize)]
     pub struct SnapshotWorld {
         pub characters: SnapshotCharacters,
         pub projectiles: SnapshotProjectiles,
+        pub ddrace_projectiles: SnapshotDdraceProjectiles,
         pub lasers: SnapshotLasers,
         pub pickups: SnapshotPickups,
         pub red_flags: SnapshotFlags,
         pub blue_flags: SnapshotFlags,
+        pub ddrace_entities: SnapshotDdraceEntities,
 
         pub inactive_objects: SnapshotInactiveObject,
     }
@@ -199,23 +235,22 @@ pub mod snapshot {
             Self {
                 characters: world_pool.characters_pool.new(),
                 projectiles: world_pool.projectiles_pool.new(),
+                ddrace_projectiles: world_pool.ddrace_projectiles_pool.new(),
                 lasers: world_pool.lasers_pool.new(),
                 pickups: world_pool.pickups_pool.new(),
                 red_flags: world_pool.flags_pool.new(),
                 blue_flags: world_pool.flags_pool.new(),
+                ddrace_entities: world_pool.ddrace_entities_pool.new(),
                 inactive_objects: SnapshotInactiveObject {
                     hearts: world_pool.inactive_objects.new(),
                     shields: world_pool.inactive_objects.new(),
                     red_flags: world_pool.inactive_objects.new(),
                     blue_flags: world_pool.inactive_objects.new(),
-                    weapons: [
-                        world_pool.inactive_objects.new(),
-                        world_pool.inactive_objects.new(),
-                        world_pool.inactive_objects.new(),
-                        world_pool.inactive_objects.new(),
-                        world_pool.inactive_objects.new(),
-                    ],
+                    weapons: std::array::from_fn(|_| world_pool.inactive_objects.new()),
+                    weapon_shields: std::array::from_fn(|_| world_pool.inactive_objects.new()),
                     ninjas: world_pool.inactive_objects.new(),
+                    ninja_shields: world_pool.inactive_objects.new(),
+                    ddrace_entities: world_pool.inactive_ddrace_entities.new(),
                 },
             }
         }
@@ -258,13 +293,17 @@ pub mod snapshot {
         pub character_reusable_cores_pool: Pool<CharacterReusableCore>,
         projectiles_pool: Pool<PoolSnapshotProjectiles>,
         pub projectile_reusable_cores_pool: Pool<ProjectileReusableCore>,
+        ddrace_projectiles_pool: Pool<PoolSnapshotDdraceProjectiles>,
         lasers_pool: Pool<PoolSnapshotLasers>,
         pub laser_reusable_cores_pool: Pool<LaserReusableCore>,
         pickups_pool: Pool<PoolSnapshotPickups>,
         pub pickup_reusable_cores_pool: Pool<PickupReusableCore>,
         flags_pool: Pool<PoolSnapshotFlags>,
         pub flag_reusable_cores_pool: Pool<FlagReusableCore>,
+        ddrace_entities_pool: Pool<PoolSnapshotDdraceEntities>,
+        pub ddrace_entity_reusable_cores_pool: Pool<DdraceEntityReusableCore>,
         inactive_objects: Pool<PoolSnapshotInactiveObjects>,
+        inactive_ddrace_entities: Pool<PoolSnapshotInactiveDdraceEntities>,
         pub character_ids_pool: Pool<FxHashSet<CharacterId>>,
     }
 
@@ -277,7 +316,8 @@ pub mod snapshot {
                 projectiles_pool: Pool::with_capacity(1024), // TODO: no random number
                 // multiply by 2, because every projectile has two cores of this type
                 projectile_reusable_cores_pool: Pool::with_capacity(1024 * 2), // TODO: no random number
-                lasers_pool: Pool::with_capacity(1024), // TODO: no random number
+                ddrace_projectiles_pool: Pool::with_capacity(1024), // TODO: no random number
+                lasers_pool: Pool::with_capacity(1024),             // TODO: no random number
                 // multiply by 2, because every laser has two cores of this type
                 laser_reusable_cores_pool: Pool::with_capacity(1024 * 2), // TODO: no random number
                 pickups_pool: Pool::with_capacity(1024),                  // TODO: no random number
@@ -286,7 +326,11 @@ pub mod snapshot {
                 flags_pool: Pool::with_capacity(16),                       // TODO: no random number
                 // multiply by 2, because every flag has two cores of this type
                 flag_reusable_cores_pool: Pool::with_capacity(16 * 2), // TODO: no random number
-                inactive_objects: Pool::with_capacity(16 * 2),         // TODO: no random number
+                ddrace_entities_pool: Pool::with_capacity(1024),       // TODO: no random number
+                // multiply by 2, because every ddrace entity has two cores of this type
+                ddrace_entity_reusable_cores_pool: Pool::with_capacity(1024 * 2), // TODO: no random number
+                inactive_objects: Pool::with_capacity(16 * 2), // TODO: no random number
+                inactive_ddrace_entities: Pool::with_capacity(16 * 2), // TODO: no random number
                 character_ids_pool: Pool::with_capacity(16 * 2),
             }
         }
@@ -439,6 +483,20 @@ pub mod snapshot {
                         .copy_clone_from(&proj.projectile.reusable_core);
                     projectiles.insert(*id, snap_proj);
                 });
+                let mut ddrace_projectiles = self.world_pool.ddrace_projectiles_pool.new();
+                stage
+                    .world
+                    .get_ddrace_projectiles()
+                    .iter()
+                    .for_each(|(id, proj)| {
+                        ddrace_projectiles.insert(
+                            *id,
+                            SnapshotDdraceProjectile {
+                                core: proj.core,
+                                game_el_id: proj.base.game_element_id,
+                            },
+                        );
+                    });
                 let mut lasers = self.world_pool.lasers_pool.new();
                 stage.world.get_lasers().iter().for_each(|(id, laser)| {
                     let mut snap_laser = SnapshotLaser {
@@ -479,6 +537,18 @@ pub mod snapshot {
                 };
                 prepare_flags(stage.world.get_red_flags(), &mut red_flags);
                 prepare_flags(stage.world.get_blue_flags(), &mut blue_flags);
+                let mut ddrace_entities = self.world_pool.ddrace_entities_pool.new();
+                stage.world.ddrace_entities.iter().for_each(|(id, entity)| {
+                    let mut snap_entity = SnapshotDdraceEntity {
+                        core: entity.core,
+                        reusable_core: self.world_pool.ddrace_entity_reusable_cores_pool.new(),
+                        game_el_id: entity.base.game_element_id,
+                    };
+                    snap_entity
+                        .reusable_core
+                        .copy_clone_from(&entity.reusable_core);
+                    ddrace_entities.insert(*id, snap_entity);
+                });
                 let add_inactive_obj =
                     |objs: &Vec<GameObjectWorld>, cont: &mut PoolSnapshotInactiveObjects| {
                         cont.extend(objs.iter().copied());
@@ -504,23 +574,40 @@ pub mod snapshot {
                     &stage.world.inactive_game_objects.pickups.blue_flags,
                     &mut inactive_blue_flags,
                 );
-                let mut weapons: [_; WeaponType::COUNT] = [
-                    self.world_pool.inactive_objects.new(),
-                    self.world_pool.inactive_objects.new(),
-                    self.world_pool.inactive_objects.new(),
-                    self.world_pool.inactive_objects.new(),
-                    self.world_pool.inactive_objects.new(),
-                ];
+                let mut weapons: [_; WeaponType::COUNT] =
+                    std::array::from_fn(|_| self.world_pool.inactive_objects.new());
                 for (i, weapon) in weapons.iter_mut().enumerate() {
                     add_inactive_obj(
                         &stage.world.inactive_game_objects.pickups.weapons[i],
                         weapon,
                     );
                 }
+                let mut weapon_shields: [_; WeaponType::COUNT] =
+                    std::array::from_fn(|_| self.world_pool.inactive_objects.new());
+                for (i, weapon_shield) in weapon_shields.iter_mut().enumerate() {
+                    add_inactive_obj(
+                        &stage.world.inactive_game_objects.pickups.weapon_shields[i],
+                        weapon_shield,
+                    );
+                }
                 let mut ninjas = self.world_pool.inactive_objects.new();
                 add_inactive_obj(
                     &stage.world.inactive_game_objects.pickups.ninjas,
                     &mut ninjas,
+                );
+                let mut ninja_shields = self.world_pool.inactive_objects.new();
+                add_inactive_obj(
+                    &stage.world.inactive_game_objects.pickups.ninja_shields,
+                    &mut ninja_shields,
+                );
+                let mut inactive_ddrace_entities = self.world_pool.inactive_ddrace_entities.new();
+                inactive_ddrace_entities.extend(
+                    stage
+                        .world
+                        .inactive_game_objects
+                        .ddrace_entities
+                        .iter()
+                        .copied(),
                 );
 
                 stages.insert(
@@ -529,17 +616,22 @@ pub mod snapshot {
                         world: SnapshotWorld {
                             characters,
                             projectiles,
+                            ddrace_projectiles,
                             lasers,
                             pickups,
                             red_flags,
                             blue_flags,
+                            ddrace_entities,
                             inactive_objects: SnapshotInactiveObject {
                                 hearts,
                                 shields,
                                 red_flags: inactive_red_flags,
                                 blue_flags: inactive_blue_flags,
                                 weapons,
+                                weapon_shields,
                                 ninjas,
+                                ninja_shields,
+                                ddrace_entities: inactive_ddrace_entities,
                             },
                         },
                         match_manager: SnapshotMatchManager::new(stage.match_manager.game_match),
@@ -647,6 +739,14 @@ pub mod snapshot {
                             false
                         }
                     });
+                    stage.world.ddrace_projectiles.retain(|id, ent| {
+                        if snap_stage.world.ddrace_projectiles.contains_key(id) {
+                            true
+                        } else {
+                            ent.drop_mode(DropMode::Silent);
+                            false
+                        }
+                    });
                     // same for lasers
                     stage.world.lasers.retain(|id, ent| {
                         if snap_stage.world.lasers.contains_key(id) {
@@ -678,6 +778,15 @@ pub mod snapshot {
                     };
                     retain_flags(&mut stage.world.red_flags, &snap_stage.world.red_flags);
                     retain_flags(&mut stage.world.blue_flags, &snap_stage.world.blue_flags);
+                    // same for ddrace entities
+                    stage.world.ddrace_entities.retain(|id, ent| {
+                        if snap_stage.world.ddrace_entities.contains_key(id) {
+                            true
+                        } else {
+                            ent.drop_mode(DropMode::Silent);
+                            false
+                        }
+                    });
 
                     true
                 } else {
@@ -884,6 +993,43 @@ pub mod snapshot {
                         .reusable_core
                         .copy_clone_from(&proj.reusable_core);
                 });
+                snap_stage
+                    .world
+                    .ddrace_projectiles
+                    .values()
+                    .for_each(|proj| {
+                        if !state_stage
+                            .world
+                            .ddrace_projectiles
+                            .contains_key(&proj.game_el_id)
+                        {
+                            state_stage.world.insert_new_ddrace_projectile(
+                                proj.game_el_id,
+                                &proj.core.pos,
+                                &proj.core.vel,
+                                proj.core
+                                    .life_span
+                                    .get()
+                                    .map(|ticks_left| ticks_left.get())
+                                    .unwrap_or_default(),
+                                proj.core.damage,
+                                proj.core.force,
+                                proj.core.is_explosive,
+                                proj.core.no_damage_explosion,
+                                proj.core.can_hit_owner,
+                                proj.core.freeze,
+                                proj.core.bouncing,
+                                proj.core.ty,
+                            );
+                        }
+
+                        let stage_proj = state_stage
+                            .world
+                            .ddrace_projectiles
+                            .to_back(&proj.game_el_id)
+                            .unwrap();
+                        stage_proj.core = proj.core;
+                    });
                 // go through all lasers of the stage, add missing ones
                 snap_stage.world.lasers.values().for_each(|laser| {
                     // if the laser does not exist, add it
@@ -960,6 +1106,46 @@ pub mod snapshot {
                     &mut state_stage.world.blue_flags,
                     &snap_stage.world.blue_flags,
                 );
+                // go through all ddrace entities of the stage, add missing ones
+                snap_stage
+                    .world
+                    .ddrace_entities
+                    .values()
+                    .for_each(|entity| {
+                        // if the ddrace entity does not exist, add it
+                        if !state_stage
+                            .world
+                            .ddrace_entities
+                            .contains_key(&entity.game_el_id)
+                        {
+                            state_stage.world.ddrace_entities.insert(
+                                entity.game_el_id,
+                                DdraceEntity {
+                                    base: crate::entities::entity::entity::Entity::new(
+                                        &entity.game_el_id,
+                                    ),
+                                    core: entity.core,
+                                    reusable_core: state_stage
+                                        .world
+                                        .world_pool
+                                        .ddrace_entity_pool
+                                        .ddrace_entity_reusable_cores_pool
+                                        .new(),
+                                },
+                            );
+                        }
+
+                        // sorting by always moving the entry to the end (all entries will do this)
+                        let stage_entity = state_stage
+                            .world
+                            .ddrace_entities
+                            .to_back(&entity.game_el_id)
+                            .unwrap();
+                        stage_entity.core = entity.core;
+                        stage_entity
+                            .reusable_core
+                            .copy_clone_from(&entity.reusable_core);
+                    });
 
                 state_stage
                     .world
@@ -999,8 +1185,30 @@ pub mod snapshot {
                     .world
                     .inactive_game_objects
                     .pickups
+                    .weapon_shields
+                    .iter_mut()
+                    .enumerate()
+                    .for_each(|(index, weapon_shield)| {
+                        weapon_shield
+                            .clone_from(&snap_stage.world.inactive_objects.weapon_shields[index])
+                    });
+                state_stage
+                    .world
+                    .inactive_game_objects
+                    .pickups
                     .ninjas
                     .clone_from(&snap_stage.world.inactive_objects.ninjas);
+                state_stage
+                    .world
+                    .inactive_game_objects
+                    .pickups
+                    .ninja_shields
+                    .clone_from(&snap_stage.world.inactive_objects.ninja_shields);
+                state_stage
+                    .world
+                    .inactive_game_objects
+                    .ddrace_entities
+                    .clone_from(&snap_stage.world.inactive_objects.ddrace_entities);
             });
         }
 

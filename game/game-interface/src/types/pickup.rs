@@ -9,4 +9,6 @@ pub enum PickupType {
     PowerupArmor,
     PowerupNinja,
     PowerupWeapon(WeaponType),
+    PowerupWeaponShield(WeaponType),
+    PowerupNinjaShield,
 }

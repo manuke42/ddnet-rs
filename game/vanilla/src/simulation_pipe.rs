@@ -16,15 +16,17 @@ pub mod simulation_pipe {
     use math::math::vector::vec2;
     use serde::{Deserialize, Serialize};
 
-    use crate::entities::character::character::{CharactersView, CharactersViewMut};
+    use crate::entities::character::character::{CharacterPool, CharactersView, CharactersViewMut};
     use crate::entities::character::core::character_core::{Core, CoreReusable};
     use crate::entities::character::pos::character_pos::{
         CharacterPos, CharacterPositionPlayfield,
     };
+    use crate::entities::ddrace_entity::ddrace_entity::DdraceEntityCore;
     use crate::entities::flag::flag::Flags;
     use crate::events::events::{
         CharacterTickEvent, FlagEvent, LaserEvent, PickupEvent, ProjectileEvent,
     };
+    use crate::types::types::GameOptions;
     use crate::world::world::GameObjectsWorld;
     use crate::{
         entities::character::character::Characters,
@@ -568,13 +570,62 @@ pub mod simulation_pipe {
     pub struct SimulationPipePickup<'a> {
         pub characters: SimulationPipeOwnerlessCharacters<'a>,
         pub field: &'a CharacterPositionPlayfield,
+        pub char_pool: &'a CharacterPool,
+        pub game_options: &'a GameOptions,
     }
 
     impl<'a> SimulationPipePickup<'a> {
-        pub fn new(characters: &'a mut Characters, field: &'a CharacterPositionPlayfield) -> Self {
+        pub fn new(
+            characters: &'a mut Characters,
+            field: &'a CharacterPositionPlayfield,
+            char_pool: &'a CharacterPool,
+            game_options: &'a GameOptions,
+        ) -> Self {
             Self {
                 characters: SimulationPipeOwnerlessCharacters { characters },
                 field,
+                char_pool,
+                game_options,
+            }
+        }
+    }
+
+    pub struct SimulationPipeDdraceProjectile<'a> {
+        pub collision: &'a Collision,
+        pub characters: SimulationPipeOwnerlessCharacters<'a>,
+        pub field: &'a CharacterPositionPlayfield,
+    }
+
+    impl<'a> SimulationPipeDdraceProjectile<'a> {
+        pub fn new(
+            collision: &'a Collision,
+            characters: &'a mut Characters,
+            field: &'a CharacterPositionPlayfield,
+        ) -> Self {
+            Self {
+                collision,
+                characters: SimulationPipeOwnerlessCharacters { characters },
+                field,
+            }
+        }
+    }
+
+    pub struct SimulationPipeDdraceEntity<'a> {
+        pub collision: &'a Collision,
+        pub characters: &'a mut Characters,
+        pub entities: &'a [DdraceEntityCore],
+    }
+
+    impl<'a> SimulationPipeDdraceEntity<'a> {
+        pub fn new(
+            collision: &'a Collision,
+            characters: &'a mut Characters,
+            entities: &'a [DdraceEntityCore],
+        ) -> Self {
+            Self {
+                collision,
+                characters,
+                entities,
             }
         }
     }

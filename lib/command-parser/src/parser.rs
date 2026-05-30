@@ -708,7 +708,7 @@ fn parse_command<const S: usize>(
                     }
                     let range = cmds
                         .first()
-                        .and_then(|first| cmds.last().map(|last| (first, last)))
+                        .zip(cmds.last())
                         .and_then(|(first, last)| {
                             last.args
                                 .last()

@@ -54,14 +54,14 @@ where
     pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
         self.hash_map
             .iter()
-            .filter(|(k, v)| (self.key_filter_func)(k) || (self.val_filter_func)(v))
+            .filter(|(k, v)| (self.key_filter_func)(k) && (self.val_filter_func)(v))
     }
 
     #[allow(clippy::should_implement_trait)]
     pub fn into_iter(self) -> impl Iterator<Item = (&'a K, &'a V)> {
         self.hash_map
             .iter()
-            .filter(move |(k, v)| (self.key_filter_func)(k) || (self.val_filter_func)(v))
+            .filter(move |(k, v)| (self.key_filter_func)(k) && (self.val_filter_func)(v))
     }
 }
 
@@ -123,19 +123,19 @@ where
     pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
         self.hash_map
             .iter()
-            .filter(|(k, v)| (self.key_filter_func)(k) || (self.val_filter_func)(v))
+            .filter(|(k, v)| (self.key_filter_func)(k) && (self.val_filter_func)(v))
     }
 
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (&K, &mut V)> {
         self.hash_map
             .iter_mut()
-            .filter(|(k, v)| (self.key_filter_func)(k) || (self.val_filter_func)(v))
+            .filter(|(k, v)| (self.key_filter_func)(k) && (self.val_filter_func)(v))
     }
 
     #[allow(clippy::should_implement_trait)]
     pub fn into_iter(self) -> impl Iterator<Item = (&'a K, &'a mut V)> {
         self.hash_map
             .iter_mut()
-            .filter(move |(k, v)| (self.key_filter_func)(k) || (self.val_filter_func)(v))
+            .filter(move |(k, v)| (self.key_filter_func)(k) && (self.val_filter_func)(v))
     }
 }

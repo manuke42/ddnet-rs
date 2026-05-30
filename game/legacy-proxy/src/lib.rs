@@ -13,7 +13,7 @@ use base::{
     reduced_ascii_str::ReducedAsciiString,
 };
 use base_http::{http::HttpClient, http_server::HttpDownloadServer};
-use base_io::io::Io;
+use base_io::{io::Io, runtime::IoRuntimeTask};
 use client::{ClientData, ClientState, ProxyClient, SocketClient, WarnPkt};
 use game_base::{
     connecting_log::ConnectingLog,
@@ -34,7 +34,9 @@ use game_interface::{
     },
     interface::GameStateServerOptions,
     types::{
-        character_info::{MAX_ASSET_NAME_LEN, NetworkCharacterInfo, NetworkSkinInfo},
+        character_info::{
+            MAX_ASSET_NAME_LEN, MAX_CHARACTER_NAME_LEN, NetworkCharacterInfo, NetworkSkinInfo,
+        },
         emoticons::EmoticonType,
         fixed_zoom_level::FixedZoomLevel,
         flag::FlagType,
@@ -49,13 +51,13 @@ use game_interface::{
         laser::LaserType,
         network_stats::PlayerNetworkStats,
         pickup::PickupType,
-        player_info::PlayerUniqueId,
+        player_info::{PlayerDropReason, PlayerUniqueId},
         render::{
             character::{CharacterBuff, CharacterDebuff, TeeEye},
             game::game_match::MatchSide,
             projectiles::WeaponWithProjectile,
         },
-        resource_key::{NetworkResourceKey, ResourceKeyBase},
+        resource_key::{MtPoolNetworkResourceKey, NetworkResourceKey, ResourceKeyBase},
         snapshot::SnapshotLocalPlayer,
         weapons::WeaponType,
     },
@@ -87,15 +89,20 @@ use libtw2_gamenet_ddnet::{
         system,
     },
     snap_obj::{
-        self, CHARACTERFLAG_WEAPON_GRENADE, CHARACTERFLAG_WEAPON_GUN, CHARACTERFLAG_WEAPON_HAMMER,
-        CHARACTERFLAG_WEAPON_LASER, CHARACTERFLAG_WEAPON_SHOTGUN, Character, DdnetCharacter,
-        DdnetPlayer, PROJECTILEFLAG_NORMALIZE_VEL, obj_size,
+        self, CHARACTERFLAG_GRENADE_HIT_DISABLED, CHARACTERFLAG_HAMMER_HIT_DISABLED,
+        CHARACTERFLAG_LASER_HIT_DISABLED, CHARACTERFLAG_MOVEMENTS_DISABLED,
+        CHARACTERFLAG_SHOTGUN_HIT_DISABLED, CHARACTERFLAG_WEAPON_GRENADE, CHARACTERFLAG_WEAPON_GUN,
+        CHARACTERFLAG_WEAPON_HAMMER, CHARACTERFLAG_WEAPON_LASER, CHARACTERFLAG_WEAPON_SHOTGUN,
+        Character, DdnetCharacter, DdnetPlayer, PROJECTILEFLAG_BOUNCE_HORIZONTAL,
+        PROJECTILEFLAG_BOUNCE_VERTICAL, PROJECTILEFLAG_EXPLOSIVE, PROJECTILEFLAG_FREEZE,
+        PROJECTILEFLAG_NORMALIZE_VEL, obj_size,
     },
 };
 use libtw2_net::net::PeerId;
 use libtw2_packer::{IntUnpacker, Unpacker};
 use log::{Level, debug, log_enabled, warn};
 use map::{file::MapFileReader, map::Map};
+use master_server_types::{addr::Protocol, legacy_server_list::LegacyServerList};
 use math::{
     colors::{legacy_color_to_rgba, rgba_to_legacy_color},
     math::{
@@ -125,7 +132,7 @@ use pool::{
     rc::PoolRc,
     traits::Recyclable,
 };
-use projectile::{get_pos, get_vel};
+use projectile::get_pos;
 use rand::RngCore;
 use sha2::Digest;
 use socket::Socket;
@@ -143,6 +150,7 @@ use std::{
 use tokio::sync::Notify;
 use vanilla::{
     collision::collision::{Collision, Tunings},
+    config::config::{ConfigGameType, ConfigVanilla},
     entities::{
         character::{
             character::{
@@ -153,6 +161,7 @@ use vanilla::{
             player::player::{PlayerInfo as VanillaPlayerInfo, SpectatorPlayer},
             pos::character_pos::CharacterPositionPlayfield,
         },
+        ddrace_projectile::ddrace_projectile::DdraceProjectileCore,
         flag::flag::{FlagCore, PoolFlagReusableCore},
         laser::laser::{LaserCore, PoolLaserReusableCore},
         pickup::pickup::{PickupCore, PoolPickupReusableCore},
@@ -164,7 +173,8 @@ use vanilla::{
     simulation_pipe::simulation_pipe::SimulationPipeCharactersGetter,
     snapshot::snapshot::{
         Snapshot, SnapshotCharacter, SnapshotCharacterPhasedState, SnapshotCharacterPlayerTy,
-        SnapshotCharacterSpectateMode, SnapshotCharacters, SnapshotFlag, SnapshotFlags,
+        SnapshotCharacterSpectateMode, SnapshotCharacters, SnapshotDdraceEntities,
+        SnapshotDdraceProjectile, SnapshotDdraceProjectiles, SnapshotFlag, SnapshotFlags,
         SnapshotInactiveObject, SnapshotLaser, SnapshotLasers, SnapshotMatchManager,
         SnapshotPickup, SnapshotPickups, SnapshotPool, SnapshotProjectile, SnapshotProjectiles,
         SnapshotSpectatorPlayer, SnapshotStage, SnapshotWorld,
@@ -239,6 +249,15 @@ struct LocalPlayer {
     pub ddnet_player_snap: Option<DdnetPlayer>,
 }
 
+#[derive(Clone)]
+struct PendingLeavePlayer {
+    id: CharacterId,
+    stage_id: StageId,
+    name: MtPoolNetworkString<MAX_CHARACTER_NAME_LEN>,
+    skin: MtPoolNetworkResourceKey<MAX_ASSET_NAME_LEN>,
+    skin_info: NetworkSkinInfo,
+}
+
 #[derive(Debug, Clone)]
 enum ServerInfoTy {
     Partial { requires_password: bool },
@@ -291,6 +310,7 @@ struct ClientBase {
 
     events: events::GameEvents,
     event_id_generator: EventIdGenerator,
+    pending_game_kill_msgs: Vec<game::SvKillMsg>,
 
     capabilities: Capabilities,
 
@@ -321,6 +341,22 @@ struct ClientBase {
     player_snap_pool: Pool<Vec<u8>>,
 }
 
+impl ClientBase {
+    fn is_race(&self) -> bool {
+        match &self.server_info {
+            ServerInfoTy::Partial { .. } => false,
+            ServerInfoTy::Full(info) => {
+                let game_type = info.game_type.to_lowercase();
+                self.capabilities.is_ddnet
+                    && (game_type == "race"
+                        || game_type.contains("ddrace")
+                        || game_type.contains("block")
+                        || game_type == "gores")
+            }
+        }
+    }
+}
+
 struct Client {
     base: ClientBase,
 
@@ -349,9 +385,117 @@ struct Client {
     last_snapshot: Snapshot,
 
     start_time: Duration,
+    retry_full_server_at: Option<Duration>,
+    retry_full_server_task: Option<IoRuntimeTask<bool>>,
 }
 
 impl Client {
+    fn server_full_disconnect(reason: &str) -> bool {
+        let reason = reason.to_ascii_lowercase();
+        reason.contains("server is full")
+    }
+
+    fn legacy_server_list_has_free_slot(servers_raw: &str, connect_addr: SocketAddr) -> bool {
+        let Ok(servers) = serde_json::from_str::<LegacyServerList>(servers_raw) else {
+            return false;
+        };
+
+        servers.servers.iter().any(|server| {
+            let has_address = server
+                .addresses
+                .iter()
+                .any(|addr| addr.protocol == Protocol::V6 && addr.to_socket_addr() == connect_addr);
+            has_address && server.info.clients.len() < server.info.max_clients as usize
+        })
+    }
+
+    fn start_full_server_retry_task(&mut self) {
+        if self.retry_full_server_task.is_some() {
+            return;
+        }
+
+        let http = self.io.http.clone();
+        let connect_addr = self.connect_addr;
+        let notifier = self.notifier_server.clone();
+        self.retry_full_server_task = Some(
+            self.io
+                .rt
+                .spawn(async move {
+                    let res = async {
+                        let servers = http
+                            .download_text(
+                                "https://master1.ddnet.org/ddnet/15/servers.json"
+                                    .try_into()
+                                    .unwrap(),
+                            )
+                            .await?;
+                        Ok(Self::legacy_server_list_has_free_slot(
+                            &servers,
+                            connect_addr,
+                        ))
+                    }
+                    .await;
+                    notifier.notify_one();
+                    res
+                })
+                .cancelable(),
+        );
+    }
+
+    fn retry_full_server_connect(&mut self) -> anyhow::Result<()> {
+        let Some(retry_at) = self.retry_full_server_at else {
+            return Ok(());
+        };
+
+        let now = self.time.now();
+        let Some(task) = &self.retry_full_server_task else {
+            if now >= retry_at {
+                self.start_full_server_retry_task();
+            }
+            return Ok(());
+        };
+        if !task.is_finished() {
+            return Ok(());
+        }
+
+        let should_reconnect = match self.retry_full_server_task.take().unwrap().get() {
+            Ok(has_free_slot) => has_free_slot,
+            Err(err) => {
+                self.log.log(format!(
+                    "Could not check legacy server list for free slots: {err}. \
+                    Trying to reconnect anyway."
+                ));
+                true
+            }
+        };
+        self.retry_full_server_at = Some(now + Duration::from_secs(2));
+
+        if !should_reconnect {
+            return Ok(());
+        }
+
+        let Some((_, player)) = self.players.iter_mut().next() else {
+            self.retry_full_server_at = None;
+            return Ok(());
+        };
+
+        self.log.log("Trying to reconnect to legacy server.");
+        let player_info = std::mem::take(&mut player.data.player_info);
+        let socket = match SocketClient::new(&self.io, self.connect_addr) {
+            Ok(socket) => socket,
+            Err(err) => {
+                self.log
+                    .log(format!("Could not reconnect to legacy server: {err}"));
+                player.data.player_info = player_info;
+                return Ok(());
+            }
+        };
+        *player = ProxyClient::new(player_info, socket, 0, false);
+        self.retry_full_server_at = None;
+        self.retry_full_server_task = None;
+        Ok(())
+    }
+
     fn run(
         io: &Io,
         time: &base::steady_clock::SteadyClock,
@@ -628,6 +772,7 @@ impl Client {
                             worlds: GameWorldsEvents::new_without_pool(),
                         },
                         event_id_generator,
+                        pending_game_kill_msgs: Default::default(),
 
                         capabilities: Capabilities::default(),
                         tunes: Default::default(),
@@ -684,6 +829,8 @@ impl Client {
                     log,
 
                     start_time: proxy_start,
+                    retry_full_server_at: None,
+                    retry_full_server_task: None,
                 };
 
                 app.run_loop().unwrap();
@@ -708,6 +855,180 @@ impl Client {
 
     fn sys_msg_to_ping_id(msg: system::PongEx) -> u128 {
         msg.id.as_u128()
+    }
+
+    fn is_legacy_leave_system_chat(message: &[u8]) -> bool {
+        let message = String::from_utf8_lossy(message);
+        message.starts_with('\'') && message.ends_with("' has left the game")
+    }
+
+    /// Read the old snapshot info for a player whose legacy id dropped while
+    /// resolving an ambiguous `WEAPON_GAME` message.
+    fn pending_leave_player_from_snapshot(
+        base: &ClientBase,
+        snapshot: &Snapshot,
+        legacy_id: i32,
+        char_id: CharacterId,
+    ) -> Option<PendingLeavePlayer> {
+        base.legacy_id_in_stage_id
+            .get(&legacy_id)
+            .and_then(|stage_id| {
+                snapshot.stages.get(stage_id).and_then(|stage| {
+                    stage
+                        .world
+                        .characters
+                        .get(&char_id)
+                        .map(|character| PendingLeavePlayer {
+                            id: char_id,
+                            stage_id: *stage_id,
+                            name: MtPoolNetworkString::from_without_pool(
+                                character.player_info.player_info.name.clone(),
+                            ),
+                            skin: MtPoolNetworkResourceKey::from_without_pool(
+                                character.player_info.player_info.skin.clone(),
+                            ),
+                            skin_info: character.player_info.player_info.skin_info,
+                        })
+                })
+            })
+            .or_else(|| {
+                snapshot
+                    .spectator_players
+                    .get(&char_id)
+                    .map(|player| PendingLeavePlayer {
+                        id: char_id,
+                        stage_id: base.stage_0_id,
+                        name: MtPoolNetworkString::from_without_pool(
+                            player.player.player_info.player_info.name.clone(),
+                        ),
+                        skin: MtPoolNetworkResourceKey::from_without_pool(
+                            player.player.player_info.player_info.skin.clone(),
+                        ),
+                        skin_info: player.player.player_info.player_info.skin_info,
+                    })
+            })
+    }
+
+    /// Emit the new protocol's explicit leave notification for a player that was
+    /// inferred to have disconnected from legacy snapshot state.
+    fn push_player_left(base: &mut ClientBase, player: PendingLeavePlayer) {
+        let events = base
+            .events
+            .worlds
+            .entry(player.stage_id)
+            .or_insert_with_keep_order(|| events::GameWorldEvents {
+                events: mt_datatypes::PoolFxLinkedHashMap::new_without_pool(),
+            });
+        events.events.insert(
+            base.event_id_generator.next_id(),
+            events::GameWorldEvent::Notification(GameWorldNotificationEvent::System(
+                GameWorldSystemMessage::PlayerLeft {
+                    id: player.id,
+                    name: player.name,
+                    skin: player.skin,
+                    skin_info: player.skin_info,
+                    reason: PlayerDropReason::Disconnect,
+                },
+            )),
+        );
+    }
+
+    /// Emit explicit leave events for legacy ids that disappeared from the new
+    /// active snapshot while their old snapshot info is still available.
+    fn push_dropped_player_left_events(
+        base: &mut ClientBase,
+        old_snapshot: &Snapshot,
+        dropped_characters: &HashMap<i32, CharacterId>,
+    ) {
+        for (legacy_id, char_id) in dropped_characters {
+            if !base.char_legacy_to_new_id.contains_key(legacy_id)
+                && let Some(player) = Self::pending_leave_player_from_snapshot(
+                    base,
+                    old_snapshot,
+                    *legacy_id,
+                    *char_id,
+                )
+            {
+                Self::push_player_left(base, player);
+            }
+        }
+    }
+
+    /// Resolve delayed `WEAPON_GAME` kill messages after snapshot rebuilding.
+    /// Still-present victims are game kills; dropped victims already emitted leave.
+    fn flush_pending_game_kill_msgs(base: &mut ClientBase) {
+        for msg in std::mem::take(&mut base.pending_game_kill_msgs) {
+            if base.char_legacy_to_new_id.contains_key(&msg.victim) {
+                Self::push_kill_notification(base, msg);
+            }
+        }
+    }
+
+    /// Convert a legacy kill message into the new action-feed event once the
+    /// caller knows it is not an ambiguous disconnect-side `WEAPON_GAME` kill.
+    fn push_kill_notification(base: &mut ClientBase, msg: game::SvKillMsg) {
+        const WEAPON_GAME: i32 = -3;
+        const WEAPON_SELF: i32 = -2;
+        const WEAPON_WORLD: i32 = -1;
+        const WEAPON_HAMMER: i32 = 0;
+        const WEAPON_GUN: i32 = 1;
+        const WEAPON_SHOTGUN: i32 = 2;
+        const WEAPON_GRENADE: i32 = 3;
+        const WEAPON_LASER: i32 = 4;
+        const WEAPON_NINJA: i32 = 5;
+
+        let is_race = base.is_race();
+        let events = base
+            .events
+            .worlds
+            .entry(base.stage_0_id)
+            .or_insert_with_keep_order(|| events::GameWorldEvents {
+                events: mt_datatypes::PoolFxLinkedHashMap::new_without_pool(),
+            });
+        events.events.insert(
+            base.event_id_generator.next_id(),
+            events::GameWorldEvent::Notification(GameWorldNotificationEvent::Action(
+                events::GameWorldAction::Kill {
+                    killer: base.char_legacy_to_new_id.get(&msg.killer).copied(),
+                    assists: mt_datatypes::PoolVec::new_without_pool(),
+                    victims: mt_datatypes::PoolVec::from_without_pool(
+                        if [WEAPON_WORLD, WEAPON_SELF, WEAPON_GAME].contains(&msg.weapon) {
+                            Default::default()
+                        } else {
+                            base.char_legacy_to_new_id
+                                .get(&msg.victim)
+                                .copied()
+                                .into_iter()
+                                .collect()
+                        },
+                    ),
+                    weapon: match msg.weapon {
+                        WEAPON_HAMMER => events::GameWorldActionKillWeapon::Weapon {
+                            weapon: WeaponType::Hammer,
+                        },
+                        WEAPON_GUN => events::GameWorldActionKillWeapon::Weapon {
+                            weapon: WeaponType::Gun,
+                        },
+                        WEAPON_SHOTGUN => events::GameWorldActionKillWeapon::Weapon {
+                            weapon: if is_race {
+                                WeaponType::Puller
+                            } else {
+                                WeaponType::Shotgun
+                            },
+                        },
+                        WEAPON_GRENADE => events::GameWorldActionKillWeapon::Weapon {
+                            weapon: WeaponType::Grenade,
+                        },
+                        WEAPON_LASER => events::GameWorldActionKillWeapon::Weapon {
+                            weapon: WeaponType::Laser,
+                        },
+                        WEAPON_NINJA => events::GameWorldActionKillWeapon::Ninja,
+                        _ => events::GameWorldActionKillWeapon::World,
+                    },
+                    flags: Default::default(),
+                },
+            )),
+        );
     }
 
     fn player_info_mut<'a>(
@@ -748,13 +1069,20 @@ impl Client {
         collision: Option<&Collision>,
         cur_time: Duration,
     ) {
+        let is_race = base.is_race();
         let add_proj = |snapshot: &mut Snapshot,
                         id,
                         owner_id: i32,
                         pos: vec2,
                         type_: enums::Weapon,
                         start_tick: snap_obj::Tick,
-                        vel: vec2| {
+                        vel: vec2,
+                        is_explosive: bool,
+                        no_damage_explosion: bool,
+                        can_hit_owner: bool,
+                        freeze: bool,
+                        bouncing: i32,
+                        ownerless_ddnet_proj: bool| {
             let stage_id = base
                 .teams
                 .get(&owner_id)
@@ -770,40 +1098,65 @@ impl Client {
                 enums::Weapon::Shotgun => (base.tunes.shotgun_curvature, base.tunes.shotgun_speed),
                 enums::Weapon::Grenade => (base.tunes.grenade_curvature, base.tunes.grenade_speed),
             };
-            stage.world.projectiles.insert(
-                proj_id,
-                SnapshotProjectile {
-                    core: ProjectileCore {
-                        pos: get_pos(pos, vel, speed, curvature, now, start_tick),
-                        vel: get_vel(now, start_tick, vel, speed, curvature),
-                        life_span: 100,
-                        damage: 0,
-                        force: 0.0,
-                        is_explosive: match type_ {
-                            enums::Weapon::Hammer
-                            | enums::Weapon::Pistol
-                            | enums::Weapon::Shotgun
-                            | enums::Weapon::Rifle
-                            | enums::Weapon::Ninja => false,
-                            enums::Weapon::Grenade => true,
+            let ty = match type_ {
+                enums::Weapon::Hammer
+                | enums::Weapon::Ninja
+                | enums::Weapon::Rifle
+                | enums::Weapon::Pistol => WeaponWithProjectile::Gun,
+                enums::Weapon::Shotgun => WeaponWithProjectile::Shotgun,
+                enums::Weapon::Grenade => WeaponWithProjectile::Grenade,
+            };
+            let cur_pos = get_pos(pos, vel, speed, curvature, now, start_tick);
+            if no_damage_explosion || freeze || bouncing != 0 || ownerless_ddnet_proj {
+                let elapsed_ticks = (now - start_tick).max(0) as GameTickType;
+                let life_span_ticks = 100 + 1;
+                let life_span = GameTickCooldownAndLength::new_with_length(
+                    life_span_ticks,
+                    life_span_ticks.saturating_add(elapsed_ticks),
+                );
+                stage.world.ddrace_projectiles.insert(
+                    proj_id,
+                    SnapshotDdraceProjectile {
+                        core: DdraceProjectileCore {
+                            pos: cur_pos,
+                            start_pos: pos,
+                            vel,
+                            life_span,
+                            damage: 0,
+                            force: 0.0,
+                            is_explosive,
+                            no_damage_explosion,
+                            can_hit_owner,
+                            freeze,
+                            bouncing,
+                            ty,
                         },
-                        ty: match type_ {
-                            enums::Weapon::Hammer
-                            | enums::Weapon::Ninja
-                            | enums::Weapon::Rifle
-                            | enums::Weapon::Pistol => WeaponWithProjectile::Gun,
-                            enums::Weapon::Shotgun => WeaponWithProjectile::Shotgun,
-                            enums::Weapon::Grenade => WeaponWithProjectile::Grenade,
-                        },
-                        side: None,
+                        game_el_id: proj_id,
                     },
-                    reusable_core: PoolProjectileReusableCore::from_without_pool(
-                        ProjectileReusableCore {},
-                    ),
-                    game_el_id: proj_id,
-                    owner_game_el_id: player_id,
-                },
-            );
+                );
+            } else {
+                stage.world.projectiles.insert(
+                    proj_id,
+                    SnapshotProjectile {
+                        core: ProjectileCore {
+                            pos: cur_pos,
+                            vel,
+                            life_span: 100,
+                            damage: 0,
+                            force: 0.0,
+                            is_explosive,
+                            ty,
+                            side: None,
+                            can_hit_others: true,
+                        },
+                        reusable_core: PoolProjectileReusableCore::from_without_pool(
+                            ProjectileReusableCore {},
+                        ),
+                        game_el_id: proj_id,
+                        owner_game_el_id: player_id,
+                    },
+                );
+            }
         };
         let add_laser = |snapshot: &mut Snapshot, id, owner_id: i32, laser: snap_obj::Laser| {
             let stage_id = base
@@ -840,6 +1193,33 @@ impl Client {
                 },
             );
         };
+        let pickup_type_from_legacy = |pickup: &snap_obj::Pickup| match pickup.type_ {
+            0 => PickupType::PowerupHealth,
+            1 => PickupType::PowerupArmor,
+            2 => PickupType::PowerupWeapon(match pickup.subtype {
+                0 => WeaponType::Hammer,
+                1 => WeaponType::Gun,
+                2 => {
+                    if is_race {
+                        WeaponType::Puller
+                    } else {
+                        WeaponType::Shotgun
+                    }
+                }
+                3 => WeaponType::Grenade,
+                _ => WeaponType::Laser,
+            }),
+            3 => PickupType::PowerupNinja,
+            4 => PickupType::PowerupWeaponShield(if is_race {
+                WeaponType::Puller
+            } else {
+                WeaponType::Shotgun
+            }),
+            5 => PickupType::PowerupWeaponShield(WeaponType::Grenade),
+            6 => PickupType::PowerupNinjaShield,
+            7 => PickupType::PowerupWeaponShield(WeaponType::Laser),
+            _ => PickupType::PowerupArmor,
+        };
         let add_pickup = |snapshot: &mut Snapshot, id, pickup: snap_obj::Pickup| {
             let stage = snapshot.stages.get_mut(&player_stage).unwrap();
             let pickup_id = base.pickup_legacy_to_new_id.get(&id).copied().unwrap();
@@ -849,20 +1229,7 @@ impl Client {
                 SnapshotPickup {
                     core: PickupCore {
                         pos,
-                        ty: match pickup.type_ {
-                            0 => PickupType::PowerupHealth,
-                            1 => PickupType::PowerupArmor,
-                            2 => PickupType::PowerupWeapon(match pickup.subtype {
-                                0 => WeaponType::Hammer,
-                                1 => WeaponType::Gun,
-                                2 => WeaponType::Shotgun,
-                                3 => WeaponType::Grenade,
-                                _ => WeaponType::Laser,
-                            }),
-                            3 => PickupType::PowerupNinja,
-                            // TODO: armor shields
-                            _ => PickupType::PowerupArmor,
-                        },
+                        ty: pickup_type_from_legacy(&pickup),
                     },
                     reusable_core: PoolPickupReusableCore::new_without_pool(),
                     game_el_id: pickup_id,
@@ -886,6 +1253,12 @@ impl Client {
                             projectile.vel_x as f32 / 100.0,
                             projectile.vel_y as f32 / 100.0,
                         ),
+                        matches!(projectile.type_, enums::Weapon::Grenade),
+                        false,
+                        false,
+                        false,
+                        0,
+                        false,
                     );
                 }
                 SnapObj::Laser(laser) => {
@@ -1030,7 +1403,13 @@ impl Client {
                     let active_weapon = match character.weapon {
                         enums::WEAPON_HAMMER => WeaponType::Hammer,
                         enums::WEAPON_PISTOL => WeaponType::Gun,
-                        enums::WEAPON_SHOTGUN => WeaponType::Shotgun,
+                        enums::WEAPON_SHOTGUN => {
+                            if is_race {
+                                WeaponType::Puller
+                            } else {
+                                WeaponType::Shotgun
+                            }
+                        }
                         enums::WEAPON_GRENADE => WeaponType::Grenade,
                         enums::WEAPON_RIFLE => WeaponType::Laser,
                         // Weapon ninja
@@ -1048,25 +1427,38 @@ impl Client {
                         }
                     };
                     let mut weapons: FxLinkedHashMap<WeaponType, Weapon> = Default::default();
+                    let weapon_ammo = (!is_race).then_some(10);
+                    let def_weapon = Weapon {
+                        next_ammo_regeneration_tick: Default::default(),
+                        cur_ammo: weapon_ammo,
+                        upgrades: PoolFxHashSet::new_without_pool(),
+                    };
                     if let Some(ddnet_char) = ddnet_char {
                         if (ddnet_char.flags & CHARACTERFLAG_WEAPON_HAMMER) != 0 {
-                            weapons.insert(WeaponType::Hammer, Weapon::default());
+                            weapons.insert(WeaponType::Hammer, def_weapon.clone());
                         }
                         if (ddnet_char.flags & CHARACTERFLAG_WEAPON_GUN) != 0 {
-                            weapons.insert(WeaponType::Gun, Weapon::default());
+                            weapons.insert(WeaponType::Gun, def_weapon.clone());
                         }
                         if (ddnet_char.flags & CHARACTERFLAG_WEAPON_SHOTGUN) != 0 {
-                            weapons.insert(WeaponType::Shotgun, Weapon::default());
+                            weapons.insert(
+                                if is_race {
+                                    WeaponType::Puller
+                                } else {
+                                    WeaponType::Shotgun
+                                },
+                                def_weapon.clone(),
+                            );
                         }
                         if (ddnet_char.flags & CHARACTERFLAG_WEAPON_GRENADE) != 0 {
-                            weapons.insert(WeaponType::Grenade, Weapon::default());
+                            weapons.insert(WeaponType::Grenade, def_weapon.clone());
                         }
                         if (ddnet_char.flags & CHARACTERFLAG_WEAPON_LASER) != 0 {
-                            weapons.insert(WeaponType::Laser, Weapon::default());
+                            weapons.insert(WeaponType::Laser, def_weapon.clone());
                         }
                     }
                     let active_weapon = if !weapons.contains_key(&active_weapon) {
-                        weapons.insert(active_weapon, Default::default());
+                        weapons.insert(active_weapon, def_weapon.clone());
                         active_weapon
                     } else {
                         active_weapon
@@ -1171,6 +1563,26 @@ impl Client {
                     if let Some(ddnet_char) = ddnet_char {
                         core.jumps.max = ddnet_char.jumps;
                         core.jumps.count = ddnet_char.jumped_total;
+                        core.set_weapon_hit_disabled(
+                            WeaponType::Hammer,
+                            (ddnet_char.flags & CHARACTERFLAG_HAMMER_HIT_DISABLED) != 0,
+                        );
+                        core.set_weapon_hit_disabled(
+                            if is_race {
+                                WeaponType::Puller
+                            } else {
+                                WeaponType::Shotgun
+                            },
+                            (ddnet_char.flags & CHARACTERFLAG_SHOTGUN_HIT_DISABLED) != 0,
+                        );
+                        core.set_weapon_hit_disabled(
+                            WeaponType::Grenade,
+                            (ddnet_char.flags & CHARACTERFLAG_GRENADE_HIT_DISABLED) != 0,
+                        );
+                        core.set_weapon_hit_disabled(
+                            WeaponType::Laser,
+                            (ddnet_char.flags & CHARACTERFLAG_LASER_HIT_DISABLED) != 0,
+                        );
                         inp.cursor.set(CharacterInputCursor::from_vec2(&dvec2::new(
                             ddnet_char.target_x as f64 / 32.0,
                             ddnet_char.target_y as f64 / 32.0,
@@ -1184,28 +1596,60 @@ impl Client {
                             debuffs: Default::default(),
                             interactions: Default::default(),
                             queued_emoticon: Default::default(),
+                            switch_states: Default::default(),
                         });
-                    if let Some(ddnet_char) = ddnet_char
-                        && ddnet_char.freeze_start.0 != 0
-                    {
-                        let remaining = ddnet_char.freeze_end.0.saturating_sub(tick);
-                        let length = ddnet_char
-                            .freeze_end
-                            .0
-                            .saturating_sub(ddnet_char.freeze_start.0)
-                            .unsigned_abs();
-                        reusable_core.debuffs.insert(
-                            CharacterDebuff::Freeze,
-                            BuffProps {
-                                remaining_tick: GameTickCooldownAndLength::new_with_length(
-                                    remaining.unsigned_abs() as u64,
-                                    length as u64,
-                                ),
-                                interact_tick: Default::default(),
-                                interact_cursor_dir: Default::default(),
-                                interact_val: 0.0,
-                            },
-                        );
+                    if let Some(ddnet_char) = ddnet_char {
+                        if ddnet_char.freeze_start.0 != 0
+                            && (ddnet_char.freeze_start.0 < ddnet_char.freeze_end.0
+                                || ddnet_char.freeze_end.0 == -1)
+                        {
+                            let remaining = ddnet_char.freeze_end.0.saturating_sub(tick);
+                            let length = ddnet_char
+                                .freeze_end
+                                .0
+                                .saturating_sub(ddnet_char.freeze_start.0)
+                                .unsigned_abs();
+                            let freeze_refresh_guard_end = ddnet_char
+                                .freeze_start
+                                .0
+                                .saturating_add(TICKS_PER_SECOND as i32);
+                            let freeze_refresh_guard = if freeze_refresh_guard_end > tick {
+                                (freeze_refresh_guard_end - tick) as u64
+                            } else {
+                                0
+                            };
+                            let (ty, remaining_tick) = if ddnet_char.freeze_end.0 == -1 {
+                                (CharacterDebuff::DeepFrozen, GameTickType::MAX.into())
+                            } else {
+                                (
+                                    CharacterDebuff::Freeze,
+                                    GameTickCooldownAndLength::new_with_length(
+                                        remaining.unsigned_abs() as u64,
+                                        length as u64,
+                                    ),
+                                )
+                            };
+                            reusable_core.debuffs.insert(
+                                ty,
+                                BuffProps {
+                                    remaining_tick,
+                                    interact_tick: freeze_refresh_guard.into(),
+                                    interact_cursor_dir: Default::default(),
+                                    interact_val: 0.0,
+                                },
+                            );
+                        }
+                        if (ddnet_char.flags & CHARACTERFLAG_MOVEMENTS_DISABLED) != 0 {
+                            reusable_core.debuffs.insert(
+                                CharacterDebuff::LiveFrozen,
+                                BuffProps {
+                                    remaining_tick: GameTickType::MAX.into(),
+                                    interact_tick: 0.into(),
+                                    interact_cursor_dir: Default::default(),
+                                    interact_val: 0.0,
+                                },
+                            );
+                        }
                     }
                     if let Some(collision) = collision {
                         let mut char_tick = character_core.tick;
@@ -1274,7 +1718,13 @@ impl Client {
                                 .flatten()
                                 .or(inp);
                             let use_inp = inp.is_some()
-                                && !reusable_core.debuffs.contains_key(&CharacterDebuff::Freeze);
+                                && !reusable_core.debuffs.contains_key(&CharacterDebuff::Freeze)
+                                && !reusable_core
+                                    .debuffs
+                                    .contains_key(&CharacterDebuff::DeepFrozen)
+                                && !reusable_core
+                                    .debuffs
+                                    .contains_key(&CharacterDebuff::LiveFrozen);
                             let inp = inp.unwrap_or_default();
                             core.physics_tick(
                                 &mut fake_pos,
@@ -1312,6 +1762,7 @@ impl Client {
                             WeaponType::Hammer => TICKS_PER_SECOND / 3,
                             WeaponType::Gun => TICKS_PER_SECOND / 8,
                             WeaponType::Shotgun => TICKS_PER_SECOND / 2,
+                            WeaponType::Puller => TICKS_PER_SECOND / 2,
                             WeaponType::Grenade => TICKS_PER_SECOND / 2,
                             WeaponType::Laser => (TICKS_PER_SECOND * 800) / 1000,
                         } as i32;
@@ -1565,7 +2016,14 @@ impl Client {
                                     reusable_core: {
                                         let mut core =
                                             PoolCharacterReusableCore::new_without_pool();
-                                        core.weapons.insert(WeaponType::Hammer, Weapon::default());
+                                        core.weapons.insert(
+                                            WeaponType::Hammer,
+                                            Weapon {
+                                                next_ammo_regeneration_tick: Default::default(),
+                                                cur_ammo: (!is_race).then_some(10),
+                                                upgrades: PoolFxHashSet::new_without_pool(),
+                                            },
+                                        );
                                         core
                                     },
                                     player_info: char_player_info,
@@ -1742,6 +2200,20 @@ impl Client {
                         projectile.type_,
                         projectile.start_tick,
                         vel,
+                        (projectile.flags & PROJECTILEFLAG_EXPLOSIVE) != 0,
+                        projectile.owner < 0,
+                        projectile.owner < 0,
+                        (projectile.flags & PROJECTILEFLAG_FREEZE) != 0,
+                        (if (projectile.flags & PROJECTILEFLAG_BOUNCE_HORIZONTAL) != 0 {
+                            1
+                        } else {
+                            0
+                        }) | (if (projectile.flags & PROJECTILEFLAG_BOUNCE_VERTICAL) != 0 {
+                            2
+                        } else {
+                            0
+                        }),
+                        projectile.owner < 0,
                     );
                 }
                 SnapObj::DdnetPickup(ddnet_pickup) => {
@@ -1799,6 +2271,20 @@ impl Client {
                             ),
                         }),
                     );
+                    events.events.insert(
+                        base.event_id_generator.next_id(),
+                        events::GameWorldEvent::Sound(events::GameWorldSoundEvent {
+                            pos: Some(
+                                vec2::new(spawn.common.x as f32, spawn.common.y as f32) / 32.0,
+                            ),
+                            owner_id: Some(player_id),
+                            ev: events::GameWorldEntitySoundEvent::Character(
+                                events::GameCharacterSoundEvent::Sound(
+                                    events::GameCharacterEventSound::Spawn,
+                                ),
+                            ),
+                        }),
+                    );
                 }
                 SnapObj::HammerHit(hammer_hit) => {
                     let events = base
@@ -1817,6 +2303,21 @@ impl Client {
                             ev: events::GameWorldEntityEffectEvent::Character(
                                 events::GameCharacterEffectEvent::Effect(
                                     events::GameCharacterEventEffect::HammerHit,
+                                ),
+                            ),
+                        }),
+                    );
+                    events.events.insert(
+                        base.event_id_generator.next_id(),
+                        events::GameWorldEvent::Sound(events::GameWorldSoundEvent {
+                            pos: Some(
+                                vec2::new(hammer_hit.common.x as f32, hammer_hit.common.y as f32)
+                                    / 32.0,
+                            ),
+                            owner_id: Some(player_id),
+                            ev: events::GameWorldEntitySoundEvent::Character(
+                                events::GameCharacterSoundEvent::Sound(
+                                    events::GameCharacterEventSound::HammerHit,
                                 ),
                             ),
                         }),
@@ -1867,9 +2368,11 @@ impl Client {
                                 }
                                 enums::Sound::ShotgunFire => {
                                     events::GameWorldEntitySoundEvent::Character(
-                                        events::GameCharacterSoundEvent::Sound(
-                                            events::GameCharacterEventSound::ShotgunFire,
-                                        ),
+                                        events::GameCharacterSoundEvent::Sound(if is_race {
+                                            events::GameCharacterEventSound::PullerFire
+                                        } else {
+                                            events::GameCharacterEventSound::ShotgunFire
+                                        }),
                                     )
                                 }
                                 enums::Sound::GrenadeFire => {
@@ -2046,9 +2549,15 @@ impl Client {
                                     )
                                 }
                                 enums::Sound::PickupShotgun => {
-                                    events::GameWorldEntitySoundEvent::Shotgun(
-                                        events::GameShotgunEventSound::Collect,
-                                    )
+                                    if is_race {
+                                        events::GameWorldEntitySoundEvent::Puller(
+                                            events::GamePullerEventSound::Collect,
+                                        )
+                                    } else {
+                                        events::GameWorldEntitySoundEvent::Shotgun(
+                                            events::GameShotgunEventSound::Collect,
+                                        )
+                                    }
                                 }
                                 enums::Sound::PickupNinja => {
                                     events::GameWorldEntitySoundEvent::Character(
@@ -2727,12 +3236,6 @@ impl Client {
 
                     if is_active_connection {
                         base.last_snap_tick = tick;
-                        *snapshot = Snapshot::new(
-                            &base.vanilla_snap_pool,
-                            base.id_generator.peek_next_id(),
-                            None,
-                            Default::default(),
-                        );
 
                         let mut local_player_legacy_id = None;
                         // search legacy id of local player
@@ -2863,7 +3366,21 @@ impl Client {
                                     items.insert(0, (SnapObj::Character(char), *id));
                                 }
                             }
+
+                            Self::push_dropped_player_left_events(
+                                base,
+                                snapshot,
+                                &char_legacy_to_new_id,
+                            );
+                            Self::flush_pending_game_kill_msgs(base);
                         }
+
+                        *snapshot = Snapshot::new(
+                            &base.vanilla_snap_pool,
+                            base.id_generator.peek_next_id(),
+                            None,
+                            Default::default(),
+                        );
 
                         let legacy_id_in_stage_id = &mut base.legacy_id_in_stage_id;
                         legacy_id_in_stage_id.clear();
@@ -2890,23 +3407,27 @@ impl Client {
                                 world: SnapshotWorld {
                                     characters: SnapshotCharacters::new_without_pool(),
                                     projectiles: SnapshotProjectiles::new_without_pool(),
+                                    ddrace_projectiles: SnapshotDdraceProjectiles::new_without_pool(
+                                    ),
                                     lasers: SnapshotLasers::new_without_pool(),
                                     pickups: SnapshotPickups::new_without_pool(),
                                     red_flags: SnapshotFlags::new_without_pool(),
                                     blue_flags: SnapshotFlags::new_without_pool(),
+                                    ddrace_entities: SnapshotDdraceEntities::new_without_pool(),
                                     inactive_objects: SnapshotInactiveObject {
                                         blue_flags: PoolVec::new_without_pool(),
                                         hearts: PoolVec::new_without_pool(),
                                         shields: PoolVec::new_without_pool(),
                                         red_flags: PoolVec::new_without_pool(),
-                                        weapons: [
-                                            PoolVec::new_without_pool(),
-                                            PoolVec::new_without_pool(),
-                                            PoolVec::new_without_pool(),
-                                            PoolVec::new_without_pool(),
-                                            PoolVec::new_without_pool(),
-                                        ],
+                                        weapons: std::array::from_fn(|_| {
+                                            PoolVec::new_without_pool()
+                                        }),
+                                        weapon_shields: std::array::from_fn(|_| {
+                                            PoolVec::new_without_pool()
+                                        }),
                                         ninjas: PoolVec::new_without_pool(),
+                                        ninja_shields: PoolVec::new_without_pool(),
+                                        ddrace_entities: PoolVec::new_without_pool(),
                                     },
                                 },
                             }
@@ -3041,15 +3562,15 @@ impl Client {
                 }
             }
             (_, SystemOrGame::Game(Game::SvChat(chat))) => {
+                if chat.client_id == -1 && Self::is_legacy_leave_system_chat(chat.message) {
+                    return;
+                }
+
                 let (name, skin, skin_info) = if let Some(character) = base
                     .legacy_id_in_stage_id
                     .get(&chat.client_id)
                     .and_then(|s| snapshot.stages.get(s))
-                    .and_then(|s| {
-                        base.char_legacy_to_new_id
-                            .get(&chat.client_id)
-                            .map(|c| (s, c))
-                    })
+                    .zip(base.char_legacy_to_new_id.get(&chat.client_id))
                     .and_then(|(s, c)| s.world.characters.get(c))
                 {
                     let p = &character.player_info.player_info;
@@ -3179,63 +3700,12 @@ impl Client {
                     .insert(emoticon.client_id, (time.now(), emoticon.emoticon));
             }
             (_, SystemOrGame::Game(Game::SvKillMsg(msg))) => {
-                let events = base
-                    .events
-                    .worlds
-                    .entry(base.stage_0_id)
-                    .or_insert_with_keep_order(|| events::GameWorldEvents {
-                        events: mt_datatypes::PoolFxLinkedHashMap::new_without_pool(),
-                    });
                 const WEAPON_GAME: i32 = -3; // team switching etc
-                const WEAPON_SELF: i32 = -2; // console kill command
-                const WEAPON_WORLD: i32 = -1; // death tiles etc
-                const WEAPON_HAMMER: i32 = 0;
-                const WEAPON_GUN: i32 = 1;
-                const WEAPON_SHOTGUN: i32 = 2;
-                const WEAPON_GRENADE: i32 = 3;
-                const WEAPON_LASER: i32 = 4;
-                const WEAPON_NINJA: i32 = 5;
-                events.events.insert(
-                    base.event_id_generator.next_id(),
-                    events::GameWorldEvent::Notification(GameWorldNotificationEvent::Action(
-                        events::GameWorldAction::Kill {
-                            killer: base.char_legacy_to_new_id.get(&msg.killer).copied(),
-                            assists: mt_datatypes::PoolVec::new_without_pool(),
-                            victims: mt_datatypes::PoolVec::from_without_pool(
-                                if [WEAPON_WORLD, WEAPON_SELF, WEAPON_GAME].contains(&msg.weapon) {
-                                    Default::default()
-                                } else {
-                                    base.char_legacy_to_new_id
-                                        .get(&msg.victim)
-                                        .copied()
-                                        .into_iter()
-                                        .collect()
-                                },
-                            ),
-                            weapon: match msg.weapon {
-                                WEAPON_HAMMER => events::GameWorldActionKillWeapon::Weapon {
-                                    weapon: WeaponType::Hammer,
-                                },
-                                WEAPON_GUN => events::GameWorldActionKillWeapon::Weapon {
-                                    weapon: WeaponType::Gun,
-                                },
-                                WEAPON_SHOTGUN => events::GameWorldActionKillWeapon::Weapon {
-                                    weapon: WeaponType::Shotgun,
-                                },
-                                WEAPON_GRENADE => events::GameWorldActionKillWeapon::Weapon {
-                                    weapon: WeaponType::Grenade,
-                                },
-                                WEAPON_LASER => events::GameWorldActionKillWeapon::Weapon {
-                                    weapon: WeaponType::Laser,
-                                },
-                                WEAPON_NINJA => events::GameWorldActionKillWeapon::Ninja,
-                                // WEAPON_WORLD | WEAPON_SELF | WEAPON_GAME
-                                _ => events::GameWorldActionKillWeapon::World,
-                            },
-                            flags: Default::default(),
-                        },
-                    )),
-                );
+                if msg.weapon == WEAPON_GAME {
+                    base.pending_game_kill_msgs.push(msg);
+                } else {
+                    Self::push_kill_notification(base, msg);
+                }
             }
             (_, SystemOrGame::Game(Game::SvTuneParams(tunes))) => {
                 base.tunes.ground_control_speed = tunes.ground_control_speed.to_float();
@@ -4339,6 +4809,11 @@ impl Client {
 
     fn handle_server_events_and_sleep(&mut self) -> anyhow::Result<()> {
         if let Some(con_id) = self.con_id {
+            let retry_timeout = self
+                .retry_full_server_at
+                .filter(|_| self.retry_full_server_task.is_none())
+                .map(|retry_at| retry_at.saturating_sub(self.time.now()));
+
             let mut event_handler = |socket: &mut SocketClient,
                                      ev: libtw2_net::net::ChunkOrEvent<'_, SocketAddr>,
                                      base: &mut ClientBase,
@@ -4398,7 +4873,22 @@ impl Client {
                             .log(format!("Proxy client got disconnected: {reason}"));
                         socket.skip_disconnect_on_drop = true;
                         if is_main_connection {
-                            self.server_network.kick(&con_id, KickType::Kick(reason));
+                            if Self::server_full_disconnect(&reason) {
+                                self.log.log(
+                                    "Legacy server is full, waiting for a free slot before reconnecting.",
+                                );
+                                self.retry_full_server_at = Some(self.time.now());
+                                self.server_network.send_unordered_to(
+                                    &ServerToClientMessage::QueueInfo(
+                                        "The legacy server is full.\nWaiting for a free slot."
+                                            .try_into()
+                                            .unwrap(),
+                                    ),
+                                    &con_id,
+                                );
+                            } else {
+                                self.server_network.kick(&con_id, KickType::Kick(reason));
+                            }
                         }
                     }
                     Connect(_) => {
@@ -4517,15 +5007,10 @@ impl Client {
 
                             let first_connect = self.http_server.is_none();
 
-                            let ServerInfoTy::Full(server_info) = &self.base.server_info else {
+                            let ServerInfoTy::Full(_) = &self.base.server_info else {
                                 panic!("server info not received, bug in code.");
                             };
-                            let game_type = server_info.game_type.to_lowercase();
-                            let is_race = game_type == "race"
-                                || game_type.contains("ddrace")
-                                || game_type.contains("block")
-                                || game_type == "gores";
-                            let is_race = is_race && self.base.capabilities.is_ddnet;
+                            let is_race = self.base.is_race();
 
                             let server_info = MsgSvServerInfo {
                                 map: map_name.try_into().unwrap(),
@@ -4533,7 +5018,11 @@ impl Client {
                                 required_resources: Default::default(),
                                 game_mod: GameModification::Ddnet,
                                 render_mod: RenderModification::Native,
-                                mod_config: None,
+                                mod_config: serde_json::to_vec(&ConfigVanilla {
+                                    game_type: ConfigGameType::Race,
+                                    ..Default::default()
+                                })
+                                .ok(),
                                 resource_server_fallback: Some(http_server.port_v4),
                                 hint_start_camera_pos: Default::default(),
                                 server_options: GameStateServerOptions {
@@ -4647,7 +5136,7 @@ impl Client {
                 .values()
                 .map(|p| p.socket.socket.receivers())
                 .collect();
-            let (pkt, index) = self
+            let (pkt, index, receiver_start_index) = self
                 .io
                 .rt
                 .spawn(async move {
@@ -4655,7 +5144,7 @@ impl Client {
                         Pin<Box<dyn Future<Output = Option<(Vec<u8>, SocketAddr)>> + Send>>;
                     let mut futures: Vec<SockFuture> = vec![
                         Box::pin(async move {
-                            net.wait_for_event_async(None).await;
+                            net.wait_for_event_async(retry_timeout).await;
                             None
                         }),
                         Box::pin(async move {
@@ -4663,20 +5152,21 @@ impl Client {
                             None
                         }),
                     ];
+                    let receiver_start_index = futures.len();
                     futures.extend(receivers.into_iter().map(|(v4, v6)| {
                         let future: SockFuture =
                             Box::pin(async move { Socket::recv_from(v4, v6).await });
                         future
                     }));
                     let (res, index, _) = futures::future::select_all(futures).await;
-                    Ok((res, index))
+                    Ok((res, index, receiver_start_index))
                 })
                 .get()
                 .unwrap();
             if let Some((data, addr)) = pkt
-                && index > 1
+                && index >= receiver_start_index
             {
-                let index = index - 2;
+                let index = index - receiver_start_index;
 
                 let other_active = if index > 0 {
                     self.players
@@ -4706,12 +5196,16 @@ impl Client {
         } else {
             let notify = self.notifier_server.clone();
             let finish_notify = self.finish_notifier.clone();
+            let retry_timeout = self
+                .retry_full_server_at
+                .filter(|_| self.retry_full_server_task.is_none())
+                .map(|retry_at| retry_at.saturating_sub(self.time.now()));
             let _ = self
                 .io
                 .rt
                 .spawn(async move {
                     tokio::select! {
-                        _ = notify.wait_for_event_async(None) => {}
+                        _ = notify.wait_for_event_async(retry_timeout) => {}
                         _ = finish_notify.notified() => {}
                     }
                     Ok(())
@@ -4724,6 +5218,8 @@ impl Client {
 
     fn run_once(&mut self) -> anyhow::Result<()> {
         self.handle_client_events()?;
+
+        self.retry_full_server_connect()?;
 
         self.handle_server_events_and_sleep()?;
 

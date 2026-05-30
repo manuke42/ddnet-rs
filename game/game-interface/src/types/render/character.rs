@@ -45,6 +45,10 @@ pub struct CharacterBuffInfo {
 pub enum CharacterDebuff {
     /// character is freezed (e.g. ddrace freeze)
     Freeze,
+    /// character is deep frozen (ddrace)
+    DeepFrozen,
+    /// character is live frozen (ddrace)
+    LiveFrozen,
 }
 
 #[derive(Debug, Hiarc, Clone, Copy, Serialize, Deserialize)]

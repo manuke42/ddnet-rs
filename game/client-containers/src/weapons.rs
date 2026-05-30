@@ -80,6 +80,16 @@ pub struct Shotgun {
 }
 
 #[derive(Debug, Hiarc, Clone)]
+pub struct Puller {
+    pub weapon: Weapon,
+    pub spawn: Vec<SoundObject>,
+    pub collect: Vec<SoundObject>,
+
+    pub projectile: WeaponProjectile,
+    pub muzzles: WeaponMuzzles,
+}
+
+#[derive(Debug, Hiarc, Clone)]
 pub struct Hammer {
     pub weapon: Weapon,
     pub hits: Vec<SoundObject>,
@@ -90,6 +100,7 @@ pub struct Weapons {
     pub hammer: Hammer,
     pub gun: Gun,
     pub shotgun: Shotgun,
+    pub puller: Puller,
     pub grenade: Grenade,
     pub laser: Laser,
 }
@@ -100,6 +111,7 @@ impl Weapons {
             WeaponType::Hammer => &self.hammer.weapon,
             WeaponType::Gun => &self.gun.weapon,
             WeaponType::Shotgun => &self.shotgun.weapon,
+            WeaponType::Puller => &self.puller.weapon,
             WeaponType::Grenade => &self.grenade.weapon,
             WeaponType::Laser => &self.laser.weapon,
         }
@@ -528,6 +540,66 @@ impl LoadShotgun {
 }
 
 #[derive(Debug, Hiarc)]
+pub struct LoadPuller {
+    weapon: LoadWeapon,
+
+    projectile: LoadProjectile,
+    muzzles: LoadMuzzles,
+
+    spawn: Vec<SoundBackendMemory>,
+    collect: Vec<SoundBackendMemory>,
+}
+
+impl LoadPuller {
+    pub fn new(
+        graphics_mt: &GraphicsMultiThreaded,
+        sound_mt: &SoundMultiThreaded,
+        files: &ContainerLoadedItemDir,
+        default_files: &ContainerLoadedItemDir,
+        weapon_name: &str,
+        weapon_part: &str,
+    ) -> anyhow::Result<Self> {
+        Ok(Self {
+            weapon: LoadWeapon::new(
+                graphics_mt,
+                sound_mt,
+                files,
+                default_files,
+                weapon_name,
+                weapon_part,
+            )?,
+
+            spawn: load_sound_file_part_list_and_upload(
+                sound_mt,
+                files,
+                default_files,
+                weapon_name,
+                &[weapon_part, "audio"],
+                "spawn",
+            )?,
+
+            collect: load_sound_file_part_list_and_upload(
+                sound_mt,
+                files,
+                default_files,
+                weapon_name,
+                &[weapon_part, "audio"],
+                "collect",
+            )?,
+
+            projectile: LoadProjectile::new(
+                graphics_mt,
+                files,
+                default_files,
+                weapon_name,
+                weapon_part,
+            )?,
+            muzzles: LoadMuzzles::new(graphics_mt, files, default_files, weapon_name, weapon_part)?,
+        })
+    }
+}
+
+#[derive(Debug, Hiarc)]
 pub struct LoadHammer {
     weapon: LoadWeapon,
 
@@ -570,6 +642,7 @@ pub struct LoadWeapons {
     hammer: LoadHammer,
     gun: LoadGun,
     shotgun: LoadShotgun,
+    puller: LoadPuller,
     grenade: LoadGrenade,
     laser: LoadLaser,
 
@@ -611,6 +684,15 @@ impl LoadWeapons {
                 default_files,
                 weapon_name,
                 "shotgun",
+            )?,
+            // puller
+            puller: LoadPuller::new(
+                graphics_mt,
+                sound_mt,
+                &files,
+                default_files,
+                weapon_name,
+                "puller",
             )?,
             // grenade
             grenade: LoadGrenade::new(
@@ -690,6 +772,32 @@ impl LoadWeapons {
                     .projectile
                     .load(texture_handle, &self.weapon_name),
                 muzzles: self.shotgun.muzzles.load(texture_handle, &self.weapon_name),
+            },
+            puller: Puller {
+                weapon: LoadWeapon::load_files_into_objects(
+                    texture_handle,
+                    sound_object_handle,
+                    self.puller.weapon,
+                    &self.weapon_name,
+                ),
+                spawn: self
+                    .puller
+                    .spawn
+                    .into_iter()
+                    .map(|s| sound_object_handle.create(s))
+                    .collect(),
+                collect: self
+                    .puller
+                    .collect
+                    .into_iter()
+                    .map(|s| sound_object_handle.create(s))
+                    .collect(),
+
+                projectile: self
+                    .puller
+                    .projectile
+                    .load(texture_handle, &self.weapon_name),
+                muzzles: self.puller.muzzles.load(texture_handle, &self.weapon_name),
             },
             grenade: Grenade {
                 weapon: LoadWeapon::load_files_into_objects(

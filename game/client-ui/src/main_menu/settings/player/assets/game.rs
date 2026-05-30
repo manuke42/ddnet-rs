@@ -74,6 +74,8 @@ pub fn game_list(
             index += 1;
             render_texture(&game.lose_shotgun, index);
             index += 1;
+            render_texture(&game.lose_puller, index);
+            index += 1;
             render_texture(&game.heart.tex, index);
             index += 1;
             render_texture(&game.shield.tex, index);

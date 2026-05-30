@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 pub enum LaserType {
     #[default]
     Rifle,
-    Shotgun, // TODO: rename to puller?
+    Puller,
     Door,
     Freeze,
 }

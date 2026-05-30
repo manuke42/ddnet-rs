@@ -38,3 +38,8 @@ Android
 # using https://github.com/rust-mobile/xbuild
 x build --release --arch arm64 --platform android --format apk -p ddnet-rs --features bundled_data_dir
 ```
+
+AI Usage
+-------
+
+Using AI is totally fine, but as powerful as these tools are, they are probability machines and differently than humans have much less self reflection and cannot learn on the fly. Even if they are 90% correct, they rarely are 100% correct. Human review for correctness and code quality by the developer that uses these tools is a must! Maintainers cannot do the heavy work for you.

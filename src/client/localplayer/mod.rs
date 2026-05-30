@@ -81,4 +81,31 @@ pub struct ClientPlayer {
     pub cursor_last_cam_mode: Option<PlayerCameraMode>,
 }
 
+impl ClientPlayer {
+    pub fn apply_zoom_step(&mut self, cur_time: &Duration) {
+        if let Some(state) = &mut self.zoom_state {
+            const UPDATE_TIME: Duration = Duration::from_millis(50);
+            const FIRST_UPDATE_TIME: Duration = Duration::from_millis(250);
+            if state
+                .last_apply_time
+                .is_none_or(|t| *cur_time >= t + UPDATE_TIME)
+            {
+                const ZOOM_STEP: f32 = 1.1;
+                let zoom_factor = match state.mode {
+                    ClientPlayerZoomMode::ZoomingIn => 1.0 / ZOOM_STEP,
+                    ClientPlayerZoomMode::ZoomingOut => ZOOM_STEP,
+                };
+                self.zoom = (self.zoom * zoom_factor).clamp(0.01, 1024.0);
+
+                let apply_time = state
+                    .last_apply_time
+                    .map(|t| cur_time.saturating_sub(cur_time.saturating_sub(t + UPDATE_TIME)))
+                    .unwrap_or_else(|| cur_time.saturating_add(FIRST_UPDATE_TIME));
+
+                state.last_apply_time = Some(apply_time);
+            }
+        }
+    }
+}
+
 pub type LocalPlayers = FxLinkedHashMap<PlayerId, ClientPlayer>;
