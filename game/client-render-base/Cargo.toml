@@ -43,4 +43,7 @@ rustc-hash = "2.1.1"
 serde = { version = "1.0.228", features = ["derive"] }
 strum = { version = "0.27.2", features = ["derive"] }
 time = { version = "0.3.44", features = ["serde"] }
+tracing = { version = "0.1.41", default-features = false, features = [
+  "attributes",
+] }
 url = { version = "2.5.7", features = ["serde"] }

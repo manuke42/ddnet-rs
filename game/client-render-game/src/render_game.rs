@@ -18,7 +18,10 @@ use base::{
 };
 use base_io::io::Io;
 use camera::Camera;
-use client_containers::utils::{RenderGameContainers, load_containers};
+use client_containers::{
+    container::ContainerKey,
+    utils::{RenderGameContainers, load_containers},
+};
 pub use client_render::emote_wheel::render::EmoteWheelInput;
 use client_render::{
     actionfeed::render::{ActionfeedRender, ActionfeedRenderPipe},
@@ -112,6 +115,7 @@ use sound::{
     commands::SoundSceneCreateProps, scene_object::SceneObject, sound::SoundManager,
     sound_listener::SoundListener, types::SoundPlayProps,
 };
+use tracing::instrument;
 use ui_base::ui::UiCreator;
 use url::Url;
 
@@ -415,6 +419,22 @@ pub struct RenderGameInput {
 
 type RenderPlayerHelper = (i32, i32, u32, u32, (PlayerId, RenderGameForPlayer));
 
+macro_rules! for_each_resource_container {
+    ($call:ident) => {
+        $call!(skin_container, skin);
+        $call!(weapon_container, weapon);
+        $call!(hook_container, hook);
+        $call!(ctf_container, ctf);
+        $call!(ninja_container, ninja);
+        $call!(freeze_container, freeze);
+        $call!(entities_container, entities);
+        $call!(hud_container, hud);
+        $call!(emoticons_container, emoticons);
+        $call!(particles_container, particles);
+        $call!(game_container, game);
+    };
+}
+
 pub struct RenderGame {
     // containers
     containers: RenderGameContainers,
@@ -484,7 +504,7 @@ impl RenderGame {
             Some("downloaded".as_ref()),
         ));
 
-        let mut containers = load_containers(
+        let containers = load_containers(
             io,
             thread_pool,
             props.resource_http_download_url,
@@ -516,7 +536,7 @@ impl RenderGame {
         let motd = MotdRender::new(graphics, &creator);
         let spectator_selection = SpectatorSelectionRender::new(graphics, &creator);
 
-        let mut map_vote_thumbnails_container = load_thumbnail_container(
+        let map_vote_thumbnails_container = load_thumbnail_container(
             io.clone(),
             thread_pool.clone(),
             DEFAULT_THUMBNAIL_CONTAINER_PATH,
@@ -525,13 +545,6 @@ impl RenderGame {
             sound,
             scene.clone(),
             props.resource_download_server,
-        );
-
-        Self::update_containers_impl(
-            &mut containers,
-            &mut map_vote_thumbnails_container,
-            cur_time,
-            props.client_local_infos.iter(),
         );
 
         Ok(Self {
@@ -2539,7 +2552,7 @@ impl RenderGame {
         }
     }
 
-    fn check_required_containers_loaded(&mut self) -> bool {
+    fn check_required_local_character_containers_loaded(&mut self) -> bool {
         let loaded = self.client_local_infos.iter().all(|i| {
             self.containers.skin_container.is_loaded_or_failed(&i.skin)
                 && self
@@ -2559,6 +2572,29 @@ impl RenderGame {
         loaded
     }
 
+    fn check_required_containers_default_loaded(containers: &mut RenderGameContainers) -> bool {
+        let mut loaded = true;
+
+        macro_rules! check_loaded {
+            ($container:ident, $resource:ident) => {
+                let is_loaded = containers.$container.is_default_task_loaded();
+
+                // if loaded also load into memory
+                if is_loaded {
+                    containers
+                        .$container
+                        .get_or_default_opt(None::<&ContainerKey>);
+                }
+
+                loaded &= is_loaded;
+            };
+        }
+
+        for_each_resource_container!(check_loaded);
+
+        loaded
+    }
+
     fn update_containers_impl<'a, F>(
         containers: &mut RenderGameContainers,
         map_vote_thumbnails_container: &mut ThumbnailContainer,
@@ -2567,90 +2603,32 @@ impl RenderGame {
     ) where
         F: Iterator<Item = &'a NetworkCharacterInfo> + Clone,
     {
-        containers.skin_container.update(
-            cur_time,
-            &Duration::from_secs(5),
-            &Duration::from_secs(1),
-            character_infos.clone().map(|info| info.skin.borrow()),
-            None,
-        );
-        containers.weapon_container.update(
-            cur_time,
-            &Duration::from_secs(5),
-            &Duration::from_secs(1),
-            character_infos.clone().map(|info| info.weapon.borrow()),
-            None,
-        );
-        containers.hook_container.update(
-            cur_time,
-            &Duration::from_secs(5),
-            &Duration::from_secs(1),
-            character_infos.clone().map(|info| info.hook.borrow()),
-            None,
-        );
-        containers.ctf_container.update(
-            cur_time,
-            &Duration::from_secs(5),
-            &Duration::from_secs(1),
-            character_infos.clone().map(|info| info.ctf.borrow()),
-            None,
-        );
-        containers.ninja_container.update(
-            cur_time,
-            &Duration::from_secs(5),
-            &Duration::from_secs(1),
-            character_infos.clone().map(|info| info.ninja.borrow()),
-            None,
-        );
-        containers.freeze_container.update(
-            cur_time,
-            &Duration::from_secs(5),
-            &Duration::from_secs(1),
-            character_infos.clone().map(|info| info.freeze.borrow()),
-            None,
-        );
-        containers.entities_container.update(
-            cur_time,
-            &Duration::from_secs(5),
-            &Duration::from_secs(1),
-            character_infos.clone().map(|info| info.entities.borrow()),
-            None,
-        );
-        containers.hud_container.update(
-            cur_time,
-            &Duration::from_secs(5),
-            &Duration::from_secs(1),
-            character_infos.clone().map(|info| info.hud.borrow()),
-            None,
-        );
-        containers.emoticons_container.update(
-            cur_time,
-            &Duration::from_secs(5),
-            &Duration::from_secs(1),
-            character_infos.clone().map(|info| info.emoticons.borrow()),
-            None,
-        );
-        containers.particles_container.update(
-            cur_time,
-            &Duration::from_secs(5),
-            &Duration::from_secs(1),
-            character_infos.clone().map(|info| info.particles.borrow()),
-            None,
-        );
-        containers.game_container.update(
-            cur_time,
-            &Duration::from_secs(5),
-            &Duration::from_secs(1),
-            character_infos.map(|info| info.game.borrow()),
-            None,
-        );
-        map_vote_thumbnails_container.update(
-            cur_time,
-            &Duration::from_secs(5),
-            &Duration::from_secs(1),
-            [].into_iter(),
-            None,
-        );
+        let keep_alive = Duration::from_secs(5);
+        let timeout = Duration::from_secs(1);
+
+        macro_rules! update_container {
+            ($container:ident, $resource:ident) => {
+                containers.$container.update(
+                    cur_time,
+                    &keep_alive,
+                    &timeout,
+                    character_infos.clone().map(|info| info.$resource.borrow()),
+                    None,
+                );
+            };
+        }
+
+        for_each_resource_container!(update_container);
+
+        if map_vote_thumbnails_container.is_default_loaded() {
+            map_vote_thumbnails_container.update(
+                cur_time,
+                &keep_alive,
+                &timeout,
+                [].into_iter(),
+                None,
+            );
+        }
     }
 
     fn update_containers(
@@ -2872,8 +2850,11 @@ impl RenderGameInterface for RenderGame {
         res
     }
 
+    #[instrument(level = "trace", skip_all)]
     fn continue_loading(&mut self) -> Result<bool, String> {
-        let containers_loaded = self.check_required_containers_loaded();
+        let containers_loaded =
+            Self::check_required_containers_default_loaded(&mut self.containers)
+                && self.check_required_local_character_containers_loaded();
         self.map
             .continue_loading()
             .map(|m| m.is_some() && containers_loaded)

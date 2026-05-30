@@ -152,7 +152,7 @@ pub fn load_thumbnail_container(
         &scene,
         path.as_ref(),
         ContainerLoadOptions {
-            assume_unused: true,
+            assume_unused: false,
             ..Default::default()
         },
     )

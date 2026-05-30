@@ -89,6 +89,7 @@ pub mod state {
     use legacy_map::mapdef_06::EntityTiles;
     use pool::rc::PoolRc;
     use rustc_hash::FxHashMap;
+    use tracing::instrument;
 
     use crate::collision::collision::Tunings;
     use crate::command_chain::{Command, CommandChain};
@@ -685,6 +686,7 @@ pub mod state {
     }
 
     impl GameStateCreate for GameState {
+        #[instrument(level = "trace", skip_all)]
         fn new(
             map: Vec<u8>,
             map_name: NetworkReducedAsciiString<MAX_MAP_NAME_LEN>,

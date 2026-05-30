@@ -41,6 +41,7 @@ use map::{file::MapFileReader, map::Map};
 use math::math::vector::vec2;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sound::{commands::SoundSceneCreateProps, scene_handle::SoundSceneHandle, sound::SoundManager};
+use tracing::instrument;
 use url::Url;
 use vanilla::collision::collision::Collision;
 
@@ -553,6 +554,7 @@ impl ClientMapRender {
         }
     }
 
+    #[instrument(level = "trace", skip_all)]
     pub fn continue_loading(&mut self) -> anyhow::Result<Option<&ClientMapRenderAndFile>> {
         let mut eval = || {
             let mut self_helper = Self::None;
