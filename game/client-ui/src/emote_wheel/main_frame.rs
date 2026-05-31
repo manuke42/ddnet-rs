@@ -11,7 +11,7 @@ use math::math::{
 use tracing::instrument;
 use ui_base::types::{UiRenderPipe, UiState};
 
-use crate::utils::{render_emoticon_for_ui, render_tee_for_ui, rotate};
+use client_ui_utils::{render_emoticon_for_ui, render_tee_for_ui, rotate};
 
 use super::user_data::{EmoteWheelEvent, UserData};
 

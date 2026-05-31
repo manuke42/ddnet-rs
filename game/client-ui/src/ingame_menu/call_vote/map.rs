@@ -21,9 +21,11 @@ use ui_base::{
     utils::{add_margins, get_margin},
 };
 
+use client_ui_utils::render_texture_for_ui;
+
 use crate::{
     events::UiEvent, ingame_menu::user_data::UserData, sort::sortable_header,
-    time_display::TimeDisplay, utils::render_texture_for_ui,
+    time_display::TimeDisplay,
 };
 
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
@@ -438,8 +440,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
                         match list_view {
                             ListView::Images => {
                                 // show as list
-                                use super::super::super::main_menu::settings::list;
-                                list::list::render(
+                                client_ui_utils::assets_list::render(
                                     ui,
                                     map_infos.iter().map(|(key, _)| {
                                         (key.name.as_str(), ContainerItemIndexType::Disk)

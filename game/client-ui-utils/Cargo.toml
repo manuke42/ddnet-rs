@@ -1,0 +1,23 @@
+[package]
+name = "client-ui-utils"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+client-containers = { path = "../client-containers" }
+client-render-base = { path = "../client-render-base" }
+game-interface = { path = "../game-interface" }
+
+graphics = { path = "../../lib/graphics" }
+graphics-types = { path = "../../lib/graphics-types" }
+math = { path = "../../lib/math" }
+pool = { path = "../../lib/pool" }
+ui-base = { path = "../../lib/ui-base" }
+
+anyhow = { version = "1", features = ["backtrace"] }
+egui = { version = "0.34", default-features = false, features = ["serde"] }
+egui_extras = { version = "0.34" }
+fuzzy-matcher = "0.3"
+tracing = { version = "0.1", default-features = false, features = [
+  "attributes",
+] }

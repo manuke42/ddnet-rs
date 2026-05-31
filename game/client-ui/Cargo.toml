@@ -10,6 +10,7 @@ binds = ["dep:binds"]
 client-containers = { path = "../client-containers" }
 client-render-base = { path = "../client-render-base" }
 client-types = { path = "../client-types" }
+client-ui-utils = { path = "../client-ui-utils" }
 demo = { path = "../demo" }
 game-base = { path = "../game-base" }
 game-config = { path = "../game-config" }

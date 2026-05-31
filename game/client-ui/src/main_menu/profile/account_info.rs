@@ -11,13 +11,12 @@ use game_interface::types::{
 use math::math::vector::{ubvec4, vec2};
 use ui_base::types::{UiRenderPipe, UiState};
 
-use crate::{
-    main_menu::{
-        profiles_interface::{LinkedCredential, ProfilesInterface},
-        settings::player::tee::main_frame::{eye_to_render_eye, render_skin},
-        user_data::{PROFILE_SKIN_PREVIEW, ProfileSkin, ProfileState, UserData},
-    },
-    utils::render_tee_for_ui,
+use client_ui_utils::render_tee_for_ui;
+
+use crate::main_menu::{
+    profiles_interface::{LinkedCredential, ProfilesInterface},
+    settings::player::tee::main_frame::{eye_to_render_eye, render_skin},
+    user_data::{PROFILE_SKIN_PREVIEW, ProfileSkin, ProfileState, UserData},
 };
 
 use super::back_bar::back_bar;

@@ -5,7 +5,7 @@ use std::{
 
 use base::hash::fmt_hash;
 use client_render_base::map::map_buffered::graphic_tile::tile_flags_to_uv;
-use client_ui::utils::render_texture_for_ui;
+use client_ui_utils::render_texture_for_ui;
 use egui::{
     Color32, ComboBox, DragValue, Frame, Rect, ScrollArea, Sense, Spacing, Stroke, Window, vec2,
 };

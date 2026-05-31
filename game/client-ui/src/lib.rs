@@ -17,5 +17,4 @@ pub mod sort;
 pub mod spectator_selection;
 pub mod thumbnail_container;
 pub mod time_display;
-pub mod utils;
 pub mod vote;

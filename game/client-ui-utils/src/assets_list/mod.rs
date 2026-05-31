@@ -12,6 +12,7 @@ use ui_base::{
 };
 
 #[instrument(level = "trace", skip_all)]
+#[allow(clippy::too_many_arguments)]
 pub fn render<'a>(
     ui: &mut egui::Ui,
     entries: impl Iterator<Item = (&'a str, ContainerItemIndexType)>,
@@ -60,7 +61,7 @@ pub fn render<'a>(
                                         matcher.fuzzy_match(name, &search_str).is_some()
                                     })
                                 {
-                                    super::entry::render(
+                                    entry::render(
                                         ui,
                                         entry_index,
                                         entry_name,
@@ -120,3 +121,5 @@ pub fn render<'a>(
             })
         });
 }
+
+pub mod entry;

@@ -67,8 +67,8 @@ use client_ui::{
         spatial_chat::SpatialChat,
     },
     spectator_selection::user_data::SpectatorSelectionEvent,
-    utils::render_tee_for_ui,
 };
+use client_ui_utils::render_tee_for_ui;
 use command_parser::parser::ParserCache;
 use config::config::ConfigEngine;
 use ddnet_info_proxy::DdnetInfoProxy;

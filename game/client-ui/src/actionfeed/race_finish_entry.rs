@@ -8,7 +8,9 @@ use math::math::vector::vec2;
 use tracing::instrument;
 use ui_base::types::{UiRenderPipe, UiState};
 
-use crate::{actionfeed::shared::entry_frame, utils::render_tee_for_ui};
+use client_ui_utils::render_tee_for_ui;
+
+use crate::actionfeed::shared::entry_frame;
 
 use super::user_data::{RenderTeeInfo, UserData};
 

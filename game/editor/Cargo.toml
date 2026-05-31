@@ -23,7 +23,7 @@ camera = { path = "../camera" }
 client-containers = { path = "../client-containers" }
 client-notifications = { path = "../client-notifications" }
 client-render-base = { path = "../client-render-base" }
-client-ui = { path = "../client-ui" }
+client-ui-utils = { path = "../client-ui-utils" }
 editor-auto-mapper-wasm = { path = "../editor-auto-mapper-wasm" }
 editor-interface = { path = "../editor-interface" }
 egui-timeline = { path = "../egui-timeline" }

@@ -15,15 +15,14 @@ use math::math::vector::vec2;
 use tracing::instrument;
 use ui_base::types::{UiRenderPipe, UiState};
 
-use crate::{
-    scoreboard::{
-        content::list::definitions::{
-            TABLE_CONTENT_COLUMN_SPACING, TABLE_CONTENT_FONT_SIZES, TABLE_CONTENT_TEE_SIZES,
-            TABLE_CONTENT_WIDTH, TABLE_NAME_COLUMN_INDEX,
-        },
-        user_data::UserData,
+use client_ui_utils::{render_flag_for_ui, render_tee_for_ui};
+
+use crate::scoreboard::{
+    content::list::definitions::{
+        TABLE_CONTENT_COLUMN_SPACING, TABLE_CONTENT_FONT_SIZES, TABLE_CONTENT_TEE_SIZES,
+        TABLE_CONTENT_WIDTH, TABLE_NAME_COLUMN_INDEX,
     },
-    utils::{render_flag_for_ui, render_tee_for_ui},
+    user_data::UserData,
 };
 
 pub type RenderPlayer<'a> = (Option<&'a StageId>, &'a ScoreboardCharacterInfo);

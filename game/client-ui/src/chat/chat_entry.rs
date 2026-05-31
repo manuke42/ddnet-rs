@@ -8,7 +8,7 @@ use math::math::vector::vec2;
 use tracing::instrument;
 use ui_base::types::{UiRenderPipe, UiState};
 
-use crate::utils::render_tee_for_ui;
+use client_ui_utils::render_tee_for_ui;
 
 use super::{
     shared::{MARGIN, MARGIN_FROM_TEE, TEE_SIZE, entry_frame},

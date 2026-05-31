@@ -11,7 +11,7 @@ use ui_base::{
     utils::add_margins,
 };
 
-use crate::utils::render_tee_for_ui;
+use client_ui_utils::render_tee_for_ui;
 
 use super::user_data::{SpectatorSelectionEvent, UserData};
 

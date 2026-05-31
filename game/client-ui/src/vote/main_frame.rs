@@ -13,11 +13,9 @@ use ui_base::{
     utils::get_margin,
 };
 
-use crate::{
-    ingame_menu::call_vote::map::stars_text,
-    utils::{render_tee_for_ui, render_texture_for_ui},
-    vote::user_data::VoteRenderData,
-};
+use client_ui_utils::{render_tee_for_ui, render_texture_for_ui};
+
+use crate::{ingame_menu::call_vote::map::stars_text, vote::user_data::VoteRenderData};
 
 use super::user_data::{UserData, VoteRenderType};
 

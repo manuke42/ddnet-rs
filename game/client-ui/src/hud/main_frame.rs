@@ -25,7 +25,7 @@ use ui_base::{
     types::{UiRenderPipe, UiState},
 };
 
-use crate::utils::{render_tee_for_ui, render_texture_for_ui};
+use client_ui_utils::{render_tee_for_ui, render_texture_for_ui};
 
 use super::user_data::UserData;
 

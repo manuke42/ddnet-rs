@@ -10,7 +10,9 @@ use graphics::handles::texture::texture::TextureContainer;
 use math::math::vector::vec2;
 use ui_base::types::{UiRenderPipe, UiState};
 
-use crate::{main_menu::user_data::UserData, utils::render_texture_for_ui};
+use client_ui_utils::render_texture_for_ui;
+
+use crate::main_menu::user_data::UserData;
 
 pub fn hud_list(
     ui: &mut egui::Ui,
@@ -31,7 +33,7 @@ pub fn hud_list(
         .entry("hud-search".to_string())
         .or_default();
     let mut next_name = None;
-    super::super::super::list::list::render(
+    client_ui_utils::assets_list::render(
         ui,
         entries_sorted.iter().map(|(name, &ty)| (name.as_str(), ty)),
         150.0,

@@ -7,7 +7,9 @@ use game_interface::types::{
 };
 use ui_base::types::{UiRenderPipe, UiState};
 
-use crate::{main_menu::user_data::UserData, utils::render_tee_for_ui_with_skin};
+use client_ui_utils::render_tee_for_ui_with_skin;
+
+use crate::main_menu::user_data::UserData;
 
 pub fn ninja_list(
     ui: &mut egui::Ui,
@@ -28,7 +30,7 @@ pub fn ninja_list(
         .entry("ninja-search".to_string())
         .or_default();
     let mut next_name = None;
-    super::super::super::list::list::render(
+    client_ui_utils::assets_list::render(
         ui,
         entries_sorted.iter().map(|(name, &ty)| (name.as_str(), ty)),
         100.0,

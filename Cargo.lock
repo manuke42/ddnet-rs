@@ -1893,6 +1893,7 @@ dependencies = [
  "client-containers",
  "client-render-base",
  "client-types",
+ "client-ui-utils",
  "command-parser",
  "config",
  "demo",
@@ -1926,6 +1927,25 @@ dependencies = [
  "ui-generic",
  "url",
  "vanilla",
+]
+
+[[package]]
+name = "client-ui-utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "client-containers",
+ "client-render-base",
+ "egui",
+ "egui_extras",
+ "fuzzy-matcher",
+ "game-interface",
+ "graphics",
+ "graphics-types",
+ "math",
+ "pool",
+ "tracing",
+ "ui-base",
 ]
 
 [[package]]
@@ -3019,6 +3039,7 @@ dependencies = [
  "client-replay",
  "client-types",
  "client-ui",
+ "client-ui-utils",
  "command-parser",
  "config",
  "config-fs",
@@ -3519,7 +3540,7 @@ dependencies = [
  "client-containers",
  "client-notifications",
  "client-render-base",
- "client-ui",
+ "client-ui-utils",
  "config",
  "ed25519-dalek",
  "editor-auto-mapper-wasm",

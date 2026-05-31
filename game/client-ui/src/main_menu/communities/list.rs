@@ -6,10 +6,11 @@ use game_interface::types::resource_key::ResourceKey;
 use math::math::vector::vec2;
 use ui_base::types::{UiRenderPipe, UiState};
 
+use client_ui_utils::render_texture_for_ui;
+
 use crate::{
     main_menu::{communities::IconUrlHash, user_data::UserData},
     thumbnail_container::Thumbnail,
-    utils::render_texture_for_ui,
 };
 
 pub fn community_list(
@@ -30,7 +31,7 @@ pub fn community_list(
         .entry("community-explore-search".to_string())
         .or_default();
     let mut next_name = None;
-    super::super::settings::list::list::render(
+    client_ui_utils::assets_list::render(
         ui,
         entries_sorted
             .keys()

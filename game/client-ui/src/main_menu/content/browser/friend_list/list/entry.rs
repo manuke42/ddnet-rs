@@ -6,10 +6,9 @@ use game_interface::types::render::character::TeeEye;
 use math::math::vector::vec2;
 use ui_base::types::{UiRenderPipe, UiState};
 
-use crate::{
-    main_menu::user_data::UserData,
-    utils::{render_flag_for_ui, render_tee_for_ui},
-};
+use client_ui_utils::{render_flag_for_ui, render_tee_for_ui};
+
+use crate::main_menu::user_data::UserData;
 
 /// single server list entry
 pub fn render(

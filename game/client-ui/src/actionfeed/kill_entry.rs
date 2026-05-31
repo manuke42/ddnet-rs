@@ -6,10 +6,9 @@ use tracing::instrument;
 use ui_base::types::{UiRenderPipe, UiState};
 use vanilla::weapons::definitions::weapon_def::get_weapon_visual_scale;
 
-use crate::{
-    actionfeed::shared::entry_frame,
-    utils::{render_tee_for_ui, render_texture_for_ui, render_weapon_for_ui},
-};
+use client_ui_utils::{render_tee_for_ui, render_texture_for_ui, render_weapon_for_ui};
+
+use crate::actionfeed::shared::entry_frame;
 
 use super::user_data::{RenderTeeInfo, UserData};
 

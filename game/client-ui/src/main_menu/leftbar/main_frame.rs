@@ -15,6 +15,8 @@ use math::math::vector::vec2;
 use tracing::instrument;
 use ui_base::{style::bg_frame_color, types::UiState};
 
+use client_ui_utils::{render_tee_for_ui, render_texture_for_ui};
+
 use crate::{
     main_menu::{
         communities::IconUrlHash,
@@ -25,7 +27,6 @@ use crate::{
         user_data::{PROFILE_SKIN_PREVIEW, ProfileSkin, UserData},
     },
     thumbnail_container::Thumbnail,
-    utils::{render_tee_for_ui, render_texture_for_ui},
 };
 
 enum CustomRender<'a> {

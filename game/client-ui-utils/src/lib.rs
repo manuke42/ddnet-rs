@@ -1,3 +1,5 @@
+#![allow(clippy::too_many_arguments)]
+
 use std::{rc::Rc, time::Duration};
 
 use client_containers::{
@@ -40,6 +42,8 @@ use math::math::vector::{dvec2, ubvec4, vec2};
 use pool::mt_datatypes::PoolVec;
 use tracing::instrument;
 use ui_base::{custom_callback::CustomCallbackTrait, types::UiState};
+
+pub mod assets_list;
 
 /// TODO: this function exists in the editor already. graphics also have a similar one.
 pub fn rotate(center: &vec2, rotation: f32, points: &mut [vec2]) {

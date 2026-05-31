@@ -18,10 +18,9 @@ use ui_base::{
     types::{UiRenderPipe, UiState},
 };
 
-use crate::{
-    main_menu::{settings::player::profile_selector::profile_selector, user_data::UserData},
-    utils::render_tee_for_ui,
-};
+use client_ui_utils::render_tee_for_ui;
+
+use crate::main_menu::{settings::player::profile_selector::profile_selector, user_data::UserData};
 
 pub fn eye_to_render_eye(eye: ConfigTeeEye) -> TeeEye {
     match eye {
@@ -208,7 +207,7 @@ pub fn render_skin(
                     .entry("skin-search".to_string())
                     .or_default();
                 let mut next_name = None;
-                super::super::super::list::list::render(
+                client_ui_utils::assets_list::render(
                     ui,
                     entries_sorted.iter().map(|(name, &ty)| (name.as_str(), ty)),
                     100.0,

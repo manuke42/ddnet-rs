@@ -68,6 +68,7 @@ members = [
   "game/client-replay",
   "game/client-types",
   "game/client-ui",
+  "game/client-ui-utils",
   "game/community",
   "game/demo",
   "game/ddnet-info-proxy",
@@ -225,6 +226,7 @@ client-render-game = { path = "game/client-render-game" }
 client-replay = { path = "game/client-replay" }
 client-types = { path = "game/client-types" }
 client-ui = { path = "game/client-ui", features = ["binds"] }
+client-ui-utils = { path = "game/client-ui-utils" }
 demo = { path = "game/demo", features = ["recorder"] }
 ddnet-info-proxy = { path = "game/ddnet-info-proxy" }
 editor = { path = "game/editor", default-features = false }
