@@ -32,7 +32,7 @@ use math::math::{
 };
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
-use vanilla::collision::collision::Collision;
+use tile_map_collision::collision::Collision;
 
 use super::particle::Particle;
 

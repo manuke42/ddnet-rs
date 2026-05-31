@@ -2,6 +2,7 @@ pub mod collision {
     use anyhow::anyhow;
     use bitflags::bitflags;
     use config::{ConfigInterface, traits::ConfigInterface};
+    use game_interface::types::game::GameTickType;
     use hiarc::Hiarc;
     use legacy_map::mapdef_06::DdraceTileNum;
     use map::map::groups::{
@@ -22,7 +23,7 @@ pub mod collision {
         vector::{ivec2, vec2},
     };
 
-    use crate::state::state::TICKS_PER_SECOND;
+    pub const DEFAULT_TICKS_PER_SECOND: GameTickType = 50;
 
     #[derive(Debug, Hiarc, Copy, Clone, Serialize, Deserialize, ConfigInterface)]
     pub struct Tunings {
@@ -77,11 +78,11 @@ pub mod collision {
         fn default() -> Self {
             Self {
                 ground_control_speed: 10.0,
-                ground_control_accel: 100.0 / TICKS_PER_SECOND as f32,
+                ground_control_accel: 100.0 / DEFAULT_TICKS_PER_SECOND as f32,
                 ground_friction: 0.5,
                 ground_jump_impulse: 13.2,
                 air_jump_impulse: 12.0,
-                air_control_speed: 250.0 / TICKS_PER_SECOND as f32,
+                air_control_speed: 250.0 / DEFAULT_TICKS_PER_SECOND as f32,
                 air_control_accel: 1.5,
                 air_friction: 0.95,
                 hook_length: 380.0,
@@ -126,7 +127,15 @@ pub mod collision {
     }
 
     impl Tunings {
-        pub fn race_default() -> Self {
+        pub fn vanilla_default(ticks_per_second: GameTickType) -> Self {
+            Self {
+                ground_control_accel: 100.0 / ticks_per_second as f32,
+                air_control_speed: 250.0 / ticks_per_second as f32,
+                ..Default::default()
+            }
+        }
+
+        pub fn race_default(ticks_per_second: GameTickType) -> Self {
             Self {
                 gun_curvature: 0.0,
                 gun_speed: 1400.0,
@@ -134,7 +143,7 @@ pub mod collision {
                 shotgun_speed: 500.0,
                 shotgun_speeddiff: 0.0,
                 laser_bounce_num: 1000.0,
-                ..Default::default()
+                ..Self::vanilla_default(ticks_per_second)
             }
         }
     }
@@ -193,7 +202,7 @@ pub mod collision {
         width: u32,
         height: u32,
 
-        pub(crate) tune_zones: [Tunings; u8::MAX as usize + 1],
+        tune_zones: [Tunings; u8::MAX as usize + 1],
     }
 
     // TODO: use u8 or an enum for tile indices, instead of i32
@@ -201,8 +210,13 @@ pub mod collision {
         pub fn new(
             physics_group: MapGroupPhysics,
             load_all_layers: bool,
+            ticks_per_second: GameTickType,
         ) -> anyhow::Result<Box<Self>> {
-            Self::with_default_tune(physics_group, load_all_layers, Tunings::default())
+            Self::with_default_tune(
+                physics_group,
+                load_all_layers,
+                Tunings::vanilla_default(ticks_per_second),
+            )
         }
 
         pub fn with_default_tune(
@@ -994,6 +1008,18 @@ pub mod collision {
         pub fn get_tune_at(&self, pos: &vec2) -> &Tunings {
             let tune_tile = &self.tune_tiles[self.tile_indexf(pos.x, pos.y)];
             &self.tune_zones[tune_tile.number as usize]
+        }
+
+        pub fn tune_0_mut_for_cheats(&mut self) -> &mut Tunings {
+            &mut self.tune_zones[0]
+        }
+
+        pub fn tune_0_for_snapshots(&self) -> Tunings {
+            self.tune_zones[0]
+        }
+
+        pub fn tune_0_mut_for_snapshots(&mut self) -> &mut Tunings {
+            &mut self.tune_zones[0]
         }
     }
 }

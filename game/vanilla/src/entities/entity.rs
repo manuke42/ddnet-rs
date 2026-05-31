@@ -18,7 +18,7 @@ pub mod entity {
         NoEvents,
     }
 
-    use super::super::super::collision::collision::Collision;
+    use crate::collision::Collision;
     pub trait EntityInterface<
         C: Copy + Clone + Serialize + DeserializeOwned + 'static,
         R: ReusableCore + Serialize + DeserializeOwned + 'static,

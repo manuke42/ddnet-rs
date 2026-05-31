@@ -1,6 +1,7 @@
 pub mod character_core {
     use std::ops::{AddAssign, ControlFlow};
 
+    use crate::collision::{Collision, CollisionTile, CollisionTypes};
     use crate::reusable::{CloneWithCopyableElements, ReusableCore};
     use game_interface::{
         events::{
@@ -19,7 +20,6 @@ pub mod character_core {
     use num::FromPrimitive;
 
     use crate::{
-        collision::collision::{Collision, CollisionTile, CollisionTypes},
         entities::character::{
             character::{Characters, CharactersView},
             hook::character_hook::{CharacterHook, Hook, HookState},

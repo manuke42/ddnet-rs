@@ -11,6 +11,7 @@ pub mod character {
         num::{NonZeroI64, NonZeroU64},
     };
 
+    use crate::collision::{Collision, CollisionTile, CollisionTypes, HitTile};
     use crate::{
         reusable::{CloneWithCopyableElements, ReusableCore},
         weapons::definitions::weapon_def::{WeaponUpgrade, WeaponUpgradePool},
@@ -60,7 +61,6 @@ pub mod character {
         score::character_score::{CharacterScore, CharacterScores},
     };
     use crate::{
-        collision::collision::{Collision, CollisionTile, CollisionTypes, HitTile},
         config::config::ConfigGameType,
         entities::entity::entity::{DropMode, Entity, EntityInterface, EntityTickResult},
         events::events::{CharacterDespawnType, CharacterEvent, CharacterTickEvent},

@@ -24,6 +24,7 @@ game-config = { path = "../game-config" }
 game-interface = { path = "../game-interface" }
 legacy-map = { path = "../legacy-map" }
 map = { path = "../map" }
+tile-map-collision = { path = "../tile-map-collision" }
 vanilla = { path = "../vanilla" }
 
 hashlink = { git = "https://github.com/Jupeyy/hashlink/", branch = "ddnet", features = [

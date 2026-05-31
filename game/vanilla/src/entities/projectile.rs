@@ -17,7 +17,7 @@ pub mod projectile {
 
     use crate::reusable::{CloneWithCopyableElements, ReusableCore};
 
-    use crate::collision::collision::{Collision, CollisionTile, CollisionTypes};
+    use crate::collision::{Collision, CollisionTile, CollisionTypes};
     use crate::entities::character::character::{Character, DamageBy, DamageTypes};
     use crate::entities::entity::entity::{
         DropMode, Entity, EntityInterface, EntityTickResult, calc_pos_and_vel,

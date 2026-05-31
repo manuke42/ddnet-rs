@@ -1,4 +1,5 @@
 pub mod ddrace_entity {
+    use crate::collision::{Collision, CollisionTile, CollisionTypes};
     use base::linked_hash_map_view::FxLinkedHashMap;
     use game_interface::types::{
         game::{GameEntityId, GameTickCooldownAndLastActionCounter, GameTickType},
@@ -13,7 +14,6 @@ pub mod ddrace_entity {
     use serde::{Deserialize, Serialize};
 
     use crate::{
-        collision::collision::{Collision, CollisionTile, CollisionTypes},
         entities::{
             character::{
                 character::{BuffProps, Character},

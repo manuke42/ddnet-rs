@@ -2,7 +2,6 @@
 #![allow(clippy::module_inception)]
 #![allow(clippy::multiple_bound_locations)]
 
-pub mod collision;
 pub mod command_chain;
 pub mod config;
 pub mod entities;
@@ -21,6 +20,8 @@ pub mod state;
 pub mod types;
 pub mod weapons;
 pub mod world;
+
+pub use tile_map_collision::collision;
 
 #[cfg(test)]
 mod test {

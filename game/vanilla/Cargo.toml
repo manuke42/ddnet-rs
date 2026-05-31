@@ -8,6 +8,7 @@ game-base = { path = "../game-base" }
 game-interface = { path = "../game-interface" }
 legacy-map = { path = "../legacy-map" }
 map = { path = "../map" }
+tile-map-collision = { path = "../tile-map-collision" }
 
 base = { path = "../../lib/base" }
 base-io = { path = "../../lib/base-io" }

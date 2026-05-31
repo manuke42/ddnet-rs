@@ -29,8 +29,8 @@ pub mod world {
     use rustc_hash::FxHashMap;
     use serde::{Deserialize, Serialize};
 
+    use crate::collision::Collision;
     use crate::{
-        collision::collision::Collision,
         config::config::ConfigGameType,
         entities::{
             character::{

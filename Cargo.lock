@@ -1813,6 +1813,7 @@ dependencies = [
  "serde",
  "sound",
  "strum",
+ "tile-map-collision",
  "time",
  "tracing",
  "url",
@@ -1845,6 +1846,7 @@ dependencies = [
  "rayon",
  "serde",
  "sound",
+ "tile-map-collision",
  "tracing",
  "ui-base",
  "url",
@@ -3094,6 +3096,7 @@ dependencies = [
  "stats_alloc",
  "steam",
  "thread-priority",
+ "tile-map-collision",
  "tokio",
  "tracing",
  "trybuild",
@@ -6167,6 +6170,7 @@ dependencies = [
  "rayon",
  "serde_json",
  "sha2 0.11.0",
+ "tile-map-collision",
  "tokio",
  "uuid 0.8.2",
  "vanilla",
@@ -10726,6 +10730,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "tile-map-collision"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bitflags 2.11.1",
+ "config",
+ "game-interface",
+ "hiarc",
+ "legacy-map",
+ "log 0.4.30",
+ "map",
+ "math",
+ "rustc-hash 2.1.2",
+ "serde",
+]
+
+[[package]]
 name = "time"
 version = "0.3.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11555,6 +11576,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+ "tile-map-collision",
  "tracing",
 ]
 

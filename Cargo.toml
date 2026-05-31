@@ -93,6 +93,7 @@ members = [
   "game/master-server-types",
   "game/prediction-timer",
   "game/render-game-wasm",
+  "game/tile-map-collision",
   "game/vanilla",
   "lib/api",
   "lib/api-macros",
@@ -206,6 +207,7 @@ pool = { path = "lib/pool" }
 sound = { path = "lib/sound" }
 sound-backend = { path = "lib/sound-backend" }
 steam = { path = "lib/steam" }
+tile-map-collision = { path = "game/tile-map-collision" }
 ui-base = { path = "lib/ui-base" }
 ui-generic = { path = "lib/ui-generic" }
 ui-wasm-manager = { path = "lib/ui-wasm-manager" }

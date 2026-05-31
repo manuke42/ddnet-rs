@@ -41,9 +41,10 @@ use map::{file::MapFileReader, map::Map};
 use math::math::vector::vec2;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sound::{commands::SoundSceneCreateProps, scene_handle::SoundSceneHandle, sound::SoundManager};
+use tile_map_collision::collision::Collision;
 use tracing::instrument;
 use url::Url;
-use vanilla::collision::collision::Collision;
+use vanilla::collision::DEFAULT_TICKS_PER_SECOND;
 
 pub struct ClientMapFileData {
     pub collision: Box<Collision>,
@@ -443,7 +444,11 @@ impl RenderMapLoading {
                             let physics_group = map.groups.physics.clone();
                             let (collision, upload_data) = runtime_tp.join(
                                 || {
-                                    let collision = Collision::new(physics_group, false);
+                                    let collision = Collision::new(
+                                        physics_group,
+                                        false,
+                                        DEFAULT_TICKS_PER_SECOND,
+                                    );
                                     benchmark.bench_multi("preparing collisions");
                                     collision
                                 },

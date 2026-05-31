@@ -147,9 +147,10 @@ use std::{
     sync::{Arc, atomic::AtomicBool},
     time::Duration,
 };
+use tile_map_collision::collision::{Collision, Tunings};
 use tokio::sync::Notify;
 use vanilla::{
-    collision::collision::{Collision, Tunings},
+    collision::DEFAULT_TICKS_PER_SECOND,
     config::config::{ConfigGameType, ConfigVanilla},
     entities::{
         character::{
@@ -4985,7 +4986,8 @@ impl Client {
                             )
                             .unwrap();
 
-                            let new_collision = Collision::new(phy_group, true).unwrap();
+                            let new_collision =
+                                Collision::new(phy_group, true, DEFAULT_TICKS_PER_SECOND).unwrap();
 
                             self.log.log("Client proxy prepares map collision");
                             self.collisions = Some(new_collision);
