@@ -22,10 +22,7 @@ pub fn render(
 
     ui.scope_builder(UiBuilder::new().max_rect(rect), |ui| {
         ui.with_layout(
-            Layout::top_down(egui::Align::Center)
-                .with_main_justify(true)
-                .with_cross_justify(true)
-                .with_main_wrap(true),
+            Layout::top_down(egui::Align::Center).with_cross_justify(true),
             |ui| {
                 let mut clicked = sense.clicked();
                 Frame::default()
