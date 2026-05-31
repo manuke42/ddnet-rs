@@ -1,9 +1,8 @@
-use egui::{Color32, Id, Stroke};
+use egui::{Color32, Id, Stroke, pos2};
 use game_interface::types::{
     emoticons::{EmoticonType, EnumCount},
     render::character::{IntoEnumIterator, TeeEye},
 };
-use geo::Contains;
 use math::math::{
     PI, length, normalize_pre_length,
     vector::{dvec2, vec2},
@@ -14,6 +13,70 @@ use ui_base::types::{UiRenderPipe, UiState};
 use client_ui_utils::{render_emoticon_for_ui, render_tee_for_ui, rotate};
 
 use super::user_data::{EmoteWheelEvent, UserData};
+
+fn normalized_angle_diff(angle: f32, center: f32) -> f32 {
+    let diff = angle - center;
+    diff.sin().atan2(diff.cos())
+}
+
+fn is_mouse_in_wheel_segment(
+    mouse: dvec2,
+    center: vec2,
+    segment_center: vec2,
+    inner_radius: f32,
+    outer_radius: f32,
+    entry_count: usize,
+) -> bool {
+    let mouse_dir = mouse - dvec2::new(center.x as f64, center.y as f64);
+    let mouse_len = length(&mouse_dir) as f32;
+
+    if mouse_len < inner_radius || mouse_len > outer_radius {
+        return false;
+    }
+
+    let mouse_angle = (mouse_dir.y as f32).atan2(mouse_dir.x as f32);
+    let segment_angle = segment_center.y.atan2(segment_center.x);
+    let segment_half_angle = PI / entry_count as f32;
+
+    normalized_angle_diff(mouse_angle, segment_angle).abs() <= segment_half_angle
+}
+
+fn paint_wheel_segment(
+    ui: &egui::Ui,
+    center: vec2,
+    segment_center: vec2,
+    inner_radius: f32,
+    outer_radius: f32,
+    entry_count: usize,
+    color: Color32,
+) {
+    let segment_angle = segment_center.y.atan2(segment_center.x);
+    let half_angle = PI / entry_count as f32;
+    let steps = 16;
+
+    for i in 0..steps {
+        let angle0 = segment_angle - half_angle + 2.0 * half_angle * i as f32 / steps as f32;
+        let angle1 = segment_angle - half_angle + 2.0 * half_angle * (i + 1) as f32 / steps as f32;
+
+        let point_at = |angle: f32, radius: f32| {
+            pos2(
+                center.x + angle.cos() * radius,
+                center.y + angle.sin() * radius,
+            )
+        };
+
+        ui.painter().add(egui::Shape::convex_polygon(
+            vec![
+                point_at(angle0, inner_radius),
+                point_at(angle0, outer_radius),
+                point_at(angle1, outer_radius),
+                point_at(angle1, inner_radius),
+            ],
+            color,
+            Stroke::NONE,
+        ));
+    }
+}
 
 /// not required
 #[instrument(level = "trace", skip_all)]
@@ -27,6 +90,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
     };
 
     let color = Color32::from_black_alpha(100);
+    let hover_color = Color32::from_rgba_unmultiplied(180, 205, 255, 15);
 
     let inner_stroke_size = radius(15.0);
     let inner_start = radius(5.0);
@@ -54,9 +118,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
     let mouse = &mut *pipe.user_data.mouse;
 
     // render emoticons in a radius around the outer circle
-    let mut start_pos = vec2::new(0.0, outer_start);
     let mut pos = vec2::new(0.0, outer_center);
-    let mut end_pos = vec2::new(0.0, outer_end);
     let center = rect.center();
     let center = vec2::new(center.x, center.y);
 
@@ -77,9 +139,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
             std::slice::from_mut(pos),
         )
     };
-    start_rot(&mut start_pos);
     start_rot(&mut pos);
-    start_rot(&mut end_pos);
     for emote in EmoticonType::iter() {
         let rot = |pos: &mut vec2, scale: f32| {
             rotate(
@@ -91,40 +151,26 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
 
         rot(&mut pos, 1.0);
 
-        rot(&mut start_pos, 1.0);
-        let mut start_p0 = start_pos;
-        let mut start_p1 = start_pos;
-        rot(&mut start_p0, 0.5);
-        rot(&mut start_p1, -0.5);
-        start_p0 += center;
-        start_p1 += center;
-
-        rot(&mut end_pos, 1.0);
-        let mut end_p0 = end_pos;
-        let mut end_p1 = end_pos;
-        rot(&mut end_p0, -0.5);
-        rot(&mut end_p1, 0.5);
-        end_p0 += center;
-        end_p1 += center;
-
         let center = center + pos;
         let size = radius(10.0);
-        let selected = {
-            let trapez = geo::Polygon::new(
-                vec![
-                    (start_p0.x, start_p0.y),
-                    (start_p1.x, start_p1.y),
-                    (end_p0.x, end_p0.y),
-                    (end_p1.x, end_p1.y),
-                ]
-                .into_iter()
-                .map(geo::Point::from)
-                .collect(),
-                vec![],
-            );
-            trapez.contains(&geo::Point::new(mouse.x as f32, mouse.y as f32))
-        };
+        let selected = is_mouse_in_wheel_segment(
+            dvec2::new(mouse.x, mouse.y),
+            center - pos,
+            pos,
+            outer_start,
+            outer_end,
+            EmoticonType::COUNT,
+        );
         if selected {
+            paint_wheel_segment(
+                ui,
+                center - pos,
+                pos,
+                outer_start,
+                outer_end,
+                EmoticonType::COUNT,
+                hover_color,
+            );
             pipe.user_data
                 .events
                 .push(EmoteWheelEvent::EmoticonSelected(emote));
@@ -158,9 +204,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
     }
 
     // render tees in a radius around the inner circle
-    let mut start_pos = vec2::new(0.0, inner_start);
     let mut pos = vec2::new(0.0, inner_center);
-    let mut end_pos = vec2::new(0.0, inner_end);
     let center = rect.center();
     let center = vec2::new(center.x, center.y);
 
@@ -172,9 +216,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
             std::slice::from_mut(pos),
         )
     };
-    start_rot(&mut start_pos);
     start_rot(&mut pos);
-    start_rot(&mut end_pos);
     for eye in TeeEye::iter().rev() {
         let rot = |pos: &mut vec2, scale: f32| {
             rotate(
@@ -185,40 +227,26 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
         };
         rot(&mut pos, 1.0);
 
-        rot(&mut start_pos, 1.0);
-        let mut start_p0 = start_pos;
-        let mut start_p1 = start_pos;
-        rot(&mut start_p0, 0.5);
-        rot(&mut start_p1, -0.5);
-        start_p0 += center;
-        start_p1 += center;
-
-        rot(&mut end_pos, 1.0);
-        let mut end_p0 = end_pos;
-        let mut end_p1 = end_pos;
-        rot(&mut end_p0, -0.5);
-        rot(&mut end_p1, 0.5);
-        end_p0 += center;
-        end_p1 += center;
-
         let center = center + pos;
         let size = radius(10.0);
-        let selected = {
-            let trapez = geo::Polygon::new(
-                vec![
-                    (start_p0.x, start_p0.y),
-                    (start_p1.x, start_p1.y),
-                    (end_p0.x, end_p0.y),
-                    (end_p1.x, end_p1.y),
-                ]
-                .into_iter()
-                .map(geo::Point::from)
-                .collect(),
-                vec![],
-            );
-            trapez.contains(&geo::Point::new(mouse.x as f32, mouse.y as f32))
-        };
+        let selected = is_mouse_in_wheel_segment(
+            dvec2::new(mouse.x, mouse.y),
+            center - pos,
+            pos,
+            inner_start,
+            inner_end,
+            TeeEye::COUNT,
+        );
         if selected {
+            paint_wheel_segment(
+                ui,
+                center - pos,
+                pos,
+                inner_start,
+                inner_end,
+                TeeEye::COUNT,
+                hover_color,
+            );
             pipe.user_data
                 .events
                 .push(EmoteWheelEvent::EyeSelected(eye));

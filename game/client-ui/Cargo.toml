@@ -41,7 +41,6 @@ egui_extras = { version = "0.34" }
 email_address = { version = "0.2", features = ["serde"] }
 fuzzy-matcher = "0.3"
 gcd = "2"
-geo = "0.33"
 hashlink = { git = "https://github.com/Jupeyy/hashlink/", branch = "ddnet", features = [
   "serde",
   "serde_impl",
