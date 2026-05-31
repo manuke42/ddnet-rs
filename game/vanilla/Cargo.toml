@@ -27,7 +27,6 @@ ddnet-accounts-types = { version = "0.2" }
 
 anyhow = { version = "1", features = ["backtrace"] }
 bincode = { version = "2", features = ["serde"] }
-bitflags = { version = "2", features = ["serde"] }
 chrono = { version = "0.4", default-features = false, features = ["serde"] }
 hashlink = { git = "https://github.com/Jupeyy/hashlink/", branch = "ddnet", features = [
   "serde",

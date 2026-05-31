@@ -6,4 +6,5 @@ pub mod particle;
 pub mod particle_manager;
 pub mod tee;
 pub mod toolkit;
+pub mod weapon_visuals;
 pub mod weapons;

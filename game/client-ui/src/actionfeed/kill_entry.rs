@@ -1,10 +1,10 @@
+use client_render_base::render::weapon_visuals::get_weapon_visual_scale;
 use client_types::actionfeed::ActionKill;
 use egui::{Color32, Layout, Rect};
 use game_interface::{events::GameWorldActionKillWeapon, types::render::character::TeeEye};
 use math::math::vector::vec2;
 use tracing::instrument;
 use ui_base::types::{UiRenderPipe, UiState};
-use vanilla::weapons::definitions::weapon_def::get_weapon_visual_scale;
 
 use client_ui_utils::{render_tee_for_ui, render_texture_for_ui, render_weapon_for_ui};
 

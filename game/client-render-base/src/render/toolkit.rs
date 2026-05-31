@@ -1,5 +1,12 @@
 use std::time::Duration;
 
+use crate::{
+    map::render_pipe::GameTimeInfo,
+    render::weapon_visuals::{
+        NINJA_PICKUP_VISUAL_SIZE, NINJA_WEAPON_VISUAL_SIZE, get_ninja_sprite_scale, get_scale,
+        get_weapon_sprite_scale, get_weapon_visual_scale,
+    },
+};
 use client_containers::{
     container::ContainerKey,
     hooks::{Hook, HookContainer},
@@ -33,12 +40,6 @@ use math::math::{
     PI, PI_F64, Rng, RngSlice, angle, distance, mix, normalize,
     vector::{dvec2, ubvec4, vec2},
 };
-use vanilla::weapons::definitions::weapon_def::{
-    NINJA_PICKUP_VISUAL_SIZE, NINJA_WEAPON_VISUAL_SIZE, get_ninja_sprite_scale, get_scale,
-    get_weapon_sprite_scale, get_weapon_visual_scale,
-};
-
-use crate::map::render_pipe::GameTimeInfo;
 
 use super::{
     animation::{AnimState, TeeAnimationFrame},

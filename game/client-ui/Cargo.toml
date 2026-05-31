@@ -16,7 +16,6 @@ game-base = { path = "../game-base" }
 game-config = { path = "../game-config" }
 game-interface = { path = "../game-interface" }
 master-server-types = { path = "../master-server-types" }
-vanilla = { path = "../vanilla" }
 
 binds = { path = "../binds", optional = true }
 

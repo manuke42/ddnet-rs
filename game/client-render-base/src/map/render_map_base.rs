@@ -41,10 +41,9 @@ use map::{file::MapFileReader, map::Map};
 use math::math::vector::vec2;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use sound::{commands::SoundSceneCreateProps, scene_handle::SoundSceneHandle, sound::SoundManager};
-use tile_map_collision::collision::Collision;
+use tile_map_collision::collision::{Collision, DEFAULT_TICKS_PER_SECOND};
 use tracing::instrument;
 use url::Url;
-use vanilla::collision::DEFAULT_TICKS_PER_SECOND;
 
 pub struct ClientMapFileData {
     pub collision: Box<Collision>,

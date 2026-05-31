@@ -1817,7 +1817,6 @@ dependencies = [
  "time",
  "tracing",
  "url",
- "vanilla",
 ]
 
 [[package]]
@@ -1850,7 +1849,6 @@ dependencies = [
  "tracing",
  "ui-base",
  "url",
- "vanilla",
 ]
 
 [[package]]
@@ -1928,7 +1926,6 @@ dependencies = [
  "ui-base",
  "ui-generic",
  "url",
- "vanilla",
 ]
 
 [[package]]
@@ -11554,7 +11551,6 @@ dependencies = [
  "base",
  "base-io",
  "bincode",
- "bitflags 2.11.1",
  "chrono",
  "command-parser",
  "config",

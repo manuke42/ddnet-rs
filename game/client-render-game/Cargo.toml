@@ -25,7 +25,6 @@ game-config = { path = "../game-config" }
 game-interface = { path = "../game-interface" }
 map = { path = "../map" }
 tile-map-collision = { path = "../tile-map-collision" }
-vanilla = { path = "../vanilla" }
 
 egui = { version = "0.34", default-features = false, features = ["serde"] }
 num-traits = "0.2"
