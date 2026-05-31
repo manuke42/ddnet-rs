@@ -13,7 +13,6 @@ use client_render_base::render::{
     tee::RenderTee,
     weapon_visuals::{get_weapon_sprite_scale, get_weapon_visual_scale},
 };
-use client_ui::hud::user_data::RenderDateTime;
 use game_interface::types::{
     emoticons::{EnumCount, IntoEnumIterator},
     game::{GameTickType, NonZeroGameTickType},
@@ -36,6 +35,7 @@ use graphics::{
     streaming::quad_scope_begin,
 };
 use graphics_types::rendering::State;
+use ingame_ui::hud::user_data::RenderDateTime;
 use math::math::{PI, vector::vec2};
 use ui_base::ui::UiCreator;
 

@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use client_ui::motd::{page::MotdUi, user_data::UserData};
 use egui::Color32;
 use graphics::{
     graphics::graphics::Graphics,
@@ -9,6 +8,7 @@ use graphics::{
         stream::stream::GraphicsStreamHandle, texture::texture::GraphicsTextureHandle,
     },
 };
+use ingame_ui::motd::{page::MotdUi, user_data::UserData};
 use ui_base::{
     types::UiRenderPipe,
     ui::{UiContainer, UiCreator},

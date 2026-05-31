@@ -243,11 +243,11 @@ impl Scoreboard {
                 }),
             });
         }
-        client_ui::scoreboard::main_frame::render(
+        ingame_ui::scoreboard::main_frame::render(
             ui,
             &mut UiRenderPipe::new(
                 pipe.cur_time,
-                &mut client_ui::scoreboard::user_data::UserData {
+                &mut ingame_ui::scoreboard::user_data::UserData {
                     scoreboard: &game_interface::types::render::scoreboard::Scoreboard {
                         game: ScoreboardGameType::SidedPlay {
                             ignore_stage: *red_stages.front().unwrap().0,
@@ -291,12 +291,12 @@ impl Scoreboard {
         for _ in 0..12 {
             spectator_players.push(());
         }
-        client_ui::scoreboard::main_frame::render(
+        ingame_ui::scoreboard::main_frame::render(
             ui,
             &mut UiRenderPipe::new(
                 pipe.cur_time,
                 pipe.config,
-                client_ui::scoreboard::user_data::UserData {
+                ingame_ui::scoreboard::user_data::UserData {
                     game_data: &ScoreboardGameType::SoloPlay {
                         players,
                         spectator_players,

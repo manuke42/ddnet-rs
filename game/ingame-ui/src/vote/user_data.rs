@@ -14,7 +14,7 @@ use graphics::handles::{
     canvas::canvas::GraphicsCanvasHandle, stream::stream::GraphicsStreamHandle,
 };
 
-use crate::thumbnail_container::ThumbnailContainer;
+use client_ui_utils::thumbnail_container::ThumbnailContainer;
 
 #[derive(Debug, Clone, Copy)]
 pub struct VoteRenderPlayer<'a> {

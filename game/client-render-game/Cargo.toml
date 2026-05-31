@@ -20,9 +20,11 @@ client-render = { path = "../client-render" }
 client-render-base = { path = "../client-render-base" }
 client-types = { path = "../client-types" }
 client-ui = { path = "../client-ui" }
+client-ui-utils = { path = "../client-ui-utils" }
 game-base = { path = "../game-base" }
 game-config = { path = "../game-config" }
 game-interface = { path = "../game-interface" }
+ingame-ui = { path = "../ingame-ui" }
 map = { path = "../map" }
 tile-map-collision = { path = "../tile-map-collision" }
 

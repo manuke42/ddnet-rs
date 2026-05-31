@@ -1,4 +1,4 @@
-use client_ui::motd::user_data::UserData;
+use ingame_ui::motd::user_data::UserData;
 use ui_base::types::{UiRenderPipe, UiState};
 use ui_generic::traits::UiPageInterface;
 
@@ -21,7 +21,7 @@ impl MotdPage {
         pipe: &mut UiRenderPipe<()>,
         ui_state: &mut UiState,
     ) {
-        client_ui::motd::main_frame::render(
+        ingame_ui::motd::main_frame::render(
             ui,
             &mut UiRenderPipe {
                 cur_time: pipe.cur_time,

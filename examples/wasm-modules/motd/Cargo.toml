@@ -12,6 +12,6 @@ ui-base = { path = "../../../lib/ui-base" }
 ui-generic = { path = "../../../lib/ui-generic" }
 
 api-ui-game = { path = "../../../game/api-ui-game" }
-client-ui = { path = "../../../game/client-ui" }
+ingame-ui = { path = "../../../game/ingame-ui" }
 
 egui = { version = "0.34", default-features = false, features = ["serde"] }

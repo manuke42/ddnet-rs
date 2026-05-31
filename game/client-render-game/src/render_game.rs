@@ -47,16 +47,9 @@ use client_types::{
     actionfeed::{Action, ActionInFeed, ActionKill, ActionPlayer},
     chat::{ChatMsg, MsgSystem, ServerMsg, SystemMsgPlayerSkin},
 };
-use client_ui::{
-    chat::user_data::{ChatEvent, ChatMode, MsgInChat},
-    emote_wheel::user_data::EmoteWheelEvent,
-    hud::user_data::RenderDateTime,
-    spectator_selection::user_data::SpectatorSelectionEvent,
-    thumbnail_container::{
-        DEFAULT_THUMBNAIL_CONTAINER_PATH, ThumbnailContainer, load_thumbnail_container,
-    },
-    time_display::TimeDisplay,
-    vote::user_data::{VoteRenderData, VoteRenderPlayer, VoteRenderType},
+use client_ui::time_display::TimeDisplay;
+use client_ui_utils::thumbnail_container::{
+    DEFAULT_THUMBNAIL_CONTAINER_PATH, ThumbnailContainer, load_thumbnail_container,
 };
 use config::config::ConfigDebug;
 use egui::{FontDefinitions, Rect};
@@ -100,6 +93,13 @@ use graphics::{
     handles::{backend::backend::GraphicsBackendHandle, canvas::canvas::GraphicsCanvasHandle},
 };
 use graphics_types::rendering::ColorRgba;
+use ingame_ui::{
+    chat::user_data::{ChatEvent, ChatMode, MsgInChat},
+    emote_wheel::user_data::EmoteWheelEvent,
+    hud::user_data::RenderDateTime,
+    spectator_selection::user_data::SpectatorSelectionEvent,
+    vote::user_data::{VoteRenderData, VoteRenderPlayer, VoteRenderType},
+};
 use math::math::{Rng, RngSlice, vector::vec2};
 use pool::{
     datatypes::{

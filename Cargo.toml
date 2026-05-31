@@ -86,6 +86,7 @@ members = [
   "game/game-state-wasm",
   "game/ghost",
   "game/http-accounts",
+  "game/ingame-ui",
   "game/legacy-map",
   "game/legacy-proxy",
   "game/map",
@@ -241,6 +242,7 @@ game-network = { path = "game/game-network" }
 game-server = { path = "game/game-server", default-features = false }
 game-state-wasm = { path = "game/game-state-wasm" }
 ghost = { path = "game/ghost" }
+ingame-ui = { path = "game/ingame-ui" }
 legacy-proxy = { path = "game/legacy-proxy" }
 prediction-timer = { path = "game/prediction-timer" }
 

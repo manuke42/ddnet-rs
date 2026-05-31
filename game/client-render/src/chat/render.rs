@@ -6,10 +6,6 @@ use std::{
 use base::linked_hash_map_view::FxLinkedHashMap;
 use client_containers::skins::SkinContainer;
 use client_render_base::render::tee::RenderTee;
-use client_ui::chat::{
-    page::ChatUi,
-    user_data::{ChatEvent, ChatMode, MsgInChat, UserData},
-};
 use egui::Color32;
 use game_interface::types::{
     id_types::{CharacterId, PlayerId},
@@ -21,6 +17,10 @@ use graphics::{
         backend::backend::GraphicsBackendHandle, canvas::canvas::GraphicsCanvasHandle,
         stream::stream::GraphicsStreamHandle, texture::texture::GraphicsTextureHandle,
     },
+};
+use ingame_ui::chat::{
+    page::ChatUi,
+    user_data::{ChatEvent, ChatMode, MsgInChat, UserData},
 };
 
 use ui_base::{

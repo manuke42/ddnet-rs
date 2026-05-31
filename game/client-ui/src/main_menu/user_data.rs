@@ -33,10 +33,11 @@ use math::math::vector::ubvec4;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+use client_ui_utils::thumbnail_container::ThumbnailContainer;
+
 use crate::{
     events::UiEvents,
     ingame_menu::{client_info::ClientInfo, raw_input_info::RawInputInfo},
-    thumbnail_container::ThumbnailContainer,
 };
 
 use super::{

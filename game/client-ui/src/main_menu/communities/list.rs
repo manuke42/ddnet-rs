@@ -6,12 +6,9 @@ use game_interface::types::resource_key::ResourceKey;
 use math::math::vector::vec2;
 use ui_base::types::{UiRenderPipe, UiState};
 
-use client_ui_utils::render_texture_for_ui;
+use client_ui_utils::{render_texture_for_ui, thumbnail_container::Thumbnail};
 
-use crate::{
-    main_menu::{communities::IconUrlHash, user_data::UserData},
-    thumbnail_container::Thumbnail,
-};
+use crate::main_menu::{communities::IconUrlHash, user_data::UserData};
 
 pub fn community_list(
     ui: &mut egui::Ui,

@@ -2,13 +2,7 @@ use std::time::Duration;
 
 use client_containers::skins::SkinContainer;
 use client_render_base::render::tee::RenderTee;
-use client_ui::{
-    thumbnail_container::ThumbnailContainer,
-    vote::{
-        page::VoteUi,
-        user_data::{UserData, VoteRenderData},
-    },
-};
+use client_ui_utils::thumbnail_container::ThumbnailContainer;
 use egui::{Color32, Rect};
 use graphics::{
     graphics::graphics::Graphics,
@@ -16,6 +10,10 @@ use graphics::{
         backend::backend::GraphicsBackendHandle, canvas::canvas::GraphicsCanvasHandle,
         stream::stream::GraphicsStreamHandle, texture::texture::GraphicsTextureHandle,
     },
+};
+use ingame_ui::vote::{
+    page::VoteUi,
+    user_data::{UserData, VoteRenderData},
 };
 
 use ui_base::{

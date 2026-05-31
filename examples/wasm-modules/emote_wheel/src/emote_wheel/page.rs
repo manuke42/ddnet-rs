@@ -1,11 +1,11 @@
 use api_ui_game::render::{create_emoticons_container, create_skin_container};
 use client_containers::{emoticons::EmoticonsContainer, skins::SkinContainer};
 use client_render_base::render::tee::RenderTee;
-use client_ui::emote_wheel::user_data::EmoteWheelMousePos;
 use graphics::{
     graphics::graphics::Graphics,
     handles::{canvas::canvas::GraphicsCanvasHandle, stream::stream::GraphicsStreamHandle},
 };
+use ingame_ui::emote_wheel::user_data::EmoteWheelMousePos;
 use ui_base::types::{UiRenderPipe, UiState};
 use ui_generic::traits::UiPageInterface;
 
@@ -34,11 +34,11 @@ impl EmoteWheelPage {
         pipe: &mut UiRenderPipe<()>,
         ui_state: &mut UiState,
     ) {
-        client_ui::emote_wheel::main_frame::render(
+        ingame_ui::emote_wheel::main_frame::render(
             ui,
             &mut UiRenderPipe::new(
                 pipe.cur_time,
-                &mut client_ui::emote_wheel::user_data::UserData {
+                &mut ingame_ui::emote_wheel::user_data::UserData {
                     events: &mut Default::default(),
                     canvas_handle: &self.canvas_handle,
                     stream_handle: &self.stream_handle,

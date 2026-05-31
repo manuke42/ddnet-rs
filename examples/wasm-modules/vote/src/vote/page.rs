@@ -3,10 +3,7 @@ use std::time::Duration;
 use api_ui_game::render::create_skin_container;
 use client_containers::skins::SkinContainer;
 use client_render_base::render::tee::RenderTee;
-use client_ui::{
-    thumbnail_container::{DEFAULT_THUMBNAIL_CONTAINER_PATH, ThumbnailContainer},
-    vote::user_data::{VoteRenderData, VoteRenderType},
-};
+use client_ui_utils::thumbnail_container::{DEFAULT_THUMBNAIL_CONTAINER_PATH, ThumbnailContainer};
 use game_interface::votes::{
     MapCategoryVoteKey, MapVote, MapVoteDetails, MapVoteKey, VoteState, VoteType, Voted,
 };
@@ -14,6 +11,7 @@ use graphics::{
     graphics::graphics::Graphics,
     handles::{canvas::canvas::GraphicsCanvasHandle, stream::stream::GraphicsStreamHandle},
 };
+use ingame_ui::vote::user_data::{VoteRenderData, VoteRenderType};
 use ui_base::types::{UiRenderPipe, UiState};
 use ui_generic::traits::UiPageInterface;
 
@@ -47,11 +45,11 @@ impl VotePage {
         pipe: &mut UiRenderPipe<()>,
         ui_state: &mut UiState,
     ) {
-        client_ui::vote::main_frame::render(
+        ingame_ui::vote::main_frame::render(
             ui,
             &mut UiRenderPipe::new(
                 pipe.cur_time,
-                &mut client_ui::vote::user_data::UserData {
+                &mut ingame_ui::vote::user_data::UserData {
                     canvas_handle: &self.canvas_handle,
                     stream_handle: &self.stream_handle,
                     skin_container: &mut self.skin_container,
@@ -60,7 +58,7 @@ impl VotePage {
 
                     vote_data: VoteRenderData {
                         ty: VoteRenderType::PlayerVoteKick(
-                            client_ui::vote::user_data::VoteRenderPlayer {
+                            ingame_ui::vote::user_data::VoteRenderPlayer {
                                 name: "nameless tee",
                                 skin: &Default::default(),
                                 skin_info: &Default::default(),

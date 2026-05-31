@@ -5,7 +5,10 @@ use egui::{
     Align2, Color32, CornerRadius, FontId, Frame, Grid, Rect, RichText, Shadow, Stroke, UiBuilder,
     pos2, vec2,
 };
-use game_interface::{types::render::character::TeeEye, votes::Voted};
+use game_interface::{
+    types::render::character::TeeEye,
+    votes::{MapDifficulty, Voted},
+};
 use math::math::vector::vec2;
 use tracing::instrument;
 use ui_base::{
@@ -15,9 +18,26 @@ use ui_base::{
 
 use client_ui_utils::{render_tee_for_ui, render_texture_for_ui};
 
-use crate::{ingame_menu::call_vote::map::stars_text, vote::user_data::VoteRenderData};
+use crate::vote::user_data::VoteRenderData;
 
 use super::user_data::{UserData, VoteRenderType};
+
+fn stars_text(diff: MapDifficulty) -> String {
+    let mut stars = String::new();
+    let mut added_stars = 0;
+    for _ in 0..diff.get() / 2 {
+        stars.push('\u{f005}');
+        added_stars += 1;
+    }
+    if !diff.get().is_multiple_of(2) {
+        stars.push('\u{f5c0}');
+        added_stars += 1;
+    }
+    for _ in 0..5u32.saturating_sub(added_stars) {
+        stars.push('☆');
+    }
+    stars
+}
 
 /// not required
 #[instrument(level = "trace", skip_all)]

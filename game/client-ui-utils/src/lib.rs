@@ -44,6 +44,7 @@ use tracing::instrument;
 use ui_base::{custom_callback::CustomCallbackTrait, types::UiState};
 
 pub mod assets_list;
+pub mod thumbnail_container;
 
 /// TODO: this function exists in the editor already. graphics also have a similar one.
 pub fn rotate(center: &vec2, rotation: f32, points: &mut [vec2]) {

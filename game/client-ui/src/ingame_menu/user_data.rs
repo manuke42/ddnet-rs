@@ -1,6 +1,8 @@
 use math::math::Rng;
 
-use crate::{main_menu, thumbnail_container::ThumbnailContainer};
+use client_ui_utils::thumbnail_container::ThumbnailContainer;
+
+use crate::main_menu;
 
 use super::{
     account_info::AccountInfo, server_info::GameServerInfo, server_players::ServerPlayers,

@@ -28,7 +28,6 @@ graphics = { path = "../../lib/graphics" }
 graphics-types = { path = "../../lib/graphics-types" }
 hiarc = { path = "../../lib/hiarc", features = ["derive"] }
 math = { path = "../../lib/math" }
-pool = { path = "../../lib/pool" }
 sound = { path = "../../lib/sound" }
 ui-base = { path = "../../lib/ui-base" }
 ui-generic = { path = "../../lib/ui-generic" }
@@ -41,10 +40,6 @@ egui_extras = { version = "0.34" }
 email_address = { version = "0.2", features = ["serde"] }
 fuzzy-matcher = "0.3"
 gcd = "2"
-hashlink = { git = "https://github.com/Jupeyy/hashlink/", branch = "ddnet", features = [
-  "serde",
-  "serde_impl",
-] }
 log = "0.4"
 num-rational = "0.4"
 num-traits = "0.2"

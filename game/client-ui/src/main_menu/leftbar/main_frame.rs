@@ -15,18 +15,15 @@ use math::math::vector::vec2;
 use tracing::instrument;
 use ui_base::{style::bg_frame_color, types::UiState};
 
-use client_ui_utils::{render_tee_for_ui, render_texture_for_ui};
+use client_ui_utils::{render_tee_for_ui, render_texture_for_ui, thumbnail_container::Thumbnail};
 
-use crate::{
-    main_menu::{
-        communities::IconUrlHash,
-        constants::{
-            MENU_COMMUNITY_PREFIX, MENU_EXPLORE_COMMUNITIES_NAME, MENU_FAVORITES_NAME,
-            MENU_INTERNET_NAME, MENU_LAN_NAME, MENU_PROFILE_NAME, MENU_SETTINGS_NAME,
-        },
-        user_data::{PROFILE_SKIN_PREVIEW, ProfileSkin, UserData},
+use crate::main_menu::{
+    communities::IconUrlHash,
+    constants::{
+        MENU_COMMUNITY_PREFIX, MENU_EXPLORE_COMMUNITIES_NAME, MENU_FAVORITES_NAME,
+        MENU_INTERNET_NAME, MENU_LAN_NAME, MENU_PROFILE_NAME, MENU_SETTINGS_NAME,
     },
-    thumbnail_container::Thumbnail,
+    user_data::{PROFILE_SKIN_PREVIEW, ProfileSkin, UserData},
 };
 
 enum CustomRender<'a> {

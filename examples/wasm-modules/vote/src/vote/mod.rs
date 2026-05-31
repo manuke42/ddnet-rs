@@ -1,6 +1,6 @@
 use api::{GRAPHICS, IO, RUNTIME_THREAD_POOL, SOUND};
 use client_containers::container::ContainerLoadOptions;
-use client_ui::thumbnail_container::ThumbnailContainer;
+use client_ui_utils::thumbnail_container::ThumbnailContainer;
 
 pub mod page;
 
