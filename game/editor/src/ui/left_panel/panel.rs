@@ -11,10 +11,10 @@ use crate::{
 
 pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_state: &mut UiState) {
     let res = {
-        let mut panel = egui::SidePanel::left("left_panel")
+        let mut panel = egui::Panel::left("left_panel")
             .resizable(true)
-            .width_range(120.0..=260.0);
-        panel = panel.default_width(200.0);
+            .size_range(120.0..=260.0);
+        panel = panel.default_size(200.0);
 
         Some(panel.show_inside(ui, |ui| {
             let map = &mut pipe.user_data.editor_tab.map;

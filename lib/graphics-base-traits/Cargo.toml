@@ -9,5 +9,5 @@ hiarc = { path = "../hiarc", features = ["derive"] }
 pool = { path = "../pool" }
 
 anyhow = { version = "1", features = ["backtrace"] }
-bincode = { features = ["serde"], version = "2" }
+bincode = { version = "2", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }

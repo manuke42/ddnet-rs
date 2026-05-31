@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use ddnet_account_sql::any::AnyPool;
 use game_database::traits::DbKind;
 use sqlx::{
-    Any, FromRow,
+    Any, AssertSqlSafe, FromRow,
     any::{AnyArguments, AnyRow},
     query::QueryAs,
 };
@@ -71,10 +71,10 @@ impl Database {
         Ok(Self { pools })
     }
 
-    pub fn get_query<'a, F>(str: &'a str) -> QueryAs<'a, Any, F, AnyArguments<'a>>
+    pub fn get_query<'a, F>(str: &'a str) -> QueryAs<'a, Any, F, AnyArguments>
     where
         F: for<'r> FromRow<'r, AnyRow>,
     {
-        sqlx::query_as::<_, F>(str)
+        sqlx::query_as::<_, F>(AssertSqlSafe(str))
     }
 }

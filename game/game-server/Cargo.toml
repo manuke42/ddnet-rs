@@ -34,9 +34,9 @@ vanilla = { path = "../vanilla" }
 game-state-wasm = { path = "../game-state-wasm" }
 map-convert-lib = { path = "../map-convert-lib" }
 
-ddnet-account-client-http-fs = { version = "0.3" }
-ddnet-account-game-server = { version = "0.3", features = ["sqlite"] }
-ddnet-accounts-shared = { version = "0.2" }
+ddnet-account-client-http-fs = { version = "0.4" }
+ddnet-account-game-server = { version = "0.4", features = ["sqlite"] }
+ddnet-accounts-shared = { version = "0.3" }
 
 anyhow = { version = "1", features = ["backtrace"] }
 async-trait = "0.1"
@@ -47,9 +47,7 @@ ed25519-dalek = { version = "2" }
 either = "1"
 futures = "0.3"
 log = "0.4"
-rand = { version = "0.9", features = [
-  "thread_rng",
-], default-features = false }
+rand = { version = "0.10", features = ["thread_rng"], default-features = false }
 rayon = "1"
 rustc-hash = "2"
 serde = { version = "1", features = ["derive"] }

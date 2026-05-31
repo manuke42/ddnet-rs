@@ -23,7 +23,7 @@ anyhow = { version = "1", features = ["backtrace"] }
 tracing = { version = "0.1", default-features = false, features = [
   "attributes",
 ] }
-wasmer = { version = "6", default-features = false, features = [
+wasmer = { version = "7", default-features = false, features = [
   "sys",
   "cranelift",
 ] }

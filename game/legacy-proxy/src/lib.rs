@@ -133,7 +133,7 @@ use pool::{
     traits::Recyclable,
 };
 use projectile::get_pos;
-use rand::RngCore;
+use rand::Rng as _;
 use sha2::Digest;
 use socket::Socket;
 use std::{

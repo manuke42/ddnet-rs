@@ -2817,7 +2817,7 @@ impl Editor {
 pub enum EditorResult {
     Close,
     Minimize,
-    PlatformOutput(egui::PlatformOutput),
+    PlatformOutput(Box<egui::PlatformOutput>),
 }
 
 pub trait EditorInterface {
@@ -2863,7 +2863,7 @@ impl EditorInterface for Editor {
         if let Some((latest_pointer, scroll_delta, keys, modifiers)) = input_state.map(|inp| {
             (
                 inp.pointer.clone(),
-                inp.raw_scroll_delta,
+                inp.smooth_scroll_delta,
                 inp.keys_down.clone(),
                 inp.modifiers,
             )
@@ -2959,7 +2959,7 @@ impl EditorInterface for Editor {
         if let Some(res) = forced_result {
             res
         } else {
-            EditorResult::PlatformOutput(ui_output)
+            EditorResult::PlatformOutput(Box::new(ui_output))
         }
     }
 

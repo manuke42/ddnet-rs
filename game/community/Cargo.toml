@@ -8,4 +8,4 @@ base = { path = "../../lib/base" }
 
 serde = { version = "1", features = ["derive"] }
 
-ddnet-accounts-types = { version = "0.1" }
+ddnet-accounts-types = { version = "0.2" }

@@ -12,7 +12,7 @@ use map::{
     types::NonZeroU16MinusOne,
 };
 use math::math::vector::{ffixed, nffixed, nfvec4, vec2_base};
-use rand::RngCore;
+use rand::Rng;
 use time::Duration;
 use ui_base::{
     types::{UiRenderPipe, UiState},

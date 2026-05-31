@@ -15,7 +15,7 @@ wasm-runtime-types = { path = "../wasm-runtime-types" }
 
 anyhow = { version = "1", features = ["backtrace"] }
 sendable = "0.6"
-wasmer = { version = "6", default-features = false, features = [
+wasmer = { version = "7", default-features = false, features = [
   "sys",
   "cranelift",
 ] }

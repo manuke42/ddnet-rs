@@ -33,11 +33,11 @@ impl BanState {
             IpAddr::V4(ip) => self
                 .ipv4_bans
                 .get_spm(&ipnet::Ipv4Net::from(ip))
-                .map(|(&ip, v)| (ipnet::IpNet::V4(ip), v.clone())),
+                .map(|(ip, v)| (ipnet::IpNet::V4(ip), v.clone())),
             IpAddr::V6(ip) => self
                 .ipv6_bans
                 .get_spm(&ipnet::Ipv6Net::from(ip))
-                .map(|(&ip, v)| (ipnet::IpNet::V6(ip), v.clone())),
+                .map(|(ip, v)| (ipnet::IpNet::V6(ip), v.clone())),
         } {
             if ban.until.is_none_or(|until| now < until) {
                 return Some(ban);

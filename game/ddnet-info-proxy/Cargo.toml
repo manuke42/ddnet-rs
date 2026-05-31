@@ -12,8 +12,8 @@ client-ui = { path = "../client-ui" }
 
 anyhow = { version = "1", features = ["backtrace"] }
 axum = "0.8"
-reqwest = { version = "0.12", default-features = false, features = [
-  "rustls-tls",
+reqwest = { version = "0.13", default-features = false, features = [
+  "rustls",
   "json",
 ] }
 serde = { version = "1", features = ["derive"] }

@@ -39,9 +39,13 @@ impl crate::traits::Microphone for MicrophoneManager {
         Ok(MicrophoneDevices {
             devices: host
                 .devices()?
-                .map(|device| anyhow::Ok(device.name()?))
+                .map(|device| anyhow::Ok(device.id()?.to_string()))
                 .collect::<anyhow::Result<Vec<_>>>()?,
-            default: host.default_input_device().map(|d| d.name()).transpose()?,
+            default: host
+                .default_input_device()
+                .map(|d| d.id())
+                .transpose()?
+                .map(|d| d.to_string()),
         })
     }
 
@@ -54,7 +58,7 @@ impl crate::traits::Microphone for MicrophoneManager {
         let host = Self::host_from_str(host)?;
         let device = Self::device_from_str(&host, device)?;
 
-        log::info!("Loaded microphone device: {}", device.name()?);
+        log::info!("Loaded microphone device: {}", device.id()?);
 
         let config = device.default_input_config()?;
         log::info!("Default input config: {:?}", config);
@@ -87,7 +91,7 @@ impl crate::traits::Microphone for MicrophoneManager {
         const CHUNK_SIZE_RESAMPLER: usize = 480;
         const NF_CHUNK_SIZE: usize = OPUS_10_MS;
 
-        let input_sample_rate = config.sample_rate().0;
+        let input_sample_rate = config.sample_rate();
         let mut resampler = rubato::SincFixedIn::<f32>::new(
             OPUS_SAMPLE_RATE as f64 / input_sample_rate as f64,
             2.0,
@@ -313,7 +317,7 @@ impl MicrophoneManager {
     fn device_from_str(host: &cpal::Host, device: &str) -> anyhow::Result<cpal::Device> {
         let Some(device) = host
             .devices()?
-            .find(|d| d.name().is_ok_and(|name| name == device))
+            .find(|d| d.id().is_ok_and(|name| name.to_string() == device))
         else {
             return Err(anyhow!("Selected host not found"));
         };

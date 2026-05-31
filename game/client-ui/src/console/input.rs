@@ -5,7 +5,7 @@ use client_types::console::{
 };
 use command_parser::parser::{Command, CommandParseResult, CommandType, CommandsTyped, Syn, parse};
 use egui::{
-    Color32, FontId, Id, Layout, RichText, TextBuffer, TextFormat,
+    Color32, FontId, Frame, Id, Layout, RichText, TextBuffer, TextFormat,
     text::{CCursor, LayoutJob},
     text_selection::CCursorRange,
 };
@@ -235,7 +235,7 @@ pub fn render(
                     .font(FontId::monospace(12.0))
                     .id(inp_id)
                     .layouter(&mut layouter)
-                    .frame(false)
+                    .frame(Frame::NONE)
                     .show(ui);
                 *pipe.user_data.cursor = label
                     .state

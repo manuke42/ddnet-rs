@@ -28,7 +28,7 @@ atomic_enum = { version = "0.3", optional = true }
 audiopus_sys = { git = "https://github.com/Jupeyy/audiopus_sys.git", branch = "ddnet-rs", features = [
   "static",
 ], optional = true }
-cpal = { version = "0.16", optional = true }
+cpal = { version = "0.17", optional = true }
 crossbeam = { version = "0.8" }
 deep_filter = { git = "https://github.com/Rikorose/DeepFilterNet", rev = "978576aa8400552a4ce9730838c635aa30db5e61", default-features = false, features = [
   "tract",

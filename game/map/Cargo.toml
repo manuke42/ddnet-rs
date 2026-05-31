@@ -21,7 +21,7 @@ image-utils = { path = "../../lib/image-utils" }
 math = { path = "../../lib/math" }
 
 anyhow = { version = "1", features = ["backtrace"] }
-bincode = { features = ["serde"], version = "2" }
+bincode = { version = "2", features = ["serde"] }
 bitflags = { version = "2", features = ["serde"] }
 fixed = "1"
 hashlink = { git = "https://github.com/Jupeyy/hashlink/", branch = "ddnet", features = [
@@ -55,4 +55,4 @@ brotli = "8"
 difference = "2.0"
 #rust-lzma = "0.6.0"
 flate2 = "1"
-lz4_flex = { version = "0.11" }
+lz4_flex = { version = "0.13" }

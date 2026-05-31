@@ -23,7 +23,7 @@ use map::map::{
     resources::{MapResourceMetaData, MapResourceRef},
 };
 use math::math::vector::uffixed;
-use rand::RngCore;
+use rand::Rng;
 
 use crate::{
     actions::actions::{

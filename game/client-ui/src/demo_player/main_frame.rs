@@ -2,8 +2,8 @@ use std::time::Duration;
 
 use base::duration_ext::DurationToRaceStr;
 use egui::{
-    Align2, Button, Color32, CornerRadius, FontId, Frame, Grid, Layout, Rect, Shadow, Stroke,
-    TopBottomPanel, Vec2, Window,
+    Align2, Button, Color32, CornerRadius, FontId, Frame, Grid, Layout, Panel, Rect, Shadow,
+    Stroke, Vec2, Window,
 };
 
 use tracing::instrument;
@@ -19,8 +19,8 @@ use super::user_data::UserData;
 /// not required
 #[instrument(level = "trace", skip_all)]
 pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &mut UiState) {
-    let res = TopBottomPanel::bottom("demo-main")
-        .exact_height(40.0)
+    let res = Panel::bottom("demo-main")
+        .exact_size(40.0)
         .frame(
             Frame::NONE
                 .shadow(Shadow::NONE)
@@ -29,7 +29,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
         )
         .show_separator_line(false)
         .resizable(false)
-        .show(ui.ctx(), |ui| {
+        .show_inside(ui, |ui| {
             ui.set_clip_rect(ui.ctx().content_rect());
             ui.style_mut().spacing.item_spacing.y = 0.0;
             let mut rect = ui.available_rect_before_wrap();

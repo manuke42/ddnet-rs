@@ -454,7 +454,7 @@ impl TeeEditor {
             // add an overlay to show the current frames interpolated data(pos, scale, rotation)
             egui::Window::new("Vector data")
                 .anchor(egui::Align2::RIGHT_TOP, egui::vec2(0.0, 0.0))
-                .default_width(32.0)
+                .default_size(egui::vec2(32.0, 32.0))
                 .show(ui.ctx(), |ui| {
                     // position, scale & rotation
                     let anim_pos = item.atoms.anim_frame_data.get().pos;
@@ -932,10 +932,10 @@ impl UiPageInterface<Config> for TeeEditor {
                             });
                             strip.cell(|ui| {
                                 ui.style_mut().wrap_mode = None;
-                                egui::SidePanel::left("left_panel")
+                                egui::Panel::left("left_panel")
                                     .resizable(true)
-                                    .default_width(150.0)
-                                    .width_range(80.0..=200.0)
+                                    .default_size(150.0)
+                                    .size_range(80.0..=200.0)
                                     .show_inside(ui, |ui| {
                                         ui.vertical_centered(|ui| {
                                             ui.heading("Left Panel");
@@ -943,10 +943,10 @@ impl UiPageInterface<Config> for TeeEditor {
                                         });
                                     });
 
-                                egui::TopBottomPanel::bottom("bottom_panel")
+                                egui::Panel::bottom("bottom_panel")
                                     .resizable(true)
-                                    .default_height(50.0)
-                                    .height_range(20.0..=100.0)
+                                    .default_size(50.0)
+                                    .size_range(20.0..=100.0)
                                     .show_inside(ui, |ui| {
                                         ui.vertical_centered(|ui| {
                                             ui.heading("Bottom Panel");

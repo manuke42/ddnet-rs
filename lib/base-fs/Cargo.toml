@@ -33,7 +33,7 @@ tokio = { version = "1", features = [
   "time",
   "macros",
 ] }
-virtual-fs = { version = "0.601", default-features = false, features = [
+virtual-fs = { version = "0.701", default-features = false, features = [
   "host-fs",
 ] }
 

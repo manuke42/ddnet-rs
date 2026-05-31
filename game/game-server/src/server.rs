@@ -58,7 +58,7 @@ use network::network::{
     },
 };
 use pool::{datatypes::PoolFxLinkedHashMap, mt_datatypes::PoolCow, pool::Pool};
-use rand::RngCore;
+use rand::Rng;
 use sql::database::{Database, DatabaseDetails};
 use tracing::instrument;
 use vanilla::{

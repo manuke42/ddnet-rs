@@ -22,7 +22,7 @@ math = { path = "../../lib/math" }
 pool = { path = "../../lib/pool", features = ["enable_hiarc"] }
 
 # non-local libs
-ddnet-accounts-types = { version = "0.1" }
+ddnet-accounts-types = { version = "0.2" }
 
 ascii = { version = "1", features = ["serde"] }
 bitflags = { version = "2", features = ["serde"] }
@@ -36,4 +36,4 @@ num-derive = "0.4"
 num-traits = "0.2"
 rustc-hash = "2"
 serde = { version = "1", features = ["derive"] }
-strum = { version = "0.27", features = ["derive"] }
+strum = { version = "0.28", features = ["derive"] }

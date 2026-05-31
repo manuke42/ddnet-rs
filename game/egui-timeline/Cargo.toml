@@ -8,5 +8,5 @@ math = { path = "../../lib/math" }
 
 map = { path = "../map" }
 
-egui = { version = "0.33", default-features = false, features = ["serde"] }
-egui_extras = { version = "0.33" }
+egui = { version = "0.34", default-features = false, features = ["serde"] }
+egui_extras = { version = "0.34" }

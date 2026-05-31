@@ -15,5 +15,5 @@ ui-generic = { path = "../../../lib/ui-generic" }
 api-ui-game = { path = "../../../game/api-ui-game" }
 prediction-timer = { path = "../../../game/prediction-timer" }
 
-egui = { version = "0.33", default-features = false, features = ["serde"] }
-egui_plot = { version = "0.34" }
+egui = { version = "0.34", default-features = false, features = ["serde"] }
+egui_plot = { version = "0.35" }

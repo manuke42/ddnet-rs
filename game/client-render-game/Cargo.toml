@@ -26,7 +26,7 @@ game-interface = { path = "../game-interface" }
 map = { path = "../map" }
 vanilla = { path = "../vanilla" }
 
-egui = { version = "0.33", default-features = false, features = ["serde"] }
+egui = { version = "0.34", default-features = false, features = ["serde"] }
 num-traits = "0.2"
 rayon = "1"
 serde = { version = "1", features = ["derive"] }

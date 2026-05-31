@@ -10,5 +10,5 @@ anyhow = { version = "1", features = ["backtrace"] }
 async-trait = "0.1"
 url = { version = "2", features = ["serde"] }
 
-ddnet-account-client = { version = "0.2" }
-ddnet-account-client-http-fs = { version = "0.3" }
+ddnet-account-client = { version = "0.3" }
+ddnet-account-client-http-fs = { version = "0.4" }

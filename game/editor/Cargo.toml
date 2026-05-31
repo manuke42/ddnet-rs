@@ -35,10 +35,10 @@ map = { path = "../map" }
 
 map-convert-lib = { path = "../map-convert-lib" }
 
-egui = { version = "0.33", default-features = false, features = ["serde"] }
-egui-file-dialog = { version = "0.12", default-features = false }
-egui_commonmark = "0.22"
-egui_extras = { version = "0.33" }
+egui = { version = "0.34", default-features = false, features = ["serde"] }
+egui-file-dialog = { version = "0.13", default-features = false }
+egui_commonmark = "0.23"
+egui_extras = { version = "0.34" }
 
 anyhow = { version = "1", features = ["backtrace"] }
 async-trait = "0.1"
@@ -51,7 +51,7 @@ hashlink = { git = "https://github.com/Jupeyy/hashlink/", branch = "ddnet", feat
   "serde_impl",
 ] }
 log = "0.4"
-rand = { version = "0.9", features = ["thread_rng"] }
+rand = { version = "0.10", features = ["thread_rng"] }
 rayon = "1"
 regex = "1"
 rustc-hash = "2"

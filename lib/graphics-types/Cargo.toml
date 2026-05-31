@@ -14,4 +14,4 @@ pool = { path = "../pool", features = ["enable_hiarc"] }
 bitflags = { version = "2", features = ["serde"] }
 num-traits = "0.2"
 serde = "1"
-strum = { version = "0.27", features = ["derive"] }
+strum = { version = "0.28", features = ["derive"] }

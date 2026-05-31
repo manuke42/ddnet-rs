@@ -9,7 +9,7 @@ pool = { path = "../pool" }
 bincode = "2"
 sendable = "0.6"
 serde = "1"
-wasmer = { version = "6", default-features = false, features = [
+wasmer = { version = "7", default-features = false, features = [
   "sys",
   "cranelift",
 ] }

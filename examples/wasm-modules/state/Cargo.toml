@@ -71,12 +71,12 @@ legacy-map = { path = "../../../game/legacy-map" }
 map = { path = "../../../game/map" }
 vanilla = { path = "../../../game/vanilla" }
 
-ddnet-accounts-types = { version = "0.1" }
+ddnet-accounts-types = { version = "0.2" }
 
 anyhow = { version = "1", features = ["backtrace"] }
 arrayvec = { version = "0.7", features = ["serde"] }
 async-trait = "0.1"
-bincode = { features = ["serde"], version = "2" }
+bincode = { version = "2", features = ["serde"] }
 bitflags = { version = "2", features = ["serde"] }
 chrono = { version = "0.4", default-features = false, features = ["serde"] }
 flate2 = "1"

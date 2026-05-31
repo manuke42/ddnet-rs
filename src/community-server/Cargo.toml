@@ -20,9 +20,7 @@ anyhow = { version = "1", features = ["backtrace"] }
 async-trait = "0.1"
 clap = { version = "4", features = ["derive"] }
 log = "0.4"
-reqwest = { version = "0.12", default-features = false, features = [
-  "rustls-tls",
-] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
 serde_json = "1"
 tokio = { version = "1", features = [
   "rt-multi-thread",
@@ -35,8 +33,8 @@ tokio = { version = "1", features = [
 url = { version = "2", features = ["serde"] }
 x509-cert = { version = "0.2" }
 
-ddnet-account-client-http-fs = { version = "0.3" }
-ddnet-account-client-reqwest = "0.3"
-ddnet-account-game-server = { version = "0.3" }
-ddnet-accounts-shared = { version = "0.2" }
-ddnet-accounts-types = { version = "0.1" }
+ddnet-account-client-http-fs = { version = "0.4" }
+ddnet-account-client-reqwest = "0.4"
+ddnet-account-game-server = { version = "0.4" }
+ddnet-accounts-shared = { version = "0.3" }
+ddnet-accounts-types = { version = "0.2" }

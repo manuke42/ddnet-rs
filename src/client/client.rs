@@ -1365,7 +1365,7 @@ impl ClientNativeImpl {
                 EditorResult::PlatformOutput(output) => {
                     self.inp_manager.handle_platform_output(
                         native,
-                        output,
+                        *output,
                         self.local_console.ui.ui_state.is_ui_open
                             || self.game.remote_console_open(),
                     );

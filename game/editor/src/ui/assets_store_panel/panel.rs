@@ -31,10 +31,10 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
     };
 
     let res = {
-        let mut panel = egui::SidePanel::right("assets_store_panel")
+        let mut panel = egui::Panel::right("assets_store_panel")
             .resizable(true)
-            .width_range(600.0..=1200.0);
-        panel = panel.default_width(800.0);
+            .size_range(600.0..=1200.0);
+        panel = panel.default_size(800.0);
 
         let res = panel.show_inside(ui, |ui| {
             ui.horizontal(|ui| {

@@ -39,7 +39,7 @@ use map::{
 };
 use math::math::vector::{dvec2, ivec2, ubvec4, usvec2, vec2, vec4};
 use pool::mt_datatypes::PoolVec;
-use rand::RngCore;
+use rand::Rng;
 
 use crate::{
     actions::actions::{

@@ -9,7 +9,7 @@ runtime = ["steamworks"]
 [dependencies]
 base = { path = "../base" }
 
-steamworks = { version = "0.12", optional = true }
+steamworks = { version = "0.13", optional = true }
 
 anyhow = { version = "1", features = ["backtrace"] }
 async-trait = "0.1"

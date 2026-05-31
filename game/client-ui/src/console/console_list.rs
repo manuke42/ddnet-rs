@@ -1,4 +1,4 @@
-use egui::Layout;
+use egui::{Frame, Layout};
 
 use tracing::instrument;
 use ui_base::types::UiRenderPipe;
@@ -19,7 +19,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, has_text_sel
                     let mut text_as_str = pipe.user_data.msgs.as_str();
                     let text = egui::TextEdit::multiline(&mut text_as_str)
                         .id_source("console-text-output")
-                        .frame(false)
+                        .frame(Frame::NONE)
                         .show(ui);
                     *has_text_selection = text.cursor_range.is_some_and(|range| !range.is_empty());
                 },

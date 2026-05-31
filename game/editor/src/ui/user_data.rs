@@ -176,6 +176,7 @@ impl EditorMenuDialogMode {
 
                 rename_pinned_folder: "\u{f303} Rename".to_string(),
                 working_directory: "\u{f08e}  Go to working directory".to_string(),
+                select_all: "\u{f14a}".to_string(),
                 save_extension_any: "Any".to_string(),
             })
     }

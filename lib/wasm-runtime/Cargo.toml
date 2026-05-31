@@ -10,7 +10,7 @@ anyhow = { version = "1", features = ["backtrace"] }
 arrayvec = "0.7"
 bincode = { version = "2", features = ["serde"] }
 serde = "1"
-wasmer = { version = "6", default-features = false, features = [
+wasmer = { version = "7", default-features = false, features = [
   "sys",
   "cranelift",
 ] }

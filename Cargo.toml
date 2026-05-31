@@ -246,14 +246,14 @@ bincode = { version = "2", features = ["serde"] }
 bytes = "1"
 chrono = { version = "0.4", features = ["serde"] }
 crossbeam = "0.8"
-egui = { version = "0.33", default-features = false, features = ["serde"] }
-egui-winit = { version = "0.33", default-features = false, features = [
+egui = { version = "0.34", default-features = false, features = ["serde"] }
+egui-winit = { version = "0.34", default-features = false, features = [
   "x11",
   "arboard",
   "links",
 ] }
-egui_extras = { version = "0.33" }
-emath = "0.33"
+egui_extras = { version = "0.34" }
+emath = "0.34"
 env_logger = "0.11"
 fixed = "1"
 hashlink = { git = "https://github.com/Jupeyy/hashlink/", branch = "ddnet", features = [
@@ -264,7 +264,7 @@ hiarc = { path = "lib/hiarc", features = ["derive"] }
 log = "0.4"
 num = "0.4"
 parking_lot = "0.12"
-rand = { version = "0.9", features = ["std_rng"], default-features = false }
+rand = { version = "0.10", features = ["std_rng"], default-features = false }
 rayon = "1"
 serde = "1"
 serde-value = "0.7"
@@ -288,7 +288,7 @@ audiopus_sys = { git = "https://github.com/Jupeyy/audiopus_sys.git", branch = "d
   "static",
 ] }
 
-alloc-track = { version = "0.3", optional = true }
+alloc-track = { version = "0.4", optional = true }
 stats_alloc = { version = "0.1", optional = true }
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
