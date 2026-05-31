@@ -8,4 +8,3 @@ pub mod events;
 pub mod ingame_menu;
 pub mod main_menu;
 pub mod sort;
-pub mod time_display;

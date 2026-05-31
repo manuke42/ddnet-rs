@@ -21,12 +21,9 @@ use ui_base::{
     utils::{add_margins, get_margin},
 };
 
-use client_ui_utils::render_texture_for_ui;
+use client_ui_utils::{render_texture_for_ui, time_display::TimeDisplay};
 
-use crate::{
-    events::UiEvent, ingame_menu::user_data::UserData, sort::sortable_header,
-    time_display::TimeDisplay,
-};
+use crate::{events::UiEvent, ingame_menu::user_data::UserData, sort::sortable_header};
 
 #[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
 enum ListView {

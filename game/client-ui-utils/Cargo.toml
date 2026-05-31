@@ -18,6 +18,9 @@ sound = { path = "../../lib/sound" }
 ui-base = { path = "../../lib/ui-base" }
 
 anyhow = { version = "1", features = ["backtrace"] }
+chrono = { version = "0.4", default-features = false, features = [
+  "serde",
+] }
 egui = { version = "0.34", default-features = false, features = ["serde"] }
 egui_extras = { version = "0.34" }
 fuzzy-matcher = "0.3"

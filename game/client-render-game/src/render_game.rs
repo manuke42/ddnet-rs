@@ -47,10 +47,10 @@ use client_types::{
     actionfeed::{Action, ActionInFeed, ActionKill, ActionPlayer},
     chat::{ChatMsg, MsgSystem, ServerMsg, SystemMsgPlayerSkin},
 };
-use client_ui::time_display::TimeDisplay;
 use client_ui_utils::thumbnail_container::{
     DEFAULT_THUMBNAIL_CONTAINER_PATH, ThumbnailContainer, load_thumbnail_container,
 };
+use client_ui_utils::time_display::TimeDisplay;
 use config::config::ConfigDebug;
 use egui::{FontDefinitions, Rect};
 use game_base::network::{
