@@ -2043,6 +2043,10 @@ pub mod character {
 
             core.vel = Core::clamp_vel(core.move_restrictions, &core.vel);
         }
+
+        fn refresh_move_restrictions(&mut self, collision: &Collision) {
+            self.core.core.move_restrictions = collision.get_move_restrictions(self.pos.pos());
+        }
     }
 
     impl EntityInterface<CharacterCore, CharacterReusableCore, SimulationPipeCharacter<'_>>
@@ -2108,9 +2112,11 @@ pub mod character {
                 return EntityTickResult::RemoveEntity;
             }
 
+            self.refresh_move_restrictions(pipe.collision);
             self.apply_move_restrictions();
             self.handle_buffs_and_debuffs(pipe);
             self.handle_weapons(pipe);
+            self.apply_move_restrictions();
 
             self.post_ddrace_tick();
 
