@@ -572,7 +572,7 @@ pub mod character_core {
                         }
                     }
 
-                    // release hook (max default hook time is 1.25 s)
+                    // release hook (max default hook time is 1.2s + 1 tick for default tunings)
                     *hook_tick += 1;
                     if hooked_char.is_some() {
                         let hook_duration =
