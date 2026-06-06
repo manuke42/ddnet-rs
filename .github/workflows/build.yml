@@ -182,9 +182,11 @@ jobs:
     - uses: Swatinem/rust-cache@v2
 
     - name: Build debug
-      # disable windows for now, since it's the slowest build
-      if: contains(matrix.os, 'windows') == false
-      run: cargo build --verbose --features ${{ matrix.features-debug }}
+      if: contains(matrix.os, 'ubuntu')
+      run: |
+        # Disabling debug symbols here, we don't actually use the debug artifacts, we only care about
+        # whether it compiles or not
+        CARGO_PROFILE_DEV_DEBUG=0 cargo build --verbose --features ${{ matrix.features-debug }}
 
     - name: Build release
       run: cargo build --release --verbose --features ${{ matrix.features }}
@@ -232,3 +234,8 @@ jobs:
       with:
         name: ddnet-rs-${{ steps.nameparts.outputs.os }}-${{ steps.nameparts.outputs.arch }}-steam
         path: bin-artifacts
+
+    - name: Minimize Rust cache
+      run: |
+        rm -rf target/debug/build/ffmpeg-sys-next-*/out/ffmpeg-*
+        rm -rf target/release/build/ffmpeg-sys-next-*/out/ffmpeg-*
