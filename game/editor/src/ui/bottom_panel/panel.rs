@@ -291,10 +291,10 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
     let item_height = style.spacing.interact_size.y;
     let row_height = item_height + style.spacing.item_spacing.y;
     let height = row_height * 2.0;
-    let res = egui::TopBottomPanel::bottom("bottom_panel")
+    let res = egui::Panel::bottom("bottom_panel")
         .resizable(false)
-        .default_height(height)
-        .height_range(height..=height)
+        .default_size(height)
+        .size_range(height..=height)
         .show_inside(ui, |ui| {
             egui::ScrollArea::horizontal().show(ui, |ui| {
                 ui.vertical(|ui| {

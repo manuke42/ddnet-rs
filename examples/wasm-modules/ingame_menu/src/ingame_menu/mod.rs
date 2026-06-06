@@ -1,9 +1,7 @@
 use api::{GRAPHICS, IO, RUNTIME_THREAD_POOL, SOUND};
 use client_containers::container::ContainerLoadOptions;
-use client_ui::{
-    main_menu::theme_container::{THEME_CONTAINER_PATH, ThemeContainer},
-    thumbnail_container::ThumbnailContainer,
-};
+use client_ui::main_menu::theme_container::{THEME_CONTAINER_PATH, ThemeContainer};
+use client_ui_utils::thumbnail_container::ThumbnailContainer;
 
 pub mod page;
 pub mod profiles;

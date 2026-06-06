@@ -3,14 +3,12 @@ use std::time::Duration;
 use client_containers::utils::RenderGameContainers;
 use client_render::vote::render::{VoteRender, VoteRenderPipe};
 use client_render_base::render::tee::RenderTee;
-use client_ui::{
-    thumbnail_container::ThumbnailContainer,
-    vote::user_data::{VoteRenderData, VoteRenderPlayer, VoteRenderType},
-};
+use client_ui_utils::thumbnail_container::ThumbnailContainer;
 use game_interface::votes::{
     MapCategoryVoteKey, MapVote, MapVoteDetails, MapVoteKey, VoteState, VoteType, Voted,
 };
 use graphics::graphics::graphics::Graphics;
+use ingame_ui::vote::user_data::{VoteRenderData, VoteRenderPlayer, VoteRenderType};
 use ui_base::ui::UiCreator;
 
 use super::utils::render_helper;

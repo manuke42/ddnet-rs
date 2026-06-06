@@ -146,11 +146,11 @@ impl ActionfeedPage {
             });
         }
 
-        client_ui::actionfeed::main_frame::render(
+        ingame_ui::actionfeed::main_frame::render(
             ui,
             &mut UiRenderPipe::new(
                 pipe.cur_time,
-                &mut client_ui::actionfeed::user_data::UserData {
+                &mut ingame_ui::actionfeed::user_data::UserData {
                     canvas_handle: &self.canvas_handle,
                     stream_handle: &self.stream_handle,
                     entries: &entries.into(),

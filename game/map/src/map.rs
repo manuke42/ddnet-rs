@@ -21,6 +21,7 @@ use hiarc::Hiarc;
 pub use image_utils::png::PngValidatorOptions;
 use image_utils::png::is_png_image_valid;
 use serde::{Deserialize, Serialize};
+use tracing::instrument;
 
 use crate::{
     file::MapFileReader,
@@ -225,6 +226,7 @@ impl Map {
     }
 
     /// All maps that the client knows MUST be of type "twmap", even if the version changes etc.
+    #[instrument(level = "trace", skip_all)]
     pub fn read_twmap_header(reader: &MapFileReader) -> anyhow::Result<Header> {
         let file = tar_entry_to_file(
             reader
@@ -318,6 +320,7 @@ impl Map {
     /// Read only the physics group and the config (skips all other stuff).
     ///
     /// This is usually nice to use on the server.
+    #[instrument(level = "trace", skip_all)]
     pub fn read_physics_group_and_config(
         reader: &MapFileReader,
     ) -> anyhow::Result<(MapGroupPhysics, Config)> {
@@ -337,6 +340,7 @@ impl Map {
 
     /// Read a map file, whos resources were already loaded (the file header was read/checked too).
     /// See [`Map::read_resources_and_header`]
+    #[instrument(level = "trace", skip_all)]
     pub fn read_with_resources(
         resources: Resources,
         reader: &MapFileReader,

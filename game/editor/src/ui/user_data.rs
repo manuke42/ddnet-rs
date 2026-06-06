@@ -127,6 +127,13 @@ impl EditorMenuDialogMode {
             .default_file_icon("\u{f15b}")
             .default_folder_icon("\u{f07c}")
             .removable_device_icon("\u{f1f8}")
+            .parent_directory_icon("\u{f062}")
+            .back_icon("\u{f060}")
+            .forward_icon("\u{f061}")
+            .new_folder_icon("\u{f65e}")
+            .menu_icon("\u{f0c9}")
+            .search_icon("\u{1f50d}")
+            .path_edit_icon("\u{f303}")
             .labels(egui_file_dialog::FileDialogLabels {
                 title_select_directory: "\u{f07c} Select Folder".to_string(),
                 title_select_file: "\u{f07c} Open File".to_string(),
@@ -176,6 +183,7 @@ impl EditorMenuDialogMode {
 
                 rename_pinned_folder: "\u{f303} Rename".to_string(),
                 working_directory: "\u{f08e}  Go to working directory".to_string(),
+                select_all: "\u{f14a}".to_string(),
                 save_extension_any: "Any".to_string(),
             })
     }

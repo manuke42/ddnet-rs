@@ -35,10 +35,10 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
         }));
     }
 
-    let res = egui::TopBottomPanel::top("top_toolbar_switch_extra")
+    let res = egui::Panel::top("top_toolbar_switch_extra")
         .resizable(false)
-        .default_height(height)
-        .height_range(height..=height)
+        .default_size(height)
+        .size_range(height..=height)
         .show_inside(ui, |ui| {
             egui::ScrollArea::horizontal().show(ui, |ui| {
                 ui.horizontal(|ui| {

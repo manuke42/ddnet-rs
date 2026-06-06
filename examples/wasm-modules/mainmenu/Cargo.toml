@@ -18,11 +18,12 @@ api-ui-game = { path = "../../../game/api-ui-game" }
 client-containers = { path = "../../../game/client-containers" }
 client-render-base = { path = "../../../game/client-render-base" }
 client-ui = { path = "../../../game/client-ui" }
+client-ui-utils = { path = "../../../game/client-ui-utils" }
 game-base = { path = "../../../game/game-base" }
 game-config = { path = "../../../game/game-config" }
 
-anyhow = { version = "1.0.100", features = ["backtrace"] }
-async-trait = "0.1.89"
-egui = { version = "0.33.0", default-features = false, features = ["serde"] }
-email_address = { version = "0.2.9", features = ["serde"] }
-serde_json = "1.0.145"
+anyhow = { version = "1", features = ["backtrace"] }
+async-trait = "0.1"
+egui = { version = "0.34", default-features = false, features = ["serde"] }
+email_address = { version = "0.2", features = ["serde"] }
+serde_json = "1"

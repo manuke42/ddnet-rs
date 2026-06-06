@@ -1,0 +1,19 @@
+[package]
+name = "tile-map-collision"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+game-interface = { path = "../game-interface" }
+legacy-map = { path = "../legacy-map" }
+map = { path = "../map" }
+
+config = { path = "../../lib/config" }
+hiarc = { path = "../../lib/hiarc", features = ["derive"] }
+math = { path = "../../lib/math" }
+
+anyhow = { version = "1", features = ["backtrace"] }
+bitflags = { version = "2", features = ["serde"] }
+log = "0.4"
+rustc-hash = "2"
+serde = { version = "1", features = ["derive"] }

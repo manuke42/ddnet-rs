@@ -4,13 +4,13 @@ use api_ui_game::render::create_skin_container;
 use client_containers::skins::SkinContainer;
 use client_render_base::render::tee::RenderTee;
 use client_types::chat::{ChatMsg, MsgSystem, ServerMsg, SystemMsgPlayerSkin};
-use client_ui::chat::user_data::{ChatMode, MsgInChat};
 use game_base::network::types::chat::{ChatPlayerInfo, NetChatMsgPlayerChannel};
 use game_interface::types::{character_info::NetworkSkinInfo, id_gen::IdGenerator};
 use graphics::{
     graphics::graphics::Graphics,
     handles::{canvas::canvas::GraphicsCanvasHandle, stream::stream::GraphicsStreamHandle},
 };
+use ingame_ui::chat::user_data::{ChatMode, MsgInChat};
 use math::math::vector::ubvec4;
 use ui_base::types::{UiRenderPipe, UiState};
 use ui_generic::traits::UiPageInterface;
@@ -144,11 +144,11 @@ impl ChatPage {
             }),
             add_time: Duration::MAX,
         });
-        client_ui::chat::main_frame::render(
+        ingame_ui::chat::main_frame::render(
             ui,
             &mut UiRenderPipe::new(
                 pipe.cur_time,
-                &mut client_ui::chat::user_data::UserData {
+                &mut ingame_ui::chat::user_data::UserData {
                     entries: &entries,
                     show_chat_history: false,
                     is_input_active: false,

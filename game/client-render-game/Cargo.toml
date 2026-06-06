@@ -19,15 +19,19 @@ client-containers = { path = "../client-containers" }
 client-render = { path = "../client-render" }
 client-render-base = { path = "../client-render-base" }
 client-types = { path = "../client-types" }
-client-ui = { path = "../client-ui" }
+client-ui-utils = { path = "../client-ui-utils" }
 game-base = { path = "../game-base" }
 game-config = { path = "../game-config" }
 game-interface = { path = "../game-interface" }
+ingame-ui = { path = "../ingame-ui" }
 map = { path = "../map" }
-vanilla = { path = "../vanilla" }
+tile-map-collision = { path = "../tile-map-collision" }
 
-egui = { version = "0.33.0", default-features = false, features = ["serde"] }
-num-traits = "0.2.19"
-rayon = "1.11.0"
-serde = { version = "1.0.228", features = ["derive"] }
-url = { version = "2.5.7", features = ["serde"] }
+egui = { version = "0.34", default-features = false, features = ["serde"] }
+num-traits = "0.2"
+rayon = "1"
+serde = { version = "1", features = ["derive"] }
+tracing = { version = "0.1", default-features = false, features = [
+  "attributes",
+] }
+url = { version = "2", features = ["serde"] }

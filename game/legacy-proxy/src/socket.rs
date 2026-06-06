@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use base_io::{io::Io, runtime::IoRuntimeTask};
 use futures::FutureExt;
 use libtw2_net::{Timestamp, net::Callback};
-use rand::RngCore as _;
+use rand::Rng;
 use std::{error, fmt, future, io, net::SocketAddr, sync::Arc, time::Instant};
 use tokio::{
     net::UdpSocket,

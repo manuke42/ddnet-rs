@@ -1,0 +1,29 @@
+[package]
+name = "client-ui-utils"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+client-containers = { path = "../client-containers" }
+client-render-base = { path = "../client-render-base" }
+game-interface = { path = "../game-interface" }
+
+base-io = { path = "../../lib/base-io" }
+graphics = { path = "../../lib/graphics" }
+graphics-types = { path = "../../lib/graphics-types" }
+hiarc = { path = "../../lib/hiarc", features = ["derive"] }
+math = { path = "../../lib/math" }
+pool = { path = "../../lib/pool" }
+sound = { path = "../../lib/sound" }
+ui-base = { path = "../../lib/ui-base" }
+
+anyhow = { version = "1", features = ["backtrace"] }
+chrono = { version = "0.4", default-features = false, features = ["serde"] }
+egui = { version = "0.34", default-features = false, features = ["serde"] }
+egui_extras = { version = "0.34" }
+fuzzy-matcher = "0.3"
+rayon = "1"
+tracing = { version = "0.1", default-features = false, features = [
+  "attributes",
+] }
+url = { version = "2", features = ["serde"] }

@@ -63,7 +63,7 @@ impl ShaderCompiler {
         defines: HashMap<String, bool>,
     ) -> anyhow::Result<naga::Module> {
         let mut composer = naga_oil::compose::Composer::default()
-            .with_capabilities(naga::valid::Capabilities::PUSH_CONSTANT);
+            .with_capabilities(naga::valid::Capabilities::IMMEDIATES);
         Ok(
             composer.make_naga_module(naga_oil::compose::NagaModuleDescriptor {
                 source,
@@ -84,7 +84,7 @@ impl ShaderCompiler {
             &module,
             &naga::valid::Validator::new(
                 naga::valid::ValidationFlags::empty(),
-                naga::valid::Capabilities::PUSH_CONSTANT,
+                naga::valid::Capabilities::IMMEDIATES,
             )
             .validate(&module)?,
             &spv::Options {

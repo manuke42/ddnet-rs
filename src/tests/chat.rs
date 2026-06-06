@@ -4,10 +4,10 @@ use client_containers::utils::RenderGameContainers;
 use client_render::chat::render::{ChatRender, ChatRenderOptions, ChatRenderPipe};
 use client_render_base::render::tee::RenderTee;
 use client_types::chat::{ChatMsg, ServerMsg};
-use client_ui::chat::user_data::{ChatMode, MsgInChat};
 use game_base::network::types::chat::NetChatMsgPlayerChannel;
 use game_interface::types::character_info::NetworkSkinInfo;
 use graphics::graphics::graphics::Graphics;
+use ingame_ui::chat::user_data::{ChatMode, MsgInChat};
 use math::math::vector::ubvec4;
 use ui_base::{remember_mut::RememberMut, ui::UiCreator};
 

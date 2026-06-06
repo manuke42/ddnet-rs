@@ -110,11 +110,11 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
     }
 
     let res = {
-        let mut panel = egui::TopBottomPanel::bottom("server_settings_panel")
+        let mut panel = egui::Panel::bottom("server_settings_panel")
             .resizable(true)
-            .height_range(300.0..=600.0);
+            .size_range(300.0..=600.0);
         panel = panel
-            .default_height(300.0)
+            .default_size(300.0)
             .frame(Frame::side_top_panel(ui.style()).inner_margin(Margin::same(15)));
 
         Some(panel.show_inside(ui, |ui| {

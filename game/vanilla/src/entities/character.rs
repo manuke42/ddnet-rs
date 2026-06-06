@@ -11,6 +11,7 @@ pub mod character {
         num::{NonZeroI64, NonZeroU64},
     };
 
+    use crate::collision::{Collision, CollisionTile, CollisionTypes, HitTile};
     use crate::{
         reusable::{CloneWithCopyableElements, ReusableCore},
         weapons::definitions::weapon_def::{WeaponUpgrade, WeaponUpgradePool},
@@ -60,7 +61,6 @@ pub mod character {
         score::character_score::{CharacterScore, CharacterScores},
     };
     use crate::{
-        collision::collision::{Collision, CollisionTile, CollisionTypes, HitTile},
         config::config::ConfigGameType,
         entities::entity::entity::{DropMode, Entity, EntityInterface, EntityTickResult},
         events::events::{CharacterDespawnType, CharacterEvent, CharacterTickEvent},
@@ -1386,6 +1386,34 @@ pub mod character {
                     .contains_key(&CharacterDebuff::LiveFrozen)
         }
 
+        fn active_weapon_has_upgrade(&self, upgrade: WeaponUpgrade) -> bool {
+            self.reusable_core
+                .weapons
+                .get(&self.core.active_weapon)
+                .is_some_and(|weapon| weapon.upgrades.contains(&upgrade))
+        }
+
+        fn handle_jetpack(&mut self, pipe: &SimulationPipeCharacter) {
+            if self.core.active_weapon != WeaponType::Gun
+                || !self.active_weapon_has_upgrade(WeaponUpgrade::Jetpack)
+                || !*self.core.input.state.fire
+            {
+                return;
+            }
+
+            let Some(weapon) = self.reusable_core.weapons.get(&self.core.active_weapon) else {
+                return;
+            };
+            if weapon.cur_ammo.is_some_and(|ammo| ammo == 0) {
+                return;
+            }
+
+            let cursor = self.core.input.cursor.to_vec2();
+            let direction = normalize(&vec2::new(cursor.x as f32, cursor.y as f32));
+            let tuning = pipe.collision.get_tune_at(self.pos.pos());
+            self.core.core.vel += direction * (-tuning.jetpack_strength / 100.0 / 6.11);
+        }
+
         fn fire_weapon(
             &mut self,
             pipe: &mut SimulationPipeCharacter,
@@ -1401,7 +1429,11 @@ pub mod character {
                 return;
             }
 
-            let full_auto = self.core.active_weapon == WeaponType::Grenade
+            let has_jetpack = self.core.active_weapon == WeaponType::Gun
+                && self.active_weapon_has_upgrade(WeaponUpgrade::Jetpack);
+
+            let full_auto = has_jetpack
+                || self.core.active_weapon == WeaponType::Grenade
                 || self.core.active_weapon == WeaponType::Shotgun
                 || self.core.active_weapon == WeaponType::Puller
                 || self.core.active_weapon == WeaponType::Laser;
@@ -1845,6 +1877,8 @@ pub mod character {
                 return;
             }
 
+            self.handle_jetpack(pipe);
+
             // check reload timer
             if self.core.attack_recoil.is_some() {
                 return;
@@ -2009,6 +2043,10 @@ pub mod character {
 
             core.vel = Core::clamp_vel(core.move_restrictions, &core.vel);
         }
+
+        fn refresh_move_restrictions(&mut self, collision: &Collision) {
+            self.core.core.move_restrictions = collision.get_move_restrictions(self.pos.pos());
+        }
     }
 
     impl EntityInterface<CharacterCore, CharacterReusableCore, SimulationPipeCharacter<'_>>
@@ -2074,9 +2112,11 @@ pub mod character {
                 return EntityTickResult::RemoveEntity;
             }
 
+            self.refresh_move_restrictions(pipe.collision);
             self.apply_move_restrictions();
             self.handle_buffs_and_debuffs(pipe);
             self.handle_weapons(pipe);
+            self.apply_move_restrictions();
 
             self.post_ddrace_tick();
 

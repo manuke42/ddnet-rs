@@ -11,10 +11,9 @@ use ui_base::{
     types::{UiRenderPipe, UiState},
 };
 
-use crate::{
-    main_menu::{settings::player::profile_selector::profile_selector, user_data::UserData},
-    utils::render_flag_for_ui,
-};
+use client_ui_utils::render_flag_for_ui;
+
+use crate::main_menu::{settings::player::profile_selector::profile_selector, user_data::UserData};
 
 pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &mut UiState) {
     ui.with_layout(Layout::top_down(egui::Align::Min), |ui| {
@@ -81,7 +80,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
             .entry("flag-search".to_string())
             .or_default();
         let mut next_name = None;
-        super::super::super::list::list::render(
+        client_ui_utils::assets_list::render(
             ui,
             entries_sorted.iter().map(|(name, &ty)| (name.as_str(), ty)),
             50.0,

@@ -411,10 +411,10 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
     let style = ui.style();
     // 4.0 is some margin for strokes
     let height = style.spacing.interact_size.y + style.spacing.item_spacing.y + 4.0;
-    let res = egui::TopBottomPanel::top("top_toolbar")
+    let res = egui::Panel::top("top_toolbar")
         .resizable(false)
-        .default_height(height)
-        .height_range(height..=height)
+        .default_size(height)
+        .size_range(height..=height)
         .show_inside(ui, |ui| {
             egui::ScrollArea::horizontal().show(ui, |ui| {
                 ui.horizontal(|ui| {
@@ -532,10 +532,10 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
     let tools = &mut pipe.user_data.tools;
     let res =
         match &tools.active_tool {
-            ActiveTool::Tiles(_) => egui::TopBottomPanel::top("top_toolbar_tiles_extra")
+            ActiveTool::Tiles(_) => egui::Panel::top("top_toolbar_tiles_extra")
                 .resizable(false)
-                .default_height(height)
-                .height_range(height..=height)
+                .default_size(height)
+                .size_range(height..=height)
                 .show_inside(ui, |ui| {
                     egui::ScrollArea::horizontal().show(ui, |ui| {
                         ui.horizontal(|ui| {
@@ -544,10 +544,10 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
                     });
                 }),
             ActiveTool::Quads(_) => {
-                egui::TopBottomPanel::top("top_toolbar_quads_extra")
+                egui::Panel::top("top_toolbar_quads_extra")
                     .resizable(false)
-                    .default_height(height)
-                    .height_range(height..=height)
+                    .default_size(height)
+                    .size_range(height..=height)
                     .show_inside(ui, |ui| {
                         egui::ScrollArea::horizontal().show(ui, |ui| {
                             ui.horizontal(|ui| {
@@ -694,10 +694,10 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
                     })
             }
             ActiveTool::Sounds(_) => {
-                egui::TopBottomPanel::top("top_toolbar_sound_extra")
+                egui::Panel::top("top_toolbar_sound_extra")
                     .resizable(false)
-                    .default_height(height)
-                    .height_range(height..=height)
+                    .default_size(height)
+                    .size_range(height..=height)
                     .show_inside(ui, |ui| {
                         egui::ScrollArea::horizontal().show(ui, |ui| {
                             ui.horizontal(|ui| {

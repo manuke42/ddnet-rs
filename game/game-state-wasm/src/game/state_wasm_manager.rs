@@ -110,6 +110,7 @@ impl GameStateWasmManager {
             .await
     }
 
+    #[instrument(level = "trace", skip_all)]
     pub fn new(
         game_mod: GameStateMod,
         map: Vec<u8>,

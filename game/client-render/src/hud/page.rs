@@ -3,10 +3,6 @@ use std::time::Duration;
 use base::linked_hash_map_view::FxLinkedHashMap;
 use client_containers::{ctf::CtfContainer, skins::SkinContainer};
 use client_render_base::render::tee::RenderTee;
-use client_ui::hud::{
-    page::HudUi,
-    user_data::{RenderDateTime, UserData},
-};
 use egui::Color32;
 use game_interface::types::{
     game::{GameTickType, NonZeroGameTickType},
@@ -19,6 +15,10 @@ use graphics::{
         backend::backend::GraphicsBackendHandle, canvas::canvas::GraphicsCanvasHandle,
         stream::stream::GraphicsStreamHandle, texture::texture::GraphicsTextureHandle,
     },
+};
+use ingame_ui::hud::{
+    page::HudUi,
+    user_data::{RenderDateTime, UserData},
 };
 use ui_base::{
     types::UiRenderPipe,

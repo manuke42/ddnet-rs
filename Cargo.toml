@@ -68,6 +68,7 @@ members = [
   "game/client-replay",
   "game/client-types",
   "game/client-ui",
+  "game/client-ui-utils",
   "game/community",
   "game/demo",
   "game/ddnet-info-proxy",
@@ -85,6 +86,7 @@ members = [
   "game/game-state-wasm",
   "game/ghost",
   "game/http-accounts",
+  "game/ingame-ui",
   "game/legacy-map",
   "game/legacy-proxy",
   "game/map",
@@ -92,6 +94,7 @@ members = [
   "game/master-server-types",
   "game/prediction-timer",
   "game/render-game-wasm",
+  "game/tile-map-collision",
   "game/vanilla",
   "lib/api",
   "lib/api-macros",
@@ -205,6 +208,7 @@ pool = { path = "lib/pool" }
 sound = { path = "lib/sound" }
 sound-backend = { path = "lib/sound-backend" }
 steam = { path = "lib/steam" }
+tile-map-collision = { path = "game/tile-map-collision" }
 ui-base = { path = "lib/ui-base" }
 ui-generic = { path = "lib/ui-generic" }
 ui-wasm-manager = { path = "lib/ui-wasm-manager" }
@@ -225,6 +229,7 @@ client-render-game = { path = "game/client-render-game" }
 client-replay = { path = "game/client-replay" }
 client-types = { path = "game/client-types" }
 client-ui = { path = "game/client-ui", features = ["binds"] }
+client-ui-utils = { path = "game/client-ui-utils" }
 demo = { path = "game/demo", features = ["recorder"] }
 ddnet-info-proxy = { path = "game/ddnet-info-proxy" }
 editor = { path = "game/editor", default-features = false }
@@ -237,69 +242,70 @@ game-network = { path = "game/game-network" }
 game-server = { path = "game/game-server", default-features = false }
 game-state-wasm = { path = "game/game-state-wasm" }
 ghost = { path = "game/ghost" }
+ingame-ui = { path = "game/ingame-ui" }
 legacy-proxy = { path = "game/legacy-proxy" }
 prediction-timer = { path = "game/prediction-timer" }
 
-anyhow = { version = "1.0.100", features = ["backtrace"] }
-arrayvec = "0.7.6"
-bincode = { version = "2.0.1", features = ["serde"] }
-bytes = "1.10.1"
-chrono = { version = "0.4.42", features = ["serde"] }
-crossbeam = "0.8.4"
-egui = { version = "0.33.0", default-features = false, features = ["serde"] }
-egui-winit = { version = "0.33.0", default-features = false, features = [
+anyhow = { version = "1", features = ["backtrace"] }
+arrayvec = "0.7"
+bincode = { version = "2", features = ["serde"] }
+bytes = "1"
+chrono = { version = "0.4", features = ["serde"] }
+crossbeam = "0.8"
+egui = { version = "0.34", default-features = false, features = ["serde"] }
+egui-winit = { version = "0.34", default-features = false, features = [
   "x11",
   "arboard",
   "links",
 ] }
-egui_extras = { version = "0.33.0" }
-emath = "0.33.0"
-env_logger = "0.11.8"
-fixed = "1.29.0"
+egui_extras = { version = "0.34" }
+emath = "0.34"
+env_logger = "0.11"
+fixed = "1"
 hashlink = { git = "https://github.com/Jupeyy/hashlink/", branch = "ddnet", features = [
   "serde",
   "serde_impl",
 ] }
 hiarc = { path = "lib/hiarc", features = ["derive"] }
-log = "0.4.28"
-num = "0.4.3"
-parking_lot = "0.12.5"
-rand = { version = "0.9.2", features = ["std_rng"], default-features = false }
-rayon = "1.11.0"
-serde = "1.0.228"
-serde-value = "0.7.0"
-serde_json = "1.0.145"
-thread-priority = "3.0.0"
-tokio = { version = "1.48.0", features = [
+log = "0.4"
+num = "0.4"
+parking_lot = "0.12"
+rand = { version = "0.10", features = ["std_rng"], default-features = false }
+rayon = "1"
+serde = "1"
+serde-value = "0.7"
+serde_json = "1"
+thread-priority = "3"
+tokio = { version = "1", features = [
   "rt-multi-thread",
   "sync",
   "fs",
   "time",
   "macros",
 ] }
-tracing = { version = "0.1.41", default-features = false, features = [
+tracing = { version = "0.1", default-features = false, features = [
   "attributes",
 ] }
 trybuild = "1.0"
-url = "2.5.7"
-x509-cert = { version = "0.2.5" }
+url = "2"
+x509-cert = { version = "0.2" }
 
 audiopus_sys = { git = "https://github.com/Jupeyy/audiopus_sys.git", branch = "ddnet-rs", features = [
   "static",
 ] }
 
-alloc-track = { version = "0.3.1", optional = true }
-stats_alloc = { version = "0.1.10", optional = true }
+alloc-track = { version = "0.4", optional = true }
+stats_alloc = { version = "0.1", optional = true }
 
 [target.'cfg(not(target_os = "android"))'.dependencies]
-native-dialog = "0.9.3"
+native-dialog = "0.9"
 
 [target.'cfg(target_os = "android")'.dependencies]
-android_logger = "0.15.1"
-ndk = { version = "0.9.0", default-features = false }
+android_logger = "0.15"
+ndk = { version = "0.9", default-features = false }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-tracing = { version = "0.1.41", default-features = false, features = [
+tracing = { version = "0.1", default-features = false, features = [
   "max_level_off",
   "release_max_level_off",
 ] }

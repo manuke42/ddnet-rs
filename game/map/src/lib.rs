@@ -11,11 +11,12 @@ pub mod utils;
 #[cfg(test)]
 mod test {
     use std::{
+        hint::black_box,
         io::{Read, Write},
         sync::Arc,
     };
 
-    use base::benchmark::Benchmark;
+    use base::benchmark::{Benchmark, global_init};
     use base_fs::filesys::FileSystem;
     use base_io::io::IoFileSys;
     use flate2::Compression;
@@ -55,17 +56,23 @@ mod test {
         let map = map_legacy.get().unwrap();
 
         let benchmark = Benchmark::new(true);
-        let groups_encoded =
-            bincode::serde::encode_to_vec(map.groups.foreground, bincode::config::standard())
-                .unwrap();
+        let groups_encoded = black_box(
+            bincode::serde::encode_to_vec(&map.groups.foreground, bincode::config::standard())
+                .unwrap(),
+        );
         benchmark.bench("encoding (bincode)");
-        let _ = bincode::serde::decode_from_slice::<Vec<MapGroup>, _>(
+        let _ = black_box(bincode::serde::decode_from_slice::<Vec<MapGroup>, _>(
             &groups_encoded,
             bincode::config::standard(),
-        );
+        ));
         benchmark.bench("decode (bincode)");
 
-        fn compression_of_group(groups_encoded: Vec<u8>, benchmark: &Benchmark) {
+        let groups_encoded_bitcode = black_box(bitcode::serialize(&map.groups.foreground).unwrap());
+        benchmark.bench("encoding (bitcode serde)");
+        let _: Vec<MapGroup> = black_box(bitcode::deserialize(&groups_encoded_bitcode).unwrap());
+        benchmark.bench("decode (bitcode serde)");
+
+        fn compression_of_group(name: &str, groups_encoded: Vec<u8>, benchmark: &Benchmark) {
             let mut writer: Vec<u8> = Default::default();
             flate2::write::DeflateEncoder::new(&mut writer, Compression::default())
                 .write_all(&groups_encoded)
@@ -185,7 +192,7 @@ mod test {
             benchmark.bench("zstd decompress");
 
             println!(
-                "uncompressed: {}, deflate: {} - {}, gz: {} - {}, zlib: {} - {}, lz4: {}, brotli: {} - {} - {} - {}, zstd: {} - {}",
+                "{name}: uncompressed: {}, deflate: {} - {}, gz: {} - {}, zlib: {} - {}, lz4: {}, brotli: {} - {} - {} - {}, zstd: {} - {}",
                 groups_encoded.len(),
                 len_deflate_default,
                 len_deflate_best,
@@ -202,13 +209,15 @@ mod test {
                 len_zstd_best,
             );
         }
-        compression_of_group(groups_encoded, &benchmark);
+        compression_of_group("bincode", groups_encoded, &benchmark);
+        compression_of_group("bitcode serde", groups_encoded_bitcode, &benchmark);
     }
 
     /// some tests to evaluate best compression
     #[test]
     fn compression_tests() {
-        //compression_tests_for_map("ctf1");
-        compression_tests_for_map("arctic");
+        global_init(None);
+        compression_tests_for_map("ctf1");
+        //compression_tests_for_map("arctic");
     }
 }

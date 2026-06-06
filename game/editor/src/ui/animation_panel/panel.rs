@@ -53,11 +53,11 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
     let tools = &mut *pipe.user_data.tools;
 
     let res = {
-        let mut panel = egui::TopBottomPanel::bottom("animations_panel")
+        let mut panel = egui::Panel::bottom("animations_panel")
             .resizable(true)
-            .height_range(300.0..=600.0);
+            .size_range(300.0..=600.0);
         panel = panel
-            .default_height(300.0)
+            .default_size(300.0)
             .frame(Frame::side_top_panel(ui.style()).inner_margin(Margin::same(15)));
 
         // if anim panel is open, and quads/sounds are selected

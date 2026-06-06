@@ -13,7 +13,7 @@ use graphics::handles::{
 use math::math::vector::vec2;
 use ui_base::types::{UiRenderPipe, UiState};
 
-use crate::utils::{render_flag_for_ui, render_tee_for_ui};
+use client_ui_utils::{render_flag_for_ui, render_tee_for_ui};
 
 pub struct EntryData<'a> {
     pub stream_handle: &'a GraphicsStreamHandle,

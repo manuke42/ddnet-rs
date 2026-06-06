@@ -341,7 +341,7 @@ pub fn collision_mod(attr: TokenStream, tokens: TokenStream) -> TokenStream {
     impl_mod(
         get_tokens_from_file(
             attr.into_iter().next().unwrap(),
-            "game/vanilla/src/collision.rs",
+            "game/tile-map-collision/src/lib.rs",
         ),
         tokens,
     )

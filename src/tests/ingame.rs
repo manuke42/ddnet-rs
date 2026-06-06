@@ -28,8 +28,9 @@ use map::map::groups::{
 };
 use math::math::{Rng, vector::vec2};
 use pool::{datatypes::PoolFxLinkedHashMap, rc::PoolRc};
+use tile_map_collision::collision::Collision;
 use ui_base::ui::UiCreator;
-use vanilla::collision::collision::Collision;
+use vanilla::collision::DEFAULT_TICKS_PER_SECOND;
 
 use super::utils::render_helper;
 
@@ -152,6 +153,7 @@ pub fn test_ingame(
                         })],
                     },
                     false,
+                    DEFAULT_TICKS_PER_SECOND,
                 )
                 .unwrap(),
                 camera: &camera,
@@ -290,6 +292,7 @@ pub fn test_ingame_skins(
                         })],
                     },
                     false,
+                    DEFAULT_TICKS_PER_SECOND,
                 )
                 .unwrap(),
                 camera: &camera,

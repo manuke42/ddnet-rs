@@ -9,8 +9,10 @@ use client_containers::{
     weapons::{WeaponContainer, Weapons},
 };
 use client_render::hud::page::{HudRender, HudRenderPipe};
-use client_render_base::render::tee::RenderTee;
-use client_ui::hud::user_data::RenderDateTime;
+use client_render_base::render::{
+    tee::RenderTee,
+    weapon_visuals::{get_weapon_sprite_scale, get_weapon_visual_scale},
+};
 use game_interface::types::{
     emoticons::{EnumCount, IntoEnumIterator},
     game::{GameTickType, NonZeroGameTickType},
@@ -33,9 +35,9 @@ use graphics::{
     streaming::quad_scope_begin,
 };
 use graphics_types::rendering::State;
+use ingame_ui::hud::user_data::RenderDateTime;
 use math::math::{PI, vector::vec2};
 use ui_base::ui::UiCreator;
-use vanilla::weapons::definitions::weapon_def::{get_weapon_sprite_scale, get_weapon_visual_scale};
 
 const GRID_SIZE: f32 = 24.0;
 

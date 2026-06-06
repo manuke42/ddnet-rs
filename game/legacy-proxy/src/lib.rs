@@ -132,8 +132,8 @@ use pool::{
     rc::PoolRc,
     traits::Recyclable,
 };
-use projectile::get_pos;
-use rand::RngCore;
+use projectile::{get_pos, get_vel};
+use rand::Rng as _;
 use sha2::Digest;
 use socket::Socket;
 use std::{
@@ -147,9 +147,10 @@ use std::{
     sync::{Arc, atomic::AtomicBool},
     time::Duration,
 };
+use tile_map_collision::collision::{Collision, Tunings};
 use tokio::sync::Notify;
 use vanilla::{
-    collision::collision::{Collision, Tunings},
+    collision::DEFAULT_TICKS_PER_SECOND,
     config::config::{ConfigGameType, ConfigVanilla},
     entities::{
         character::{
@@ -1140,7 +1141,7 @@ impl Client {
                     SnapshotProjectile {
                         core: ProjectileCore {
                             pos: cur_pos,
-                            vel,
+                            vel: get_vel(now, start_tick, vel, speed, curvature),
                             life_span: 100,
                             damage: 0,
                             force: 0.0,
@@ -1488,7 +1489,7 @@ impl Client {
                             },
                         }
                     };
-                    let hooked_char = if matches!(
+                    let mut hooked_char = if matches!(
                         hook,
                         Hook::Active {
                             hook_state: HookState::HookGrabbed,
@@ -1659,9 +1660,18 @@ impl Client {
                         );
                         let mut fake_pos = field.get_character_pos(pos, char_id);
                         let hooks = HookedCharacters::default();
+                        let _fake_hooked_char =
+                            hooked_char.map(|hooked_char| hooks.get_new_hook(hooked_char));
                         let mut fake_hook = hooks.get_new_hook(char_id);
                         fake_hook.set(hook, hooked_char);
-                        struct FakeCharacters;
+                        struct FakeCharacters {
+                            hooked_char: Option<(
+                                CharacterId,
+                                Core,
+                                CoreReusable,
+                                vanilla::entities::character::pos::character_pos::CharacterPos,
+                            )>,
+                        }
                         impl SimulationPipeCharactersGetter for FakeCharacters {
                             fn for_other_characters_in_range_mut(
                                 &mut self,
@@ -1675,22 +1685,33 @@ impl Client {
 
                             fn get_other_character_id_and_cores_iter_by_ids_mut(
                                 &mut self,
-                                _ids: &[CharacterId],
-                                _for_each_func: &mut dyn FnMut(
+                                ids: &[CharacterId],
+                                for_each_func: &mut dyn FnMut(
                                             &CharacterId,
                                             &mut Core,
                                             &mut CoreReusable,
                                             &mut vanilla::entities::character::pos::character_pos::CharacterPos,
                                         ) -> std::ops::ControlFlow<()>,
                             ) -> std::ops::ControlFlow<()> {
+                                if let Some((hooked_char, core, reusable_core, pos)) =
+                                    &mut self.hooked_char
+                                    && ids.contains(hooked_char)
+                                {
+                                    return for_each_func(hooked_char, core, reusable_core, pos);
+                                }
                                 std::ops::ControlFlow::Continue(())
                             }
 
                             fn get_other_character_pos_by_id(
                                 &self,
-                                _other_char_id: &CharacterId,
+                                other_char_id: &CharacterId,
                             ) -> &vec2 {
-                                unreachable!()
+                                self.hooked_char
+                                    .as_ref()
+                                    .and_then(|(hooked_char, _, _, pos)| {
+                                        (hooked_char == other_char_id).then_some(pos.pos())
+                                    })
+                                    .unwrap()
                             }
 
                             fn get_other_character_by_id_mut(
@@ -1701,6 +1722,21 @@ impl Client {
                                 unreachable!()
                             }
                         }
+                        let fake_hook_pos = if let Hook::Active { hook_pos, .. } = hook {
+                            hook_pos
+                        } else {
+                            pos
+                        };
+                        let mut fake_characters = FakeCharacters {
+                            hooked_char: hooked_char.map(|hooked_char| {
+                                (
+                                    hooked_char,
+                                    Core::default(),
+                                    CoreReusable::new(),
+                                    field.get_character_pos(fake_hook_pos, hooked_char),
+                                )
+                            }),
+                        };
                         let mut inp = None;
 
                         if char_tick <= 0 {
@@ -1732,7 +1768,7 @@ impl Client {
                                 use_inp,
                                 true,
                                 &mut CorePipe {
-                                    characters: &mut FakeCharacters,
+                                    characters: &mut fake_characters,
                                     input: &inp,
                                 },
                                 collision,
@@ -1744,7 +1780,7 @@ impl Client {
                             core.physics_move(
                                 &mut fake_pos,
                                 &mut CorePipe {
-                                    characters: &mut FakeCharacters,
+                                    characters: &mut fake_characters,
                                     input: &inp,
                                 },
                                 collision,
@@ -1754,7 +1790,7 @@ impl Client {
                         }
 
                         pos = *fake_pos.pos();
-                        hook = fake_hook.get().0;
+                        (hook, hooked_char) = fake_hook.get();
                     }
                     let attack_recoil = if character.attack_tick > 0 {
                         let recoil_ticks_passed = tick.saturating_sub(character.attack_tick);
@@ -4985,7 +5021,8 @@ impl Client {
                             )
                             .unwrap();
 
-                            let new_collision = Collision::new(phy_group, true).unwrap();
+                            let new_collision =
+                                Collision::new(phy_group, true, DEFAULT_TICKS_PER_SECOND).unwrap();
 
                             self.log.log("Client proxy prepares map collision");
                             self.collisions = Some(new_collision);

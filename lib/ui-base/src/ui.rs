@@ -363,6 +363,7 @@ impl UiContainer {
                 maximized: Default::default(),
                 fullscreen: Default::default(),
                 focused: Default::default(),
+                occluded: Default::default(),
             },
         );
         if zoom_level == pixels_per_point {
@@ -399,9 +400,9 @@ impl UiContainer {
             pipe: &mut UiRenderPipe<U>,
             ui_state: &mut UiState,
         ) -> FullOutput {
-            egui_ctx.run(input, |egui_ctx| {
+            egui_ctx.run_ui(input, |egui_ctx| {
                 egui_ctx.set_style(default_style());
-                gui_main_panel(main_panel_color).show(egui_ctx, |ui| {
+                gui_main_panel(main_panel_color).show_inside(egui_ctx, |ui| {
                     #[instrument(level = "trace", skip_all)]
                     fn render_wrapped<U>(
                         ui: &mut egui::Ui,

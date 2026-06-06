@@ -9,7 +9,7 @@ use ui_base::{
 };
 
 use crate::ingame_menu::user_data::UserData;
-use crate::utils::render_flag_for_ui;
+use client_ui_utils::render_flag_for_ui;
 
 #[instrument(level = "trace", skip_all)]
 pub fn render(ui: &mut egui::Ui, ui_state: &mut UiState, pipe: &mut UiRenderPipe<UserData>) {

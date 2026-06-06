@@ -2,10 +2,6 @@ use std::time::Duration;
 
 use client_containers::{emoticons::EmoticonsContainer, skins::SkinContainer};
 use client_render_base::render::tee::RenderTee;
-use client_ui::emote_wheel::{
-    page::EmoteWheelUi,
-    user_data::{EmoteWheelEvent, EmoteWheelMousePos, UserData},
-};
 use egui::Color32;
 use game_interface::types::{character_info::NetworkSkinInfo, resource_key::ResourceKey};
 use graphics::{
@@ -14,6 +10,10 @@ use graphics::{
         backend::backend::GraphicsBackendHandle, canvas::canvas::GraphicsCanvasHandle,
         stream::stream::GraphicsStreamHandle, texture::texture::GraphicsTextureHandle,
     },
+};
+use ingame_ui::emote_wheel::{
+    page::EmoteWheelUi,
+    user_data::{EmoteWheelEvent, EmoteWheelMousePos, UserData},
 };
 
 use serde::{Deserialize, Serialize};

@@ -1,4 +1,4 @@
-use config::traits::ConfigValue;
+use config::{config::ConfigWindow, traits::ConfigValue};
 use egui::{Button, Color32, DragValue, Grid, Id, Layout, Modal, ScrollArea, Stroke, TextEdit};
 use egui_extras::{Size, StripBuilder};
 use game_config::config::ConfigRender;
@@ -8,6 +8,10 @@ use tracing::instrument;
 use ui_base::types::UiRenderPipe;
 
 use crate::{events::UiEvent, main_menu::user_data::UserData};
+
+fn is_borderless_fullscreen(wnd: &ConfigWindow) -> bool {
+    !wnd.fullscreen && wnd.maximized && !wnd.decorated
+}
 
 fn render_settings(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>) {
     let config = &mut pipe.user_data.config.engine;
@@ -19,7 +23,7 @@ fn render_settings(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>) {
         egui::ComboBox::new("fullscreen_mode", "")
             .selected_text(if wnd.fullscreen {
                 "fullscreen"
-            } else if !wnd.fullscreen && wnd.maximized && !wnd.decorated {
+            } else if is_borderless_fullscreen(wnd) {
                 "borderless-fullscreen"
             } else {
                 "windowed"
@@ -272,52 +276,58 @@ fn render_monitors(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>) {
                         )
                     }
                 ));
-                ui.style_mut().spacing.scroll.floating = false;
-                ScrollArea::vertical().show(ui, |ui| {
-                    ui.set_width(ui.available_width());
-                    let style = ui.style_mut();
-                    style.visuals.widgets.inactive.weak_bg_fill = Color32::from_black_alpha(50);
-                    style.visuals.widgets.active.weak_bg_fill = Color32::from_black_alpha(50);
-                    style.visuals.widgets.hovered.weak_bg_fill = Color32::from_black_alpha(50);
-                    for mode in &monitors.video_modes {
-                        let wnd = &mut config.engine.wnd;
-                        if ui
-                            .add(
-                                Button::new(fmt_res(
-                                    mode.width,
-                                    mode.height,
-                                    mode.refresh_rate_mhz,
-                                ))
-                                .selected(
-                                    wnd.fullscreen_width == mode.width
-                                        && wnd.fullscreen_height == mode.height
-                                        && wnd.refresh_rate_mhz == mode.refresh_rate_mhz,
-                                ),
-                            )
-                            .clicked()
-                        {
-                            const INFO_NAME: &str = "info-ingame-aspect";
-                            let mut ingame_aspect_info: bool = config.storage(INFO_NAME);
+                let is_borderless_fullscreen = is_borderless_fullscreen(wnd);
+                if is_borderless_fullscreen {
+                    ui.add_space(10.0);
+                    ui.label("Borderless fullscreen uses your desktop's resolution.");
+                } else {
+                    ui.style_mut().spacing.scroll.floating = false;
+                    ScrollArea::vertical().show(ui, |ui| {
+                        ui.set_width(ui.available_width());
+                        let style = ui.style_mut();
+                        style.visuals.widgets.inactive.weak_bg_fill = Color32::from_black_alpha(50);
+                        style.visuals.widgets.active.weak_bg_fill = Color32::from_black_alpha(50);
+                        style.visuals.widgets.hovered.weak_bg_fill = Color32::from_black_alpha(50);
+                        for mode in &monitors.video_modes {
                             let wnd = &mut config.engine.wnd;
-                            if ingame_aspect_info || !wnd.fullscreen {
-                                if wnd.fullscreen {
-                                    wnd.fullscreen_width = mode.width;
-                                    wnd.fullscreen_height = mode.height;
+                            if ui
+                                .add(
+                                    Button::new(fmt_res(
+                                        mode.width,
+                                        mode.height,
+                                        mode.refresh_rate_mhz,
+                                    ))
+                                    .selected(
+                                        wnd.fullscreen_width == mode.width
+                                            && wnd.fullscreen_height == mode.height
+                                            && wnd.refresh_rate_mhz == mode.refresh_rate_mhz,
+                                    ),
+                                )
+                                .clicked()
+                            {
+                                const INFO_NAME: &str = "info-ingame-aspect";
+                                let mut ingame_aspect_info: bool = config.storage(INFO_NAME);
+                                let wnd = &mut config.engine.wnd;
+                                if ingame_aspect_info || !wnd.fullscreen {
+                                    if wnd.fullscreen {
+                                        wnd.fullscreen_width = mode.width;
+                                        wnd.fullscreen_height = mode.height;
+                                    } else {
+                                        wnd.window_width = mode.width as f64;
+                                        wnd.window_height = mode.height as f64;
+                                    }
+                                    wnd.refresh_rate_mhz = mode.refresh_rate_mhz;
                                 } else {
-                                    wnd.window_width = mode.width as f64;
-                                    wnd.window_height = mode.height as f64;
+                                    config
+                                        .path()
+                                        .add_query((SHOW_INFO_ASPECT.into(), "1".into()));
+                                    ingame_aspect_info = true;
                                 }
-                                wnd.refresh_rate_mhz = mode.refresh_rate_mhz;
-                            } else {
-                                config
-                                    .path()
-                                    .add_query((SHOW_INFO_ASPECT.into(), "1".into()));
-                                ingame_aspect_info = true;
+                                config.set_storage(INFO_NAME, &ingame_aspect_info);
                             }
-                            config.set_storage(INFO_NAME, &ingame_aspect_info);
                         }
-                    }
-                });
+                    });
+                }
             },
         );
     }

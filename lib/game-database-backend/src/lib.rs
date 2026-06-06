@@ -22,7 +22,7 @@ use sqlx::Statement;
 #[derive(Clone)]
 pub struct CachedStatement {
     kind: DbKind,
-    stmt: Arc<AnyStatement<'static>>,
+    stmt: Arc<AnyStatement>,
     qry_props: QueryProperties,
 }
 
@@ -217,9 +217,17 @@ impl DbInterface for GameDbBackend {
                                     for s in stmts {
                                         let qry = match kind {
                                             #[cfg(feature = "mysql")]
-                                            DbKind::MySql(_) => AnyQuery::MySql(sqlx::query(&s)),
+                                            DbKind::MySql(_) => {
+                                                use sqlx::AssertSqlSafe;
+
+                                                AnyQuery::MySql(sqlx::query(AssertSqlSafe(s)))
+                                            }
                                             #[cfg(feature = "sqlite")]
-                                            DbKind::Sqlite(_) => AnyQuery::Sqlite(sqlx::query(&s)),
+                                            DbKind::Sqlite(_) => {
+                                                use sqlx::AssertSqlSafe;
+
+                                                AnyQuery::Sqlite(sqlx::query(AssertSqlSafe(s)))
+                                            }
                                         };
                                         qry.execute(&mut con.con()).await?;
                                     }
@@ -255,13 +263,23 @@ impl DbInterface for GameDbBackend {
 
         let stm = match connection {
             #[cfg(feature = "mysql")]
-            AnyConnection::MySql(con) => AnyStatement::MySql(sqlx::Statement::to_owned(
-                &con.prepare(&driver_props.sql).await?,
-            )),
+            AnyConnection::MySql(con) => {
+                use sqlx::{AssertSqlSafe, SqlSafeStr};
+
+                AnyStatement::MySql(sqlx::mysql::MySqlStatement::to_owned(
+                    &con.prepare(AssertSqlSafe(driver_props.sql.as_str()).into_sql_str())
+                        .await?,
+                ))
+            }
             #[cfg(feature = "sqlite")]
-            AnyConnection::Sqlite(con) => AnyStatement::Sqlite(sqlx::Statement::to_owned(
-                &con.prepare(&driver_props.sql).await?,
-            )),
+            AnyConnection::Sqlite(con) => {
+                use sqlx::{AssertSqlSafe, SqlSafeStr};
+
+                AnyStatement::Sqlite(sqlx::sqlite::SqliteStatement::to_owned(
+                    &con.prepare(AssertSqlSafe(driver_props.sql.as_str()).into_sql_str())
+                        .await?,
+                ))
+            }
         };
 
         let unique_id = self

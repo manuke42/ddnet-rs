@@ -22,10 +22,10 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
     };
 
     let res = {
-        let mut panel = egui::SidePanel::right("chat_panel")
+        let mut panel = egui::Panel::right("chat_panel")
             .resizable(true)
-            .width_range(300.0..=600.0);
-        panel = panel.default_width(500.0);
+            .size_range(300.0..=600.0);
+        panel = panel.default_size(500.0);
 
         let mut close_chat = None;
 

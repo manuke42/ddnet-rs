@@ -11,8 +11,8 @@ base-io = { path = "../../lib/base-io" }
 map = { path = "../../game/map" }
 map-convert-lib = { path = "../../game/map-convert-lib" }
 
-anyhow = { version = "1.0.100", features = ["backtrace"] }
-clap = { version = "4.5.51", features = ["derive"] }
-env_logger = "0.11.8"
-log = "0.4.28"
-rayon = "1.11.0"
+anyhow = { version = "1", features = ["backtrace"] }
+clap = { version = "4", features = ["derive"] }
+env_logger = "0.11"
+log = "0.4"
+rayon = "1"

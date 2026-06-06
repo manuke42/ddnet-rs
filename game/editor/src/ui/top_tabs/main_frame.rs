@@ -12,10 +12,10 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
     let style = ui.style();
     // 4.0 is some margin for strokes
     let height = style.spacing.interact_size.y + style.spacing.item_spacing.y + 4.0;
-    let res = egui::TopBottomPanel::top("top_tabs")
+    let res = egui::Panel::top("top_tabs")
         .resizable(false)
-        .default_height(height)
-        .height_range(height..=height)
+        .default_size(height)
+        .size_range(height..=height)
         .show_inside(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.style_mut().spacing.item_spacing.x = 0.0;

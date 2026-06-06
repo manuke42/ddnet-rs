@@ -2,11 +2,11 @@ use std::{collections::BTreeMap, time::Duration};
 
 use base::linked_hash_map_view::FxLinkedHashMap;
 use binds::binds::BindAction;
-use client_ui::{chat::user_data::ChatMode, emote_wheel::user_data::EmoteWheelEvent};
 use game_base::{network::messages::PlayerInputChainable, player_input::PlayerInput};
 use game_interface::types::{
     game::GameTickType, id_types::PlayerId, render::character::PlayerCameraMode,
 };
+use ingame_ui::{chat::user_data::ChatMode, emote_wheel::user_data::EmoteWheelEvent};
 use input_binds::binds::Binds;
 use math::math::vector::dvec2;
 use pool::datatypes::PoolFxLinkedHashMap;

@@ -1,6 +1,7 @@
 pub mod character_core {
     use std::ops::{AddAssign, ControlFlow};
 
+    use crate::collision::{Collision, CollisionTile, CollisionTypes};
     use crate::reusable::{CloneWithCopyableElements, ReusableCore};
     use game_interface::{
         events::{
@@ -19,7 +20,6 @@ pub mod character_core {
     use num::FromPrimitive;
 
     use crate::{
-        collision::collision::{Collision, CollisionTile, CollisionTypes},
         entities::character::{
             character::{Characters, CharactersView},
             hook::character_hook::{CharacterHook, Hook, HookState},
@@ -572,7 +572,7 @@ pub mod character_core {
                         }
                     }
 
-                    // release hook (max default hook time is 1.25 s)
+                    // release hook (max default hook time is 1.2s + 1 tick for default tunings)
                     *hook_tick += 1;
                     if hooked_char.is_some() {
                         let hook_duration =

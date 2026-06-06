@@ -29,7 +29,7 @@ impl EditorUi {
         style.interaction.show_tooltips_only_when_still = false;
         style.interaction.tooltip_delay = 0.0;
         style.visuals.clip_rect_margin = 6.0;
-        ui.ctx().set_style(style);
+        ui.ctx().set_global_style(style);
         ui.reset_style();
     }
 }

@@ -1095,6 +1095,15 @@ where
         }
     }
 
+    /// Checks if the task that loads the default value
+    /// is finished, or the default item is already loaded
+    #[instrument(level = "trace", skip_all)]
+    pub fn is_default_task_loaded(&self) -> bool {
+        self.default_item
+            .as_ref()
+            .is_none_or(|task| task.task.is_finished())
+    }
+
     /// Checks if default already loaded without initiating the loading process
     #[instrument(level = "trace", skip_all)]
     pub fn is_default_loaded(&self) -> bool {

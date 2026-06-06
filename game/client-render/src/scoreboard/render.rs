@@ -3,7 +3,6 @@ use std::time::Duration;
 use base::linked_hash_map_view::FxLinkedHashMap;
 use client_containers::{flags::FlagsContainer, skins::SkinContainer};
 use client_render_base::render::tee::RenderTee;
-use client_ui::scoreboard::{page::ScoreboardUi, user_data::UserData};
 use egui::Color32;
 use graphics::{
     graphics::graphics::Graphics,
@@ -12,6 +11,7 @@ use graphics::{
         stream::stream::GraphicsStreamHandle, texture::texture::GraphicsTextureHandle,
     },
 };
+use ingame_ui::scoreboard::{page::ScoreboardUi, user_data::UserData};
 
 use game_interface::types::{
     id_types::CharacterId,

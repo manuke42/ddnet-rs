@@ -49,13 +49,14 @@ use ui_base::types::{UiRenderPipe, UiState};
 use ui_generic::traits::UiPageInterface;
 use url::Url;
 
+use client_ui_utils::thumbnail_container::{
+    DEFAULT_THUMBNAIL_CONTAINER_PATH, ThumbnailContainer, load_thumbnail_container,
+};
+
 use crate::{
     events::UiEvents,
     ingame_menu::{client_info::ClientInfo, raw_input_info::RawInputInfo},
     main_menu::{ddnet_info::DdnetInfoRequest, user_data::MainMenuInterface},
-    thumbnail_container::{
-        DEFAULT_THUMBNAIL_CONTAINER_PATH, ThumbnailContainer, load_thumbnail_container,
-    },
 };
 
 use super::{

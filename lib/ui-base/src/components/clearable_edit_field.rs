@@ -72,27 +72,42 @@ pub fn clearable_edit_field(
                 strip.cell(|ui| {
                     ui.style_mut().wrap_mode = None;
                     let style = ui.style_mut();
+                    style.spacing.button_padding = vec2(0.0, 0.0);
                     let widgets = &mut style.visuals.widgets;
                     widgets.inactive.corner_radius = CornerRadius {
                         ne: rounding,
                         se: rounding,
                         ..Default::default()
                     };
+                    widgets.inactive.expansion = 0.0;
+                    widgets.inactive.bg_stroke = Stroke::NONE;
                     widgets.active.corner_radius = widgets.inactive.corner_radius;
                     widgets.active.expansion = widgets.inactive.expansion;
+                    widgets.active.bg_stroke = widgets.inactive.bg_stroke;
+                    widgets.active.weak_bg_fill = widgets.inactive.weak_bg_fill;
                     widgets.hovered.corner_radius = widgets.inactive.corner_radius;
                     widgets.hovered.expansion = widgets.inactive.expansion;
+                    widgets.hovered.bg_stroke = widgets.inactive.bg_stroke;
+                    widgets.hovered.weak_bg_fill = widgets.inactive.weak_bg_fill;
                     widgets.noninteractive.corner_radius = widgets.inactive.corner_radius;
                     widgets.noninteractive.expansion = widgets.inactive.expansion;
+                    widgets.noninteractive.bg_stroke = widgets.inactive.bg_stroke;
+                    widgets.noninteractive.weak_bg_fill = widgets.inactive.weak_bg_fill;
                     widgets.open.corner_radius = widgets.inactive.corner_radius;
-                    widgets.noninteractive.expansion = widgets.inactive.expansion;
+                    widgets.open.expansion = widgets.inactive.expansion;
+                    widgets.open.bg_stroke = widgets.inactive.bg_stroke;
+                    widgets.open.weak_bg_fill = widgets.inactive.weak_bg_fill;
                     if ui
-                        .add(Button::new("\u{f00d}").stroke(Stroke::NONE))
+                        .add_sized(
+                            ui.available_size(),
+                            Button::new("\u{f00d}").stroke(Stroke::NONE),
+                        )
                         .clicked()
                     {
                         text.clear();
                         if let Some(res) = &mut res {
                             res.mark_changed();
+                            res.request_focus();
                         }
                     }
                 });

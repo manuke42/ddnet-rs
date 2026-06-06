@@ -2,7 +2,8 @@ use std::collections::{BTreeMap, HashSet};
 
 use base::hash::{Hash, generate_hash_for};
 use client_containers::container::ContainerItemIndexType;
-use client_ui::{main_menu::settings::list::list, utils::render_texture_for_ui};
+use client_ui_utils::assets_list;
+use client_ui_utils::render_texture_for_ui;
 use egui::{Button, Rect, UiBuilder};
 use game_interface::types::resource_key::ResourceKey;
 use map::{
@@ -31,10 +32,10 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
     };
 
     let res = {
-        let mut panel = egui::SidePanel::right("assets_store_panel")
+        let mut panel = egui::Panel::right("assets_store_panel")
             .resizable(true)
-            .width_range(600.0..=1200.0);
-        panel = panel.default_width(800.0);
+            .size_range(600.0..=1200.0);
+        panel = panel.default_size(800.0);
 
         let res = panel.show_inside(ui, |ui| {
             ui.horizontal(|ui| {
@@ -87,7 +88,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
                 let selected_fully_loaded = pipe.user_data.sound_images_container.is_loaded(&key)
                     && key.name.as_str() != "default";
 
-                list::render(
+                assets_list::render(
                     ui,
                     entries
                         .iter()
@@ -214,7 +215,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>, ui_st
                     pipe.user_data.quad_tile_images_container.is_loaded(&key)
                         && key.name.as_str() != "default";
 
-                list::render(
+                assets_list::render(
                     ui,
                     entries
                         .iter()

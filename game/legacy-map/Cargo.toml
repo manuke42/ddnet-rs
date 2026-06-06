@@ -16,15 +16,15 @@ math = { path = "../../lib/math" }
 
 map = { path = "../map" }
 
-anyhow = { version = "1.0.100", features = ["backtrace"] }
-flate2 = "1.1.5"
+anyhow = { version = "1", features = ["backtrace"] }
+flate2 = "1"
 hashlink = { git = "https://github.com/Jupeyy/hashlink/", branch = "ddnet", features = [
   "serde",
   "serde_impl",
 ] }
-itertools = "0.14.0"
-num-derive = "0.4.2"
-num-traits = "0.2.19"
-rayon = "1.11.0"
-serde = { version = "1.0.228", features = ["derive"] }
-time = { version = "0.3.44", features = ["serde"] }
+itertools = "0.14"
+num-derive = "0.4"
+num-traits = "0.2"
+rayon = "1"
+serde = { version = "1", features = ["derive"] }
+time = { version = "0.3", features = ["serde"] }

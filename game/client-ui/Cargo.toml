@@ -10,12 +10,12 @@ binds = ["dep:binds"]
 client-containers = { path = "../client-containers" }
 client-render-base = { path = "../client-render-base" }
 client-types = { path = "../client-types" }
+client-ui-utils = { path = "../client-ui-utils" }
 demo = { path = "../demo" }
 game-base = { path = "../game-base" }
 game-config = { path = "../game-config" }
 game-interface = { path = "../game-interface" }
 master-server-types = { path = "../master-server-types" }
-vanilla = { path = "../vanilla" }
 
 binds = { path = "../binds", optional = true }
 
@@ -28,44 +28,38 @@ graphics = { path = "../../lib/graphics" }
 graphics-types = { path = "../../lib/graphics-types" }
 hiarc = { path = "../../lib/hiarc", features = ["derive"] }
 math = { path = "../../lib/math" }
-pool = { path = "../../lib/pool" }
 sound = { path = "../../lib/sound" }
 ui-base = { path = "../../lib/ui-base" }
 ui-generic = { path = "../../lib/ui-generic" }
 
-anyhow = { version = "1.0.100", features = ["backtrace"] }
-async-trait = "0.1.89"
-egui = { version = "0.33.0", default-features = false, features = ["serde"] }
-egui_commonmark = "0.22.0"
-egui_extras = { version = "0.33.0" }
-email_address = { version = "0.2.9", features = ["serde"] }
-fuzzy-matcher = "0.3.7"
-gcd = "2.3.0"
-geo = "0.31.0"
-hashlink = { git = "https://github.com/Jupeyy/hashlink/", branch = "ddnet", features = [
-  "serde",
-  "serde_impl",
-] }
-log = "0.4.28"
-num-rational = "0.4.2"
-num-traits = "0.2.19"
-rayon = "1.11.0"
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.145"
-serde_with = "3.15.1"
-tracing = { version = "0.1.41", default-features = false, features = [
+anyhow = { version = "1", features = ["backtrace"] }
+async-trait = "0.1"
+egui = { version = "0.34", default-features = false, features = ["serde"] }
+egui_commonmark = "0.23"
+egui_extras = { version = "0.34" }
+email_address = { version = "0.2", features = ["serde"] }
+fuzzy-matcher = "0.3"
+gcd = "2"
+log = "0.4"
+num-rational = "0.4"
+num-traits = "0.2"
+rayon = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_with = "3"
+tracing = { version = "0.1", default-features = false, features = [
   "attributes",
 ] }
-url = { version = "2.5.7", features = ["serde"] }
+url = { version = "2", features = ["serde"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-chrono = { version = "0.4.42", default-features = false, features = [
+chrono = { version = "0.4", default-features = false, features = [
   "serde",
   "clock",
 ] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-chrono = { version = "0.4.42", default-features = false, features = [
+chrono = { version = "0.4", default-features = false, features = [
   "serde",
   "alloc",
 ] }

@@ -5,7 +5,7 @@ use game_interface::{
     rcon_entries::AuthLevel,
     types::player_info::{AccountId, PlayerUniqueId},
 };
-use rand::Rng;
+use rand::RngExt;
 
 use crate::client::ServerClient;
 

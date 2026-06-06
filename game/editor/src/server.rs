@@ -28,7 +28,7 @@ use network::network::{
     event::NetworkEvent,
     types::{NetworkServerCertMode, NetworkServerCertModeResult},
 };
-use rand::{RngCore, seq::SliceRandom};
+use rand::{Rng, seq::SliceRandom};
 use sound::sound_mt::SoundMultiThreaded;
 
 use crate::{

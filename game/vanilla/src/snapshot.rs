@@ -1,6 +1,7 @@
 pub mod snapshot {
     use std::{num::NonZeroU16, rc::Rc};
 
+    use crate::collision::Tunings;
     use crate::{
         entities::character::character::CharacterSpectateMode, reusable::CloneWithCopyableElements,
     };
@@ -29,7 +30,6 @@ pub mod snapshot {
     use rustc_hash::FxHashSet;
 
     use crate::{
-        collision::collision::Tunings,
         entities::{
             character::{
                 character::{
@@ -652,7 +652,7 @@ pub mod snapshot {
                 &self.snapshot_pool,
                 game.id_generator.peek_next_id(),
                 game.game.voted_player,
-                game.collision.tune_zones[0],
+                game.collision.tune_0_for_snapshots(),
             );
             if let SnapshotFor::Client(client) = snap_for {
                 match client {
@@ -1277,7 +1277,7 @@ pub mod snapshot {
 
             write_game_state.game.voted_player = snapshot.voted_player;
 
-            write_game_state.collision.tune_zones[0] = snapshot.global_tune_zone;
+            *write_game_state.collision.tune_0_mut_for_snapshots() = snapshot.global_tune_zone;
 
             snapshot.local_players
         }

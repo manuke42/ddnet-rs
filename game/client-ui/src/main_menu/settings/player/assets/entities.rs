@@ -4,7 +4,9 @@ use client_render_base::map::map_buffered::ClientMapBuffered;
 use game_interface::types::{character_info::MAX_ASSET_NAME_LEN, resource_key::NetworkResourceKey};
 use ui_base::types::{UiRenderPipe, UiState};
 
-use crate::{main_menu::user_data::UserData, utils::render_entities_for_ui};
+use client_ui_utils::render_entities_for_ui;
+
+use crate::main_menu::user_data::UserData;
 
 pub fn entities_list(
     ui: &mut egui::Ui,
@@ -25,7 +27,7 @@ pub fn entities_list(
         .entry("entites-search".to_string())
         .or_default();
     let mut next_name = None;
-    super::super::super::list::list::render(
+    client_ui_utils::assets_list::render(
         ui,
         entries_sorted.iter().map(|(name, &ty)| (name.as_str(), ty)),
         200.0,

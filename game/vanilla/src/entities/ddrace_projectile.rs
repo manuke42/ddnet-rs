@@ -16,7 +16,7 @@ pub mod ddrace_projectile {
     use pool::{recycle::Recycle, traits::Recyclable};
     use serde::{Deserialize, Serialize};
 
-    use crate::collision::collision::{Collision, CollisionTile, CollisionTypes};
+    use crate::collision::{Collision, CollisionTile, CollisionTypes};
     use crate::entities::character::character::BuffProps;
     use crate::entities::entity::entity::{
         DropMode, Entity, EntityInterface, EntityTickResult, calc_pos_and_vel,

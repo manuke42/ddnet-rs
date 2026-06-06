@@ -7,9 +7,7 @@ use binds::binds::{
 };
 use camera::{Camera, CameraInterface};
 use client_types::console::ConsoleEntry;
-use client_ui::chat::user_data::ChatMode;
 use client_ui::console::utils::run_command;
-use client_ui::emote_wheel::user_data::EmoteWheelEvent;
 use command_parser::parser::CommandTypeRef;
 use config::config::ConfigEngine;
 use egui::{Context, CursorIcon};
@@ -26,6 +24,8 @@ use game_interface::types::render::character::{PlayerCameraMode, TeeEye};
 use game_interface::types::weapons::WeaponType;
 use graphics::graphics::graphics::{Graphics, ScreenshotCb};
 use graphics_types::rendering::State;
+use ingame_ui::chat::user_data::ChatMode;
+use ingame_ui::emote_wheel::user_data::EmoteWheelEvent;
 use math::math::{length, normalize_pre_length, vector::dvec2};
 
 use input_binds::binds::{BindKey, Binds, MouseExtra};

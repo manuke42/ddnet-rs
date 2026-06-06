@@ -10,6 +10,7 @@ use tar::Header;
 use anyhow::anyhow;
 use rustc_hash::FxHashMap;
 use tar::EntryType;
+use tracing::instrument;
 
 pub struct TarReaderWrapper {
     cur_pos: Arc<AtomicUsize>,
@@ -201,6 +202,7 @@ pub fn tar_file_entries(reader: &mut TarReader) -> anyhow::Result<FxHashMap<Path
         .collect::<anyhow::Result<FxHashMap<_, _>>>()
 }
 
+#[instrument(level = "trace", skip_all)]
 pub fn tar_entry_to_file(entry: &TarEntry) -> anyhow::Result<&[u8]> {
     Ok(entry.file.get(entry.range.clone()).ok_or_else(|| {
         std::io::Error::new(

@@ -18,7 +18,7 @@ pub mod laser {
     use crate::reusable::{CloneWithCopyableElements, ReusableCore};
     use game_interface::types::laser::LaserType;
 
-    use crate::collision::collision::{CollisionTile, CollisionTypes};
+    use crate::collision::{CollisionTile, CollisionTypes};
     use crate::entities::character::character::{Character, DamageBy, DamageTypes};
     use crate::entities::entity::entity::{DropMode, Entity, EntityInterface, EntityTickResult};
     use crate::events::events::LaserEvent;

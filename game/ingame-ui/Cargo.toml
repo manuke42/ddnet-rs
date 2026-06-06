@@ -1,0 +1,31 @@
+[package]
+name = "ingame-ui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+base = { path = "../../lib/base" }
+client-containers = { path = "../client-containers" }
+client-render-base = { path = "../client-render-base" }
+client-types = { path = "../client-types" }
+client-ui-utils = { path = "../client-ui-utils" }
+game-base = { path = "../game-base" }
+game-interface = { path = "../game-interface" }
+graphics = { path = "../../lib/graphics" }
+math = { path = "../../lib/math" }
+pool = { path = "../../lib/pool" }
+
+egui = { version = "0.34", default-features = false, features = ["serde"] }
+egui_commonmark = "0.23"
+egui_extras = { version = "0.34" }
+fuzzy-matcher = "0.3"
+hashlink = { git = "https://github.com/Jupeyy/hashlink/", branch = "ddnet", features = [
+  "serde",
+  "serde_impl",
+] }
+serde = { version = "1", features = ["derive"] }
+tracing = { version = "0.1", default-features = false, features = [
+  "attributes",
+] }
+ui-base = { path = "../../lib/ui-base" }
+ui-generic = { path = "../../lib/ui-generic" }

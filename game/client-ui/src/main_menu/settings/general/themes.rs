@@ -4,7 +4,9 @@ use game_interface::types::resource_key::{NetworkResourceKey, ResourceKey};
 use math::math::vector::vec2;
 use ui_base::types::{UiRenderPipe, UiState};
 
-use crate::{main_menu::user_data::UserData, utils::render_texture_for_ui};
+use client_ui_utils::render_texture_for_ui;
+
+use crate::main_menu::user_data::UserData;
 
 pub fn theme_list(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &mut UiState) {
     let entries = pipe.user_data.theme_container.entries_index();
@@ -20,7 +22,7 @@ pub fn theme_list(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state
         .entry("theme-search".to_string())
         .or_default();
     let mut next_name = None;
-    super::super::list::list::render(
+    client_ui_utils::assets_list::render(
         ui,
         entries_sorted.iter().map(|(name, &ty)| (name.as_str(), ty)),
         50.0,

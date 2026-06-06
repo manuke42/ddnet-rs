@@ -89,8 +89,10 @@ pub mod state {
     use legacy_map::mapdef_06::EntityTiles;
     use pool::rc::PoolRc;
     use rustc_hash::FxHashMap;
+    use tracing::instrument;
 
-    use crate::collision::collision::Tunings;
+    use crate::collision::Collision;
+    use crate::collision::Tunings;
     use crate::command_chain::{Command, CommandChain};
     use crate::config::config::{ConfigGameType, ConfigVanilla, ConfigVanillaWrapper};
     use crate::entities::character::character::{self, CharacterPlayerTy, CharacterSpectateMode};
@@ -116,7 +118,7 @@ pub mod state {
     use crate::weapons::definitions::weapon_def::{Weapon, WeaponUpgrade};
 
     use super::super::{
-        collision::collision::Collision, entities::character::character::Character,
+        entities::character::character::Character,
         simulation_pipe::simulation_pipe::SimulationPipeStage, spawns::GameSpawns,
         stage::stage::GameStage, world::world::WorldPool,
     };
@@ -516,8 +518,10 @@ pub mod state {
             let game_objects = GameObjectDefinitions::new(&physics_group);
 
             let default_tune = match config.game_type {
-                ConfigGameType::Race => Tunings::race_default(),
-                ConfigGameType::Dm | ConfigGameType::Ctf => Tunings::default(),
+                ConfigGameType::Race => Tunings::race_default(TICKS_PER_SECOND),
+                ConfigGameType::Dm | ConfigGameType::Ctf => {
+                    Tunings::vanilla_default(TICKS_PER_SECOND)
+                }
             };
             let mut collision = Collision::with_default_tune(physics_group, true, default_tune)?;
 
@@ -533,7 +537,7 @@ pub mod state {
                                 .flatten()
                         })
                 {
-                    if let Err(err) = collision.tune_zones[0].try_set_from_str(
+                    if let Err(err) = collision.tune_0_mut_for_cheats().try_set_from_str(
                         cmd.to_string(),
                         None,
                         Some(val.to_string()),
@@ -685,6 +689,7 @@ pub mod state {
     }
 
     impl GameStateCreate for GameState {
+        #[instrument(level = "trace", skip_all)]
         fn new(
             map: Vec<u8>,
             map_name: NetworkReducedAsciiString<MAX_MAP_NAME_LEN>,
@@ -1163,7 +1168,7 @@ pub mod state {
                             panic!("Expected a text, this is an implementation bug");
                         };
 
-                        match self.collision.tune_zones[0].try_set_from_str(
+                        match self.collision.tune_0_mut_for_cheats().try_set_from_str(
                             path,
                             None,
                             Some(val),

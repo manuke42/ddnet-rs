@@ -2,7 +2,6 @@ use api_ui_game::render::{create_ctf_container, create_skin_container};
 use base::{linked_hash_map_view::FxLinkedHashMap, network_string::PoolNetworkString};
 use client_containers::{ctf::CtfContainer, skins::SkinContainer};
 use client_render_base::render::tee::RenderTee;
-use client_ui::hud::user_data::RenderDateTime;
 use game_interface::types::{
     character_info::{NetworkCharacterInfo, NetworkSkinInfo},
     id_gen::IdGenerator,
@@ -19,6 +18,7 @@ use graphics::{
     graphics::graphics::Graphics,
     handles::{canvas::canvas::GraphicsCanvasHandle, stream::stream::GraphicsStreamHandle},
 };
+use ingame_ui::hud::user_data::RenderDateTime;
 use pool::{datatypes::PoolString, rc::PoolRc};
 use ui_base::types::{UiRenderPipe, UiState};
 use ui_generic::traits::UiPageInterface;
@@ -68,11 +68,11 @@ impl HudPage {
         pipe: &mut UiRenderPipe<()>,
         ui_state: &mut UiState,
     ) {
-        client_ui::hud::main_frame::render(
+        ingame_ui::hud::main_frame::render(
             ui,
             &mut UiRenderPipe::new(
                 pipe.cur_time,
-                &mut client_ui::hud::user_data::UserData {
+                &mut ingame_ui::hud::user_data::UserData {
                     race_round_timer_counter: &456156,
                     ticks_per_second: &50.try_into().unwrap(),
                     /*game: Some(&GameRenderInfo::Match {

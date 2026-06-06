@@ -16,15 +16,13 @@ game-database-backend = { path = "../../lib/game-database-backend", default-feat
 network = { path = "../../lib/network" }
 sql = { path = "../../lib/sql", default-features = false, features = ["mysql"] }
 
-anyhow = { version = "1.0.100", features = ["backtrace"] }
-async-trait = "0.1.89"
-clap = { version = "4.5.51", features = ["derive"] }
-log = "0.4.28"
-reqwest = { version = "0.12.24", default-features = false, features = [
-  "rustls-tls",
-] }
-serde_json = "1.0.145"
-tokio = { version = "1.48.0", features = [
+anyhow = { version = "1", features = ["backtrace"] }
+async-trait = "0.1"
+clap = { version = "4", features = ["derive"] }
+log = "0.4"
+reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
+serde_json = "1"
+tokio = { version = "1", features = [
   "rt-multi-thread",
   "sync",
   "fs",
@@ -32,11 +30,11 @@ tokio = { version = "1.48.0", features = [
   "time",
   "macros",
 ] }
-url = { version = "2.5.7", features = ["serde"] }
-x509-cert = { version = "0.2.5" }
+url = { version = "2", features = ["serde"] }
+x509-cert = { version = "0.2" }
 
-ddnet-account-client-http-fs = { version = "0.3.0" }
-ddnet-account-client-reqwest = "0.3.0"
-ddnet-account-game-server = { version = "0.3.0" }
-ddnet-accounts-shared = { version = "0.2.0" }
-ddnet-accounts-types = { version = "0.1.0" }
+ddnet-account-client-http-fs = { version = "0.4" }
+ddnet-account-client-reqwest = "0.4"
+ddnet-account-game-server = { version = "0.4" }
+ddnet-accounts-shared = { version = "0.3" }
+ddnet-accounts-types = { version = "0.2" }

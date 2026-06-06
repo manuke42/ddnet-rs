@@ -4,7 +4,6 @@ use base::{linked_hash_map_view::FxLinkedHashMap, network_string::PoolNetworkStr
 use client_containers::utils::RenderGameContainers;
 use client_render_base::render::tee::RenderTee;
 use client_render_game::components::hud::{RenderHud, RenderHudPipe};
-use client_ui::hud::user_data::RenderDateTime;
 use game_interface::types::{
     character_info::{NetworkCharacterInfo, NetworkSkinInfo},
     emoticons::IntoEnumIterator,
@@ -23,6 +22,7 @@ use game_interface::types::{
     weapons::{EnumCount, WeaponType},
 };
 use graphics::graphics::graphics::Graphics;
+use ingame_ui::hud::user_data::RenderDateTime;
 use pool::{
     datatypes::{PoolFxLinkedHashSet, PoolString},
     rc::PoolRc,

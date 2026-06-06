@@ -5,10 +5,9 @@ use game_interface::types::render::character::TeeEye;
 use tracing::instrument;
 use ui_base::types::{UiRenderPipe, UiState};
 
-use crate::{
-    main_menu::{settings::constants::SETTINGS_SUB_UI_PAGE_QUERY, user_data::UserData},
-    utils::render_tee_for_ui,
-};
+use client_ui_utils::render_tee_for_ui;
+
+use crate::main_menu::{settings::constants::SETTINGS_SUB_UI_PAGE_QUERY, user_data::UserData};
 
 #[instrument(level = "trace", skip_all)]
 pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &mut UiState) {
@@ -69,7 +68,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
 
             let cur_profile = path.query.get("selected-profile").cloned();
             let search = path.query.entry("profile-search".to_string()).or_default();
-            super::super::list::list::render(
+            client_ui_utils::assets_list::render(
                 ui,
                 config
                     .players

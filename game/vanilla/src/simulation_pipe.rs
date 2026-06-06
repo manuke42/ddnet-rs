@@ -16,6 +16,7 @@ pub mod simulation_pipe {
     use math::math::vector::vec2;
     use serde::{Deserialize, Serialize};
 
+    use crate::collision::Collision;
     use crate::entities::character::character::{CharacterPool, CharactersView, CharactersViewMut};
     use crate::entities::character::core::character_core::{Core, CoreReusable};
     use crate::entities::character::pos::character_pos::{
@@ -34,9 +35,7 @@ pub mod simulation_pipe {
         world::world::{GameWorld, WorldPool},
     };
 
-    use super::super::{
-        collision::collision::Collision, entities::character::character::Character,
-    };
+    use super::super::entities::character::character::Character;
 
     #[hiarc_safer_rc_refcell]
     #[derive(Debug, Default, Hiarc)]

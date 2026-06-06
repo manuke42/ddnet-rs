@@ -7,7 +7,6 @@ use game_interface::interface::{
 };
 use state::state::GameState;
 
-pub mod collision;
 pub mod entities;
 pub mod events;
 pub mod game_objects;
@@ -40,6 +39,11 @@ pub mod reusable {
 
 pub use api::{DB, IO_RUNTIME};
 pub use api_state::*;
+
+mod collision_overwrite;
+pub mod collision {
+    pub use super::collision_overwrite::collision::*;
+}
 
 #[unsafe(no_mangle)]
 fn mod_state_new(

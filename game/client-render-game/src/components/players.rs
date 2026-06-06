@@ -39,7 +39,7 @@ use graphics::{
 use graphics_types::rendering::{State, WrapType};
 use pool::datatypes::PoolFxLinkedHashMap;
 
-use vanilla::collision::collision::Collision;
+use tile_map_collision::collision::Collision;
 
 use game_interface::types::{
     character_info::{MAX_ASSET_NAME_LEN, NetworkSkinInfo},

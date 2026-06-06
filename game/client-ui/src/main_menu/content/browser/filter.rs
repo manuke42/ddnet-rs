@@ -5,7 +5,9 @@ use egui_extras::{Size, StripBuilder};
 use game_base::server_browser::ServerFilter;
 use ui_base::types::{UiRenderPipe, UiState};
 
-use crate::{main_menu::user_data::UserData, utils::render_flag_for_ui};
+use client_ui_utils::render_flag_for_ui;
+
+use crate::main_menu::user_data::UserData;
 
 /// button & popover
 pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &mut UiState) {
@@ -82,7 +84,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
                             |ui| {
                                 let servers = &pipe.user_data.browser_data;
                                 let server_locations = servers.locations();
-                                super::super::super::settings::list::list::render(
+                                client_ui_utils::assets_list::render(
                                     ui,
                                     server_locations
                                         .iter()

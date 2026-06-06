@@ -11,15 +11,16 @@ use sound::sound::SoundManager;
 use ui_base::types::{UiRenderPipe, UiState};
 use ui_generic::traits::UiPageInterface;
 
+use client_ui_utils::thumbnail_container::{
+    DEFAULT_THUMBNAIL_CONTAINER_PATH, ThumbnailContainer, load_thumbnail_container,
+};
+
 use crate::{
     events::UiEvents,
     main_menu::{
         ddnet_info::DdnetInfoRequest, features::EnabledFeatures, monitors::UiMonitors,
         page::MainMenuUi, player_settings_ntfy::PlayerSettingsSync,
         profiles_interface::ProfilesInterface, spatial_chat::SpatialChat,
-    },
-    thumbnail_container::{
-        DEFAULT_THUMBNAIL_CONTAINER_PATH, ThumbnailContainer, load_thumbnail_container,
     },
 };
 

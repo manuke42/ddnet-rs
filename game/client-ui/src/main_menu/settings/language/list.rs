@@ -4,7 +4,9 @@ use client_containers::container::ContainerItemIndexType;
 use game_interface::types::resource_key::NetworkResourceKey;
 use ui_base::types::{UiRenderPipe, UiState};
 
-use crate::{main_menu::user_data::UserData, utils::render_flag_for_ui};
+use client_ui_utils::render_flag_for_ui;
+
+use crate::main_menu::user_data::UserData;
 
 struct Language {
     flag: String,
@@ -36,7 +38,7 @@ pub fn lang_list(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state:
         .entry("lang-search".to_string())
         .or_default();
     let mut next_name = None;
-    super::super::list::list::render(
+    client_ui_utils::assets_list::render(
         ui,
         entries_sorted.iter().map(|(name, &ty)| (name.as_str(), ty)),
         50.0,

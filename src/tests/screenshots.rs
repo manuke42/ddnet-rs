@@ -6,7 +6,7 @@ use client_containers::{
     utils::{RenderGameContainers, load_containers},
 };
 use client_render_base::render::{tee::RenderTee, toolkit::ToolkitRender};
-use client_ui::thumbnail_container::{
+use client_ui_utils::thumbnail_container::{
     DEFAULT_THUMBNAIL_CONTAINER_PATH, ThumbnailContainer, load_thumbnail_container,
 };
 use game_interface::types::character_info::NetworkSkinInfo;

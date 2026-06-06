@@ -45,11 +45,9 @@ use client_types::{
     console::{ConsoleEntry, entries_to_parser},
 };
 use client_ui::{
-    chat::user_data::{ChatEvent, ChatMode},
     connect::page::ConnectingUi,
     console::utils::run_commands,
     events::{UiEvent, UiEvents},
-    hud::user_data::RenderDateTime,
     ingame_menu::{
         account_info::AccountInfo,
         client_info::{ActiveClientInfo, ClientInfo},
@@ -66,9 +64,8 @@ use client_ui::{
         player_settings_ntfy::PlayerSettingsSync,
         spatial_chat::SpatialChat,
     },
-    spectator_selection::user_data::SpectatorSelectionEvent,
-    utils::render_tee_for_ui,
 };
+use client_ui_utils::render_tee_for_ui;
 use command_parser::parser::ParserCache;
 use config::config::ConfigEngine;
 use ddnet_info_proxy::DdnetInfoProxy;
@@ -86,6 +83,11 @@ use graphics_backend::{
         client_window_props_changed_update_config,
     },
     window::BackendWindow,
+};
+use ingame_ui::{
+    chat::user_data::{ChatEvent, ChatMode},
+    hud::user_data::RenderDateTime,
+    spectator_selection::user_data::SpectatorSelectionEvent,
 };
 
 use editor_wasm::editor::editor_wasm_manager::{EditorState, EditorWasmManager};
@@ -1365,7 +1367,7 @@ impl ClientNativeImpl {
                 EditorResult::PlatformOutput(output) => {
                     self.inp_manager.handle_platform_output(
                         native,
-                        output,
+                        *output,
                         self.local_console.ui.ui_state.is_ui_open
                             || self.game.remote_console_open(),
                     );

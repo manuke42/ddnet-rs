@@ -3,10 +3,6 @@ use std::{collections::VecDeque, time::Duration};
 use client_containers::{ninja::NinjaContainer, skins::SkinContainer, weapons::WeaponContainer};
 use client_render_base::render::{tee::RenderTee, toolkit::ToolkitRender};
 use client_types::actionfeed::ActionInFeed;
-use client_ui::actionfeed::{
-    page::ActionFeedUi,
-    user_data::{RenderTeeInfo, UserData},
-};
 use egui::Color32;
 use graphics::{
     graphics::graphics::Graphics,
@@ -14,6 +10,10 @@ use graphics::{
         backend::backend::GraphicsBackendHandle, canvas::canvas::GraphicsCanvasHandle,
         stream::stream::GraphicsStreamHandle, texture::texture::GraphicsTextureHandle,
     },
+};
+use ingame_ui::actionfeed::{
+    page::ActionFeedUi,
+    user_data::{RenderTeeInfo, UserData},
 };
 use ui_generic::traits::UiPageInterface;
 

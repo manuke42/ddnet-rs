@@ -3,10 +3,6 @@ use std::{collections::VecDeque, time::Duration};
 use base::linked_hash_map_view::FxLinkedHashMap;
 use client_containers::skins::SkinContainer;
 use client_render_base::render::tee::RenderTee;
-use client_ui::spectator_selection::{
-    page::SpectatorSelectionUi,
-    user_data::{SpectatorSelectionEvent, UserData},
-};
 use egui::Color32;
 use game_interface::types::{id_types::CharacterId, render::character::CharacterInfo};
 use graphics::{
@@ -15,6 +11,10 @@ use graphics::{
         backend::backend::GraphicsBackendHandle, canvas::canvas::GraphicsCanvasHandle,
         stream::stream::GraphicsStreamHandle, texture::texture::GraphicsTextureHandle,
     },
+};
+use ingame_ui::spectator_selection::{
+    page::SpectatorSelectionUi,
+    user_data::{SpectatorSelectionEvent, UserData},
 };
 use ui_base::{
     types::UiRenderPipe,

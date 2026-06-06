@@ -14,9 +14,10 @@ ui-generic = { path = "../../lib/ui-generic" }
 client-containers = { path = "../client-containers" }
 client-render-base = { path = "../client-render-base" }
 client-types = { path = "../client-types" }
-client-ui = { path = "../client-ui" }
+client-ui-utils = { path = "../client-ui-utils" }
 game-base = { path = "../game-base" }
 game-interface = { path = "../game-interface" }
+ingame-ui = { path = "../ingame-ui" }
 
-egui = { version = "0.33.0", default-features = false, features = ["serde"] }
-serde = { version = "1.0.228", features = ["derive"] }
+egui = { version = "0.34", default-features = false, features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
