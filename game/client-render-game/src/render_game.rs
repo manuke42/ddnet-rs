@@ -2554,15 +2554,17 @@ impl RenderGame {
 
     fn check_required_local_character_containers_loaded(&mut self) -> bool {
         let loaded = self.client_local_infos.iter().all(|i| {
-            self.containers.skin_container.is_loaded_or_failed(&i.skin)
-                && self
-                    .containers
-                    .particles_container
-                    .is_loaded_or_failed(&i.particles)
-                && self
-                    .containers
-                    .entities_container
-                    .is_loaded_or_failed(&i.entities)
+            let mut loaded = true;
+
+            macro_rules! check_loaded {
+                ($container:ident, $resource:ident) => {
+                    loaded &= self.containers.$container.is_loaded_or_failed(&i.$resource);
+                };
+            }
+
+            for_each_resource_container!(check_loaded);
+
+            loaded
         });
         // since we don't need the property anymore after they are loaded
         // clear it to save memory & performance.
