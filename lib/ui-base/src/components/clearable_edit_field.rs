@@ -93,6 +93,7 @@ pub fn clearable_edit_field(
                         text.clear();
                         if let Some(res) = &mut res {
                             res.mark_changed();
+                            res.request_focus();
                         }
                     }
                 });
