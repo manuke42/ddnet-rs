@@ -132,7 +132,7 @@ use pool::{
     rc::PoolRc,
     traits::Recyclable,
 };
-use projectile::get_pos;
+use projectile::{get_pos, get_vel};
 use rand::Rng as _;
 use sha2::Digest;
 use socket::Socket;
@@ -1141,7 +1141,7 @@ impl Client {
                     SnapshotProjectile {
                         core: ProjectileCore {
                             pos: cur_pos,
-                            vel,
+                            vel: get_vel(now, start_tick, vel, speed, curvature),
                             life_span: 100,
                             damage: 0,
                             force: 0.0,
