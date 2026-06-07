@@ -79,7 +79,7 @@ jobs:
         echo "export LIBCLANG_PATH=${MSYS2_LOCATION}/mingw64/bin" >> ~/.bash_profile
         echo "export BINDGEN_EXTRA_CLANG_ARGS=--target=x86_64-w64-windows-gnu -isystem${MSYS2_LOCATION}/mingw64/include" >> ~/.bash_profile
 
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         submodules: true
     - run: |
@@ -123,7 +123,7 @@ jobs:
         rustup default stable-x86_64-pc-windows-gnu
 
     - name: Setup cache for x264
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       id: x264-cache
       with:
         path: ${{ matrix.x264-cache-path }}
@@ -182,9 +182,11 @@ jobs:
     - uses: Swatinem/rust-cache@v2
 
     - name: Build debug
-      # disable windows for now, since it's the slowest build
-      if: contains(matrix.os, 'windows') == false
-      run: cargo build --verbose --features ${{ matrix.features-debug }}
+      if: contains(matrix.os, 'ubuntu')
+      run: |
+        # Disabling debug symbols here, we don't actually use the debug artifacts, we only care about
+        # whether it compiles or not
+        CARGO_PROFILE_DEV_DEBUG=0 cargo build --verbose --features ${{ matrix.features-debug }}
 
     - name: Build release
       run: cargo build --release --verbose --features ${{ matrix.features }}
@@ -214,7 +216,7 @@ jobs:
         mv target/release/${{ matrix.server-bin }} bin-artifacts
 
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ddnet-rs-${{ steps.nameparts.outputs.os }}-${{ steps.nameparts.outputs.arch }}
         path: bin-artifacts
@@ -228,7 +230,12 @@ jobs:
         mv target/release/${{ matrix.bin }} bin-artifacts
 
     - name: Upload Artifacts steam
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ddnet-rs-${{ steps.nameparts.outputs.os }}-${{ steps.nameparts.outputs.arch }}-steam
         path: bin-artifacts
+
+    - name: Minimize Rust cache
+      run: |
+        rm -rf target/debug/build/ffmpeg-sys-next-*/out/ffmpeg-*
+        rm -rf target/release/build/ffmpeg-sys-next-*/out/ffmpeg-*
