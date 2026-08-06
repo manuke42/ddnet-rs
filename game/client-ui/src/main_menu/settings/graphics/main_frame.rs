@@ -126,7 +126,7 @@ fn render_settings(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>) {
                                 .selected(gpu.name == config.gl.gpu)
                                 .stroke(
                                     if gpu.name == gpus.cur.name {
-                                        Stroke::new(2.0, Color32::LIGHT_GREEN)
+                                        Stroke::new(2.0_f32, Color32::LIGHT_GREEN)
                                     } else {
                                         Stroke::NONE
                                     },

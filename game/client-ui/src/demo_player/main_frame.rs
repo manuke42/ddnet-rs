@@ -94,7 +94,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
                 ui.painter().rect_stroke(
                     rect,
                     CornerRadius::default(),
-                    Stroke::new(1.0, Color32::from_white_alpha(100)),
+                    Stroke::new(1.0_f32, Color32::from_white_alpha(100)),
                     egui::StrokeKind::Inside,
                 );
 

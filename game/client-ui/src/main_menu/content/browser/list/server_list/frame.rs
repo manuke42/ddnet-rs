@@ -19,6 +19,8 @@ use crate::{
     },
 };
 
+use super::ServerListControl;
+
 /// server list frame (scrollable)
 pub fn render(mut body: TableBody<'_>, pipe: &mut UiRenderPipe<UserData>, cur_page: &str) {
     let ddnet_info = &pipe.user_data.ddnet_info;
@@ -127,26 +129,42 @@ pub fn render(mut body: TableBody<'_>, pipe: &mut UiRenderPipe<UserData>, cur_pa
         pipe.user_data.events.push(UiEvent::CheckLocalServer);
     }
 
-    let select_prev = body
+    let navigation = body
         .ui_mut()
         .ctx()
-        .input(|i| i.key_pressed(egui::Key::ArrowUp))
-        && body.ui_mut().ctx().memory(|m| m.focused().is_none());
-    let select_next = body
-        .ui_mut()
-        .ctx()
-        .input(|i| i.key_pressed(egui::Key::ArrowDown))
-        && body.ui_mut().ctx().memory(|m| m.focused().is_none());
+        .data_mut(|d| d.get_temp::<ServerListControl>(super::server_list_control_id()));
+    let select_prev = matches!(navigation, Some(ServerListControl::Prev))
+        || body
+            .ui_mut()
+            .ctx()
+            .input(|i| i.key_pressed(egui::Key::ArrowUp))
+            && body.ui_mut().ctx().memory(|m| m.focused().is_none());
+    let select_next = matches!(navigation, Some(ServerListControl::Next))
+        || body
+            .ui_mut()
+            .ctx()
+            .input(|i| i.key_pressed(egui::Key::ArrowDown))
+            && body.ui_mut().ctx().memory(|m| m.focused().is_none());
+    let select_prev_page = matches!(navigation, Some(ServerListControl::PrevPage))
+        || body
+            .ui_mut()
+            .ctx()
+            .input(|i| i.key_pressed(egui::Key::PageUp))
+            && body.ui_mut().ctx().memory(|m| m.focused().is_none());
+    let select_next_page = matches!(navigation, Some(ServerListControl::NextPage))
+        || body
+            .ui_mut()
+            .ctx()
+            .input(|i| i.key_pressed(egui::Key::PageDown))
+            && body.ui_mut().ctx().memory(|m| m.focused().is_none());
     let select_first = body
         .ui_mut()
         .ctx()
-        .input(|i| i.key_pressed(egui::Key::PageUp))
+        .input(|i| i.key_pressed(egui::Key::Home))
         && body.ui_mut().ctx().memory(|m| m.focused().is_none());
-    let select_last = body
-        .ui_mut()
-        .ctx()
-        .input(|i| i.key_pressed(egui::Key::PageDown))
+    let select_last = body.ui_mut().ctx().input(|i| i.key_pressed(egui::Key::End))
         && body.ui_mut().ctx().memory(|m| m.focused().is_none());
+    let page_row_count = (body.max_rect().height() / 30.0).floor().max(1.0) as usize;
 
     let cur_addr = pipe.user_data.config.storage::<String>("server-addr");
 
@@ -173,6 +191,10 @@ pub fn render(mut body: TableBody<'_>, pipe: &mut UiRenderPipe<UserData>, cur_pa
                 Some(row_index + 1)
             } else if select_next {
                 Some(row_index.saturating_sub(1))
+            } else if select_prev_page {
+                Some(row_index + page_row_count)
+            } else if select_next_page {
+                Some(row_index.saturating_sub(page_row_count))
             } else if select_first {
                 Some(0)
             } else if select_last {
@@ -184,6 +206,16 @@ pub fn render(mut body: TableBody<'_>, pipe: &mut UiRenderPipe<UserData>, cur_pa
             } else {
                 None
             };
+            let select_index = select_index.map(|index| {
+                index.min(
+                    if cur_page != MENU_LAN_NAME {
+                        servers.len()
+                    } else {
+                        lan_server.len()
+                    }
+                    .saturating_sub(1),
+                )
+            });
 
             fn get_addr(addresses: &[SocketAddr]) -> &SocketAddr {
                 // generally prefer ipv4

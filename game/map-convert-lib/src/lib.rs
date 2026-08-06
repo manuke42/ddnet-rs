@@ -113,8 +113,8 @@ mod test {
                 panic!(
                     "difference found for {map_name} {name} @{diff_index}: \n{}\n in\n{} vs.\n{}",
                     diff,
-                    &String::from_utf8_lossy(&map1_json.as_bytes()[s1_start..s1_end]),
-                    &String::from_utf8_lossy(&map2_json.as_bytes()[s2_start..s2_end]),
+                    String::from_utf8_lossy(&map1_json.as_bytes()[s1_start..s1_end]),
+                    String::from_utf8_lossy(&map2_json.as_bytes()[s2_start..s2_end]),
                 );
             }
             assert!(

@@ -31,7 +31,7 @@ use math::math::vector::{ivec2, nffixed, nfvec4, vec2};
 use ui_base::types::UiRenderPipe;
 
 fn button_selected_style() -> egui::Stroke {
-    egui::Stroke::new(2.0, Color32::LIGHT_GREEN)
+    egui::Stroke::new(2.0_f32, Color32::LIGHT_GREEN)
 }
 
 fn check_layer_clicked_tile(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserDataWithTab>) {

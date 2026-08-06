@@ -415,7 +415,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>) {
                             } else {
                                 ""
                             },
-                            &player.name,
+                            player.name,
                         ));
                         ui.horizontal(|ui| {
                             fn conf_player<'a>(

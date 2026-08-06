@@ -375,7 +375,7 @@ impl EditorBindsFile {
             binds_per_event.entry(*event).or_default().push(*bind);
         }
         // sort for consistent order
-        for (_, keys) in binds_per_event.iter_mut() {
+        for keys in binds_per_event.values_mut() {
             #[derive(Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
             pub struct CmpModifiers {
                 pub alt: bool,

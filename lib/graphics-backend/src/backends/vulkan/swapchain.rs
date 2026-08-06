@@ -284,7 +284,7 @@ impl Swapchain {
             .map_err(|err| anyhow!("Could not get surface properties: {err}"))?;
 
         if is_verbose(dbg) {
-            log::info!("surface properties: {:?}", &vksurf_cap);
+            log::info!("surface properties: {:?}", vksurf_cap);
         }
 
         let present_mode = Self::get_presentation_mode(phy_device, surface, options)?;

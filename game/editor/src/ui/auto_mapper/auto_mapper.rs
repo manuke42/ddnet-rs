@@ -360,7 +360,7 @@ fn render_op_list(
                 ui.painter().rect_stroke(
                     Rect::from_min_size(pos_min, egui::vec2(ROW_HEIGHT, ROW_HEIGHT)),
                     0.0,
-                    Stroke::new(2.0, Color32::RED),
+                    Stroke::new(2.0_f32, Color32::RED),
                     egui::StrokeKind::Inside,
                 );
             }

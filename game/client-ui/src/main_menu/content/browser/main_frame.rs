@@ -1,4 +1,4 @@
-use egui::Frame;
+use egui::{Frame, Key, Modifiers};
 use egui_extras::{Size, StripBuilder};
 
 use ui_base::{
@@ -6,7 +6,10 @@ use ui_base::{
     types::{UiRenderPipe, UiState},
 };
 
-use crate::main_menu::user_data::UserData;
+use crate::main_menu::{
+    content::browser::list::server_list::{ServerListControl, server_list_control_id},
+    user_data::UserData,
+};
 
 use super::info_panel::player_list::list::entry::EntryData;
 
@@ -17,6 +20,27 @@ pub fn render(
     ui_state: &mut UiState,
     cur_page: &str,
 ) {
+    let server_list_navigation = ui.input_mut(|i| {
+        if i.consume_key(Modifiers::NONE, Key::ArrowUp) {
+            Some(ServerListControl::Prev)
+        } else if i.consume_key(Modifiers::NONE, Key::ArrowDown) {
+            Some(ServerListControl::Next)
+        } else if i.consume_key(Modifiers::NONE, Key::PageUp) {
+            Some(ServerListControl::PrevPage)
+        } else if i.consume_key(Modifiers::NONE, Key::PageDown) {
+            Some(ServerListControl::NextPage)
+        } else {
+            None
+        }
+    });
+    ui.ctx().data_mut(|d| {
+        if let Some(server_list_navigation) = server_list_navigation {
+            d.insert_temp(server_list_control_id(), server_list_navigation);
+        } else {
+            d.remove::<ServerListControl>(server_list_control_id());
+        }
+    });
+
     let w = ui.available_width();
     let margin = ui.style().spacing.item_spacing.x;
     let width_details = 300.0;

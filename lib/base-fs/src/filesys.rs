@@ -579,10 +579,7 @@ impl FileSystem {
         let rel_path = tmp_path.strip_prefix(&host_path).map_err(|err| {
             std::io::Error::new(
                 std::io::ErrorKind::NotFound,
-                format!(
-                    "could not strip {:?} from {:?}: {err}",
-                    &host_path, &tmp_path
-                ),
+                format!("could not strip {:?} from {:?}: {err}", host_path, tmp_path),
             )
         })?;
 
