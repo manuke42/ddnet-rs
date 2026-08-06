@@ -104,7 +104,7 @@ impl<'de> Deserialize<'de> for GraphicsStreamedUniformRawData {
     }
 }
 
-/// only allows to get either of the memebers
+/// only allows to get either of the members
 #[derive(Debug, Hiarc, Serialize, Deserialize)]
 pub struct GraphicsStreamedUniformData {
     raw: GraphicsStreamedUniformRawData,
