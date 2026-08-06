@@ -357,7 +357,7 @@ impl Timeline {
                         {
                             time = hovered_point.time().as_secs_f32();
                         }
-                        for (p, _) in point_group.hovered_point_channel.iter() {
+                        for p in point_group.hovered_point_channel.keys() {
                             if let Some(p) = point_group.points.get(*p) {
                                 time = p.time().as_secs_f32();
                             }
@@ -928,7 +928,7 @@ impl Timeline {
                     egui::pos2(x_off, y_off),
                     egui::pos2(x_off, y_off + ui.available_height()),
                 ],
-                Stroke::new(2.0, Color32::from_rgb(50, 50, 200)),
+                Stroke::new(2.0_f32, Color32::from_rgb(50, 50, 200)),
             );
 
             let width = ui.available_width();
@@ -1103,7 +1103,7 @@ impl Timeline {
                         egui::pos2(x_off, y_off),
                         egui::pos2(x_off, y_off + ui.available_height()),
                     ],
-                    Stroke::new(2.0, Color32::from_rgb(50, 50, 200)),
+                    Stroke::new(2.0_f32, Color32::from_rgb(50, 50, 200)),
                 );
 
                 let width = ui.available_width();
@@ -1280,10 +1280,10 @@ impl Timeline {
                     }
                     let painter = ui.painter();
                     for (color, points) in points {
-                        painter.line(points, Stroke::new(2.0, color));
+                        painter.line(points, Stroke::new(2.0_f32, color));
                     }
                     for (color, points) in bezier_points {
-                        painter.line(points, Stroke::new(2.0, color));
+                        painter.line(points, Stroke::new(2.0_f32, color));
                     }
                     for (color, point, bezier_hovered) in bezier_ends {
                         let color = if bezier_hovered {

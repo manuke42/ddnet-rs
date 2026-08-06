@@ -3846,7 +3846,7 @@ impl Client {
         }
 
         if !processed {
-            debug!("unprocessed message {:?} {msg:?}", &player.state);
+            debug!("unprocessed message {:?} {msg:?}", player.state);
         }
     }
 

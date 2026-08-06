@@ -192,7 +192,7 @@ impl MapGroupPhysics {
             .unwrap_or_else(|| {
                 panic!(
                     "FATAL ERROR: did not find a game layer (layers: {:?})",
-                    &self.layers
+                    self.layers
                 )
             })
     }

@@ -25,8 +25,8 @@ pub fn render(
 ) {
     let (stroke, to) = match &msg.channel {
         NetChatMsgPlayerChannel::Global => (Stroke::NONE, None),
-        NetChatMsgPlayerChannel::GameTeam => (Stroke::new(2.0, Color32::LIGHT_GREEN), None),
-        NetChatMsgPlayerChannel::Whisper(to) => (Stroke::new(2.0, Color32::RED), Some(to)),
+        NetChatMsgPlayerChannel::GameTeam => (Stroke::new(2.0_f32, Color32::LIGHT_GREEN), None),
+        NetChatMsgPlayerChannel::Whisper(to) => (Stroke::new(2.0_f32, Color32::RED), Some(to)),
     };
     entry_frame(ui, stroke, |ui| {
         ui.add_space(MARGIN);

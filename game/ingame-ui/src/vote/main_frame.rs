@@ -297,7 +297,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
                                         egui::vec2(width * scale, height * scale),
                                     ),
                                     0,
-                                    Stroke::new(2.0, Color32::GRAY),
+                                    Stroke::new(2.0_f32, Color32::GRAY),
                                     egui::StrokeKind::Inside,
                                 );
 
@@ -380,7 +380,7 @@ pub fn render(ui: &mut egui::Ui, pipe: &mut UiRenderPipe<UserData>, ui_state: &m
                             ui.painter().rect_stroke(
                                 rect,
                                 0.0,
-                                Stroke::new(2.0, Color32::GRAY),
+                                Stroke::new(2.0_f32, Color32::GRAY),
                                 egui::StrokeKind::Inside,
                             );
 

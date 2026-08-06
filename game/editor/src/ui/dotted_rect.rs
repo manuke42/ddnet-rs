@@ -3,7 +3,7 @@ use egui::{Color32, Pos2, Rect, Stroke, Ui};
 pub fn draw_dotted_rect(ui: &mut Ui, rect: Rect, dot_spacing: f32, color: Color32) {
     let painter = ui.painter();
 
-    let stroke = Stroke::new(1.0, color);
+    let stroke = Stroke::new(1.0_f32, color);
 
     let min = rect.min;
     let max = rect.max;

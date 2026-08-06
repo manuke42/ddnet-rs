@@ -35,7 +35,7 @@ pub fn profile_selector(
                             } else {
                                 ""
                             },
-                            &p.name,
+                            p.name,
                         ))
                         .clicked()
                     {

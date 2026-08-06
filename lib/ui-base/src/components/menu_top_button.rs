@@ -38,7 +38,7 @@ pub fn menu_top_button(
                     res.rect.top() + 18.0,
                 ),
             ],
-            Stroke::new(1.0, Color32::LIGHT_BLUE),
+            Stroke::new(1.0_f32, Color32::LIGHT_BLUE),
         ));
     }
     res
@@ -53,7 +53,7 @@ pub fn menu_top_button_icon(ui: &mut egui::Ui, props: MenuTopButtonProps) -> Res
                 Pos2::new(res.rect.left() + 8.0, 18.0),
                 Pos2::new(res.rect.left() + res.rect.width() - 8.0, 18.0),
             ],
-            Stroke::new(1.0, Color32::LIGHT_BLUE),
+            Stroke::new(1.0_f32, Color32::LIGHT_BLUE),
         ));
     }
     res

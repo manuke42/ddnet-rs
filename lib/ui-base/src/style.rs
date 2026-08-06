@@ -8,8 +8,9 @@ pub fn default_style() -> Style {
     let mut visuals = Visuals::dark();
     let clr = visuals.extreme_bg_color.to_srgba_unmultiplied();
     visuals.extreme_bg_color = Color32::from_rgba_unmultiplied(clr[0], clr[1], clr[2], 180);
-    visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0, Color32::from_rgb(200, 200, 200));
-    visuals.widgets.inactive.fg_stroke = Stroke::new(1.0, Color32::from_rgb(200, 200, 200));
+    visuals.widgets.noninteractive.fg_stroke =
+        Stroke::new(1.0_f32, Color32::from_rgb(200, 200, 200));
+    visuals.widgets.inactive.fg_stroke = Stroke::new(1.0_f32, Color32::from_rgb(200, 200, 200));
     visuals.clip_rect_margin = 0.0;
     visuals.slider_trailing_fill = true;
     Style {

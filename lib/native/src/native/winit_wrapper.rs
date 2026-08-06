@@ -738,7 +738,6 @@ impl WinitWrapper {
                         winit::event::WindowEvent::MouseWheel {
                             device_id,
                             delta,
-                            phase: _,
                             ..
                         } => native_user.as_mut().scroll(
                             &window.window,
