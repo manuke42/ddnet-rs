@@ -134,6 +134,7 @@ use pool::{
 };
 use projectile::{get_pos, get_vel};
 use rand::Rng as _;
+use regex::Regex;
 use sha2::Digest;
 use socket::Socket;
 use std::{
@@ -144,7 +145,7 @@ use std::{
     net::SocketAddr,
     num::{NonZeroI64, NonZeroU16, NonZeroU64},
     pin::Pin,
-    sync::{Arc, atomic::AtomicBool},
+    sync::{Arc, OnceLock, atomic::AtomicBool},
     time::Duration,
 };
 use tile_map_collision::collision::{Collision, Tunings};
@@ -318,6 +319,7 @@ struct ClientBase {
     tunes: Tunings,
 
     server_info: ServerInfoTy,
+    is_race: bool,
 
     votes: ServerMapVotes,
     vote_state: Option<(VoteState, Duration)>,
@@ -344,15 +346,31 @@ struct ClientBase {
 
 impl ClientBase {
     fn is_race(&self) -> bool {
-        match &self.server_info {
+        self.is_race
+    }
+
+    fn set_server_info(&mut self, server_info: ServerInfoTy) {
+        self.server_info = server_info;
+        self.refresh_is_race();
+    }
+
+    fn refresh_is_race(&mut self) {
+        self.is_race = Self::evaluate_is_race(&self.capabilities, &self.server_info);
+    }
+
+    fn evaluate_is_race(capabilities: &Capabilities, server_info: &ServerInfoTy) -> bool {
+        match server_info {
             ServerInfoTy::Partial { .. } => false,
             ServerInfoTy::Full(info) => {
                 let game_type = info.game_type.to_lowercase();
-                self.capabilities.is_ddnet
-                    && (game_type == "race"
+                static RACE_WORD_REGEX: OnceLock<Regex> = OnceLock::new();
+                let race_word_regex =
+                    RACE_WORD_REGEX.get_or_init(|| Regex::new(r"\b(race|gores)\b").unwrap());
+
+                capabilities.is_ddnet
+                    && (race_word_regex.is_match(&game_type)
                         || game_type.contains("ddrace")
-                        || game_type.contains("block")
-                        || game_type == "gores")
+                        || game_type.contains("block"))
             }
         }
     }
@@ -732,6 +750,8 @@ impl Client {
                     }
                 };
 
+                let is_race = ClientBase::evaluate_is_race(&Capabilities::default(), &server_info);
+
                 let mut app = Client {
                     last_snapshot: Snapshot::new(
                         &vanilla_snap_pool,
@@ -792,6 +812,7 @@ impl Client {
                         is_first_map_pkt: true,
 
                         server_info,
+                        is_race,
 
                         join_password: Default::default(),
 
@@ -2792,6 +2813,7 @@ impl Client {
                 // const SERVERCAPFLAG_SYNCWEAPONINPUT: i32 = 1 << 5;
                 if (caps.flags & SERVERCAPFLAG_DDNET) != 0 {
                     base.capabilities.is_ddnet = true;
+                    base.refresh_is_race();
                 }
                 if (caps.flags & SERVERCAPFLAG_ALLOWDUMMY) != 0 {
                     base.capabilities.allows_dummy = true;
@@ -2823,9 +2845,9 @@ impl Client {
                 {
                     log.log("Proxy client received map details.");
                     if !base.is_first_map_pkt {
-                        base.server_info = ServerInfoTy::Partial {
+                        base.set_server_info(ServerInfoTy::Partial {
                             requires_password: base.server_info.requires_password(),
-                        };
+                        });
                     }
                     base.is_first_map_pkt = false;
                     player.ready = Default::default();
@@ -2897,9 +2919,9 @@ impl Client {
                         log.log("Proxy client received map change packet (without map details).");
                         log.log("This is the legacy CRC map download, and thus cannot be skipped.");
                         if !base.is_first_map_pkt {
-                            base.server_info = ServerInfoTy::Partial {
+                            base.set_server_info(ServerInfoTy::Partial {
                                 requires_password: base.server_info.requires_password(),
-                            };
+                            });
                         }
                         base.is_first_map_pkt = false;
                         player.ready = Default::default();
@@ -4987,7 +5009,7 @@ impl Client {
                     &mut player.data.state
                     && let Some(server_info) = player.data.ready.received_server_info.take()
                 {
-                    self.base.server_info = ServerInfoTy::Full(server_info);
+                    self.base.set_server_info(ServerInfoTy::Full(server_info));
                     player.data.state = ClientState::ReceivedLegacyServerInfo {
                         name: std::mem::take(name),
                         hash: *hash,

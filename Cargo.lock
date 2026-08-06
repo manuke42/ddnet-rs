@@ -6073,6 +6073,7 @@ dependencies = [
  "pool",
  "rand 0.10.1",
  "rayon",
+ "regex",
  "serde_json",
  "sha2 0.11.0",
  "tile-map-collision",
