@@ -736,9 +736,7 @@ impl WinitWrapper {
                         winit::event::WindowEvent::CursorEntered { device_id: _ } => {}
                         winit::event::WindowEvent::CursorLeft { device_id: _ } => {}
                         winit::event::WindowEvent::MouseWheel {
-                            device_id,
-                            delta,
-                            ..
+                            device_id, delta, ..
                         } => native_user.as_mut().scroll(
                             &window.window,
                             &device_id,
