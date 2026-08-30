@@ -27,6 +27,7 @@ game-config-fs = { path = "../game-config-fs" }
 game-interface = { path = "../game-interface" }
 game-network = { path = "../game-network" }
 http-accounts = { path = "../http-accounts" }
+math = { path = "../../lib/math" }
 map = { path = "../map" }
 master-server-types = { path = "../master-server-types" }
 vanilla = { path = "../vanilla" }
@@ -57,3 +58,4 @@ tracing = { version = "0.1", default-features = false, features = [
   "attributes",
 ] }
 x509-cert = { version = "0.2" }
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "net", "io-util", "macros"] }

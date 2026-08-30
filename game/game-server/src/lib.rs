@@ -2,6 +2,7 @@
 
 pub mod auto_map_votes;
 pub mod client;
+pub mod control;
 pub mod local_server;
 pub mod map_votes;
 pub mod network_plugins;

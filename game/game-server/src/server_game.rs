@@ -26,7 +26,7 @@ use game_state_wasm::game::state_wasm_manager::{
 };
 use map::{
     file::MapFileReader,
-    map::{Map, resources::MapResourceMetaData},
+    map::{Map, groups::layers::physics::MapLayerPhysics, resources::MapResourceMetaData},
 };
 use network::network::connection::NetworkConnectionId;
 use pool::{datatypes::PoolFxLinkedHashMap, pool::Pool};
@@ -49,7 +49,10 @@ use game_interface::{
     votes::{VoteState, Voted},
 };
 
-use crate::spatial_chat::SpatialWorld;
+use crate::{
+    control::{AiMap, AiMapTile},
+    spatial_chat::SpatialWorld,
+};
 
 #[derive(Debug)]
 pub struct ServerPlayer {
@@ -74,9 +77,72 @@ pub struct ServerMap {
     pub name: NetworkReducedAsciiString<MAX_MAP_NAME_LEN>,
     pub map_file: Vec<u8>,
     pub resource_files: HashMap<String, Vec<u8>>,
+    pub ai_map: AiMap,
 }
 
 pub type LegacyToNewResult = (Vec<u8>, HashMap<String, Vec<u8>>);
+
+fn ai_map_from_file(map_file: &[u8]) -> anyhow::Result<AiMap> {
+    let reader = MapFileReader::new(map_file.to_vec())?;
+    let (physics, _) = Map::read_physics_group_and_config(&reader)?;
+    let width = physics.attr.width.get();
+    let height = physics.attr.height.get();
+    let mut tiles = Vec::new();
+    let mut add_tile = |index: usize, layer: u8, tile: u8, value: u16, aux: u16| {
+        if tile != 0 {
+            tiles.push(AiMapTile {
+                x: (index % width as usize) as u16,
+                y: (index / width as usize) as u16,
+                layer,
+                tile,
+                value,
+                aux,
+            });
+        }
+    };
+    for layer in &physics.layers {
+        match layer {
+            MapLayerPhysics::Arbitrary(_) => {}
+            MapLayerPhysics::Game(layer) => {
+                for (index, tile) in layer.tiles.iter().enumerate() {
+                    add_tile(index, 1, tile.index, 0, 0);
+                }
+            }
+            MapLayerPhysics::Front(layer) => {
+                for (index, tile) in layer.tiles.iter().enumerate() {
+                    add_tile(index, 2, tile.index, 0, 0);
+                }
+            }
+            MapLayerPhysics::Tele(layer) => {
+                for (index, tile) in layer.base.tiles.iter().enumerate() {
+                    add_tile(index, 3, tile.base.index, tile.number as u16, 0);
+                }
+            }
+            MapLayerPhysics::Speedup(layer) => {
+                for (index, tile) in layer.tiles.iter().enumerate() {
+                    let value = ((tile.force as u16) << 8) | tile.max_speed as u16;
+                    add_tile(index, 4, tile.base.index, value, tile.angle as u16);
+                }
+            }
+            MapLayerPhysics::Switch(layer) => {
+                for (index, tile) in layer.base.tiles.iter().enumerate() {
+                    let value = ((tile.number as u16) << 8) | tile.delay as u16;
+                    add_tile(index, 5, tile.base.index, value, 0);
+                }
+            }
+            MapLayerPhysics::Tune(layer) => {
+                for (index, tile) in layer.base.tiles.iter().enumerate() {
+                    add_tile(index, 6, tile.base.index, tile.number as u16, 0);
+                }
+            }
+        }
+    }
+    Ok(AiMap {
+        width,
+        height,
+        tiles,
+    })
+}
 
 impl ServerMap {
     pub fn new(
@@ -162,11 +228,13 @@ impl ServerMap {
                 Self::legacy_to_new(None, runtime_thread_pool, io, map_name, None, map_res_err)
             }
         }?;
+        let ai_map = ai_map_from_file(&map_file)?;
 
         Ok(Self {
             name: map_name.clone(),
             map_file,
             resource_files,
+            ai_map,
         })
     }
 

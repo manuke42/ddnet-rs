@@ -37,6 +37,12 @@ impl From<GameEntityId> for ProjectileId {
     }
 }
 
+impl Display for ProjectileId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 #[derive(
     Debug, Hiarc, Serialize, Deserialize, PartialEq, Eq, Copy, Clone, Hash, PartialOrd, Ord,
 )]
@@ -45,6 +51,12 @@ pub struct LaserId(GameEntityId);
 impl From<GameEntityId> for LaserId {
     fn from(value: GameEntityId) -> Self {
         Self(value)
+    }
+}
+
+impl Display for LaserId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
 
@@ -59,6 +71,12 @@ impl From<GameEntityId> for PickupId {
     }
 }
 
+impl Display for PickupId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 #[derive(
     Debug, Hiarc, Serialize, Deserialize, PartialEq, Eq, Copy, Clone, Hash, PartialOrd, Ord,
 )]
@@ -67,6 +85,12 @@ pub struct CtfFlagId(GameEntityId);
 impl From<GameEntityId> for CtfFlagId {
     fn from(value: GameEntityId) -> Self {
         Self(value)
+    }
+}
+
+impl Display for CtfFlagId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
 

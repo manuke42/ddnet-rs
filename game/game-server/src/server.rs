@@ -1,6 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
-    fmt::Debug,
+    fmt::{Debug, Display},
     net::{IpAddr, SocketAddr},
     num::NonZeroUsize,
     path::PathBuf,
@@ -72,6 +72,10 @@ use crate::{
     client::{
         ClientSnapshotForDiff, ClientSnapshotStorage, Clients, ServerClient, ServerClientPlayer,
         ServerNetworkClient, ServerNetworkQueuedClient, ServerPasswordClient,
+    },
+    control::{
+        AiDynamicObject, AiTickState, ControlBridge, ControlTickMode, PlayerControlMessage,
+        spawn_ai_socket_server,
     },
     map_votes::{MapVotes, ServerMapVotes},
     network_plugins::{accounts_only::AccountsOnly, cert_ban::CertBans},
@@ -199,6 +203,8 @@ pub struct Server {
     thread_pool: Arc<rayon::ThreadPool>,
     io: Io,
     http_v6: Option<Arc<HttpClient>>,
+    control_bridge: Arc<ControlBridge>,
+    _control_socket_task: IoRuntimeTask<()>,
 
     time: SteadyClock,
 
@@ -862,6 +868,8 @@ impl Server {
         let config_mod = config_mod_task.get().ok();
 
         let rcon = Rcon::new(&io);
+        let (control_bridge, control_handle) = ControlBridge::create();
+        let control_socket_task = spawn_ai_socket_server(&io.rt, control_handle);
 
         // write local server info if required.
         {
@@ -993,6 +1001,8 @@ impl Server {
             thread_pool,
             io,
             http_v6: HttpClient::new_with_bind_addr("::0".parse().unwrap()).map(Arc::new),
+            control_bridge,
+            _control_socket_task: control_socket_task,
 
             config_game,
             server_port_v4: sock_addrs[0].port(),
@@ -3058,8 +3068,11 @@ impl Server {
         self.last_tick_time = cur_time;
         self.last_register_time = None;
 
+        self.control_bridge.set_ai_map(&self.game_server.map.ai_map);
+        self.publish_ai_state();
+
         let game_event_generator = self.game_event_generator_server.clone();
-        while self.is_open.load(std::sync::atomic::Ordering::Relaxed) {
+        'outer: while self.is_open.load(std::sync::atomic::Ordering::Relaxed) {
             cur_time = self.time.now();
             if self
                 .last_register_time
@@ -3271,7 +3284,29 @@ impl Server {
                 }
             }
 
-            while is_next_tick(cur_time, &mut self.last_tick_time, ticks_in_a_second) {
+            let tick_mode = self.control_bridge.tick_mode();
+            let tick_ready = match tick_mode {
+                ControlTickMode::Manual => self.control_bridge.wait_for_tick(),
+                ControlTickMode::Realtime => {
+                    is_next_tick(cur_time, &mut self.last_tick_time, ticks_in_a_second)
+                }
+                ControlTickMode::Unbounded => true,
+            };
+            if matches!(tick_mode, ControlTickMode::Manual) && !tick_ready {
+                break 'outer;
+            }
+            if tick_ready {
+                self.last_tick_time = cur_time;
+                if self.control_bridge.take_reset_request() {
+                    let map = self.config_game.sv.map.as_str().try_into().unwrap();
+                    self.load_map(&map);
+                    self.publish_ai_state();
+                    continue;
+                }
+                let pending_inputs = self.control_bridge.take_inputs();
+                if !pending_inputs.is_empty() {
+                    self.apply_control_inputs(pending_inputs);
+                }
                 // apply all queued inputs
                 if let Some(mut inputs) = self
                     .game_server
@@ -3480,6 +3515,7 @@ impl Server {
                 }
 
                 self.game_server.game.clear_events();
+                self.publish_ai_state();
             }
 
             self.game_server.cached_character_infos =
@@ -3557,6 +3593,14 @@ impl Server {
             }
             std::mem::swap(&mut self.db_requests_helper, &mut self.db_requests);
 
+            if matches!(tick_mode, ControlTickMode::Manual) {
+                continue;
+            }
+            if matches!(tick_mode, ControlTickMode::Unbounded) {
+                std::thread::yield_now();
+                continue;
+            }
+
             // time and sleeps
             cur_time = self.time.now();
 
@@ -3575,6 +3619,149 @@ impl Server {
                 std::thread::sleep(next_tick_time);
             }
         }
+
+        self.control_bridge.close();
+    }
+
+    fn apply_control_inputs(&mut self, inputs: Vec<PlayerControlMessage>) {
+        for input in inputs {
+            if self.game_server.players.contains_key(&input.player_id) {
+                self.game_server.player_inp(
+                    &input.player_id,
+                    input.input,
+                    input
+                        .for_monotonic_tick
+                        .unwrap_or(self.game_server.cur_monotonic_tick + 1),
+                );
+            }
+        }
+    }
+
+    fn publish_ai_state(&self) {
+        self.control_bridge
+            .set_ai_tick(self.game_server.cur_monotonic_tick);
+        if !self.control_bridge.has_ai_receivers() {
+            return;
+        }
+        let mut objects = Vec::new();
+        for (_, stage) in self.game_server.game.all_stages(1.0).iter() {
+            for (id, character) in stage.world.characters.iter() {
+                let Some(object_id) = Self::entity_id_to_u64(id) else {
+                    continue;
+                };
+                let hook = character
+                    .lerped_hook
+                    .as_ref()
+                    .map(|hook| [hook.pos.x, hook.pos.y])
+                    .unwrap_or_default();
+                objects.push(AiDynamicObject {
+                    object_id,
+                    kind: 1,
+                    subtype: character.cur_weapon as u8,
+                    properties: u16::from(character.has_air_jump)
+                        | (u16::from(character.phased) << 1),
+                    state: (character.move_dir + 1) as u32,
+                    position: [character.lerped_pos.x, character.lerped_pos.y],
+                    velocity: [character.lerped_vel.x, character.lerped_vel.y],
+                    size: [1.0, 1.0],
+                    scalars: [
+                        hook[0],
+                        hook[1],
+                        character.lerped_cursor_pos.x as f32,
+                        character.lerped_cursor_pos.y as f32,
+                    ],
+                });
+            }
+            for (id, projectile) in stage.world.projectiles.iter() {
+                let Some(object_id) = Self::entity_id_to_u64(id) else {
+                    continue;
+                };
+                objects.push(AiDynamicObject {
+                    object_id,
+                    kind: 2,
+                    subtype: projectile.ty as u8,
+                    properties: u16::from(projectile.phased),
+                    state: 0,
+                    position: [projectile.pos.x, projectile.pos.y],
+                    velocity: [projectile.vel.x, projectile.vel.y],
+                    size: [0.0, 0.0],
+                    scalars: [0.0; 4],
+                });
+            }
+            for (id, laser) in stage.world.lasers.iter() {
+                let Some(object_id) = Self::entity_id_to_u64(id) else {
+                    continue;
+                };
+                let evaluation = laser
+                    .eval_tick_ratio
+                    .map(|(passed, total)| [passed as f32, total.get() as f32])
+                    .unwrap_or_default();
+                objects.push(AiDynamicObject {
+                    object_id,
+                    kind: 3,
+                    subtype: laser.ty as u8,
+                    properties: u16::from(laser.phased),
+                    state: 0,
+                    position: [laser.pos.x, laser.pos.y],
+                    velocity: [0.0, 0.0],
+                    size: [0.0, 0.0],
+                    scalars: [laser.from.x, laser.from.y, evaluation[0], evaluation[1]],
+                });
+            }
+            for (id, pickup) in stage.world.pickups.iter() {
+                let Some(object_id) = Self::entity_id_to_u64(id) else {
+                    continue;
+                };
+                let subtype = match pickup.ty {
+                    game_interface::types::pickup::PickupType::PowerupHealth => 1,
+                    game_interface::types::pickup::PickupType::PowerupArmor => 2,
+                    game_interface::types::pickup::PickupType::PowerupNinja => 3,
+                    game_interface::types::pickup::PickupType::PowerupWeapon(weapon) => {
+                        16 + weapon as u8
+                    }
+                    game_interface::types::pickup::PickupType::PowerupWeaponShield(weapon) => {
+                        32 + weapon as u8
+                    }
+                    game_interface::types::pickup::PickupType::PowerupNinjaShield => 4,
+                };
+                objects.push(AiDynamicObject {
+                    object_id,
+                    kind: 4,
+                    subtype,
+                    properties: u16::from(pickup.phased),
+                    state: 0,
+                    position: [pickup.pos.x, pickup.pos.y],
+                    velocity: [0.0, 0.0],
+                    size: [0.0, 0.0],
+                    scalars: [0.0; 4],
+                });
+            }
+            for (id, flag) in stage.world.ctf_flags.iter() {
+                let Some(object_id) = Self::entity_id_to_u64(id) else {
+                    continue;
+                };
+                objects.push(AiDynamicObject {
+                    object_id,
+                    kind: 5,
+                    subtype: flag.ty as u8,
+                    properties: u16::from(flag.phased),
+                    state: 0,
+                    position: [flag.pos.x, flag.pos.y],
+                    velocity: [0.0, 0.0],
+                    size: [0.0, 0.0],
+                    scalars: [0.0; 4],
+                });
+            }
+        }
+        self.control_bridge.publish_ai_state(&AiTickState {
+            tick: self.game_server.cur_monotonic_tick,
+            ticks_per_second: self.game_server.game.game_tick_speed().get() as u32,
+            objects,
+        });
+    }
+
+    fn entity_id_to_u64<T: Display>(id: &T) -> Option<u64> {
+        id.to_string().parse().ok()
     }
 
     /// Reload the game server with a new map,
@@ -3627,6 +3814,7 @@ impl Server {
                 .game
                 .build_from_snapshot_by_hotreload(&snapshot);
         }
+        self.control_bridge.set_ai_map(&self.game_server.map.ai_map);
         // put all players back to a loading state
         self.clients.clients.drain().for_each(|(net_id, client)| {
             self.clients.network_clients.insert(
