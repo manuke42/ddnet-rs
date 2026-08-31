@@ -20,7 +20,7 @@ u8 message_type
 payload
 ```
 
-Message types are `HELLO=1`, `STEP=2`, `INPUT=3`, `RUN_MODE=4`, `RESET=5`, `ACK=128`, `MAP=129`, `STATE=130`, and `ERROR=255`.
+Message types are `HELLO=1`, `STEP=2`, `INPUT=3`, `RUN_MODE=4`, `RESET=5`, `RESPAWN=6`, `SPAWN=7`, `DESPAWN=8`, `ACK=128`, `MAP=129`, `STATE=130`, and `ERROR=255`.
 
 All successful control commands receive an `ACK` payload:
 
@@ -28,6 +28,11 @@ All successful control commands receive an `ACK` payload:
 u8 acknowledged_message_type
 u64 acknowledged_tick
 ```
+
+If a new `HELLO` arrives while the server is parked in manual mode, the bridge
+releases one tick and acknowledges that target. This guarantees a newly attached
+actor can obtain a state at least as recent as its handshake after a prior actor
+crashed or disconnected.
 
 For `STEP`, `acknowledged_tick` is the minimum server tick that an actor must wait for before treating an incoming state as the action result. This prevents stale queued states from being used as an RL transition.
 
@@ -63,3 +68,15 @@ After each game tick, while an AI socket is connected, the server sends `STATE` 
 Do not raise the simulation tick rate for training because it changes gameplay physics. Use manual batched `STEP` calls or unbounded mode to increase throughput.
 
 `RESET` uses the server's normal map-reload lifecycle. It is appropriate for map-level curriculum changes, but a graphical client must reload and rejoin afterwards. Fast spawn-level resets require an explicit game-mode scenario hook and are intentionally not fabricated in this generic bridge.
+
+`RESPAWN` has an eight-byte little-endian player ID payload. It uses the normal in-game kill and respawn lifecycle for that connected player, advances the six required manual ticks, and returns an acknowledgement for the spawned tick. It does not reload the map or disconnect the graphical client. It is intended for local, single-player AI episodes.
+
+`SPAWN` has no payload. It creates an in-process server-owned player with no
+network peer, switches to manual mode, advances one tick, and acknowledges that
+target tick. The actor discovers the new player ID by comparing character IDs in
+the state before and after the acknowledged tick. This is the preferred training
+path because it requires no graphical client and retains authoritative stepping.
+
+`DESPAWN` contains the native player's eight-byte little-endian ID. It removes
+that player through the normal disconnect lifecycle and advances one manual tick.
+Actors must only despawn players they created themselves.

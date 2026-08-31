@@ -115,6 +115,7 @@ use game_interface::{
     rcon_entries::{AuthLevel, ExecRconInput, RconEntries, RconEntry},
     tick_result::TickEvent,
     types::{
+        character_info::NetworkCharacterInfo,
         game::{GameEntityId, GameTickType},
         id_types::PlayerId,
         input::{CharacterInput, CharacterInputInfo},
@@ -3303,6 +3304,24 @@ impl Server {
                     self.publish_ai_state();
                     continue;
                 }
+                for _ in 0..self.control_bridge.take_spawn_requests() {
+                    let player_id = self.spawn_native_ai_player();
+                    log::info!("spawned native AI training player {player_id}");
+                }
+                for player_id in self.control_bridge.take_despawn_requests() {
+                    if self.game_server.players.contains_key(&player_id) {
+                        self.game_server
+                            .player_drop(&player_id, PlayerDropReason::Disconnect);
+                        log::info!("despawned AI training player {player_id}");
+                    }
+                }
+                for player_id in self.control_bridge.take_respawn_requests() {
+                    if self.game_server.players.contains_key(&player_id) {
+                        self.game_server
+                            .game
+                            .client_command(&player_id, ClientCommand::Kill);
+                    }
+                }
                 let pending_inputs = self.control_bridge.take_inputs();
                 if !pending_inputs.is_empty() {
                     self.apply_control_inputs(pending_inputs);
@@ -3637,12 +3656,36 @@ impl Server {
         }
     }
 
-    fn publish_ai_state(&self) {
+    fn spawn_native_ai_player(&mut self) -> PlayerId {
+        let mut character = NetworkCharacterInfo::explicit_default();
+        character.name = NetworkString::new_lossy("ddnet-ai");
+        self.game_server.player_join(
+            &NetworkConnectionId::internal(u64::MAX),
+            &PlayerClientInfo {
+                info: character,
+                id: 0,
+                unique_identifier: PlayerUniqueId::CertFingerprint(generate_hash_for(
+                    b"ddnet-ai-native-training-player",
+                )),
+                initial_network_stats: PlayerNetworkStats::default(),
+            },
+        )
+    }
+
+    fn publish_ai_state(&mut self) {
         self.control_bridge
             .set_ai_tick(self.game_server.cur_monotonic_tick);
         if !self.control_bridge.has_ai_receivers() {
             return;
         }
+        let cur_snap = self
+            .game_server
+            .game
+            .snapshot_for(SnapshotClientInfo::Everything);
+        self.game_server
+            .game
+            .build_from_snapshot_for_prev(&cur_snap);
+
         let mut objects = Vec::new();
         for (_, stage) in self.game_server.game.all_stages(1.0).iter() {
             for (id, character) in stage.world.characters.iter() {

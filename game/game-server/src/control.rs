@@ -39,6 +39,9 @@ const STEP: u8 = 2;
 const INPUT: u8 = 3;
 const RUN_MODE: u8 = 4;
 const RESET: u8 = 5;
+const RESPAWN: u8 = 6;
+const SPAWN: u8 = 7;
+const DESPAWN: u8 = 8;
 const ACK: u8 = 128;
 const MAP: u8 = 129;
 const STATE: u8 = 130;
@@ -120,13 +123,15 @@ impl TickGate {
 
     fn wait_for_tick(&self) -> bool {
         let mut guard = self.inner.lock().unwrap();
-        while guard.permits == 0 && !guard.closed {
+        while guard.permits == 0 && !guard.closed && matches!(guard.mode, ControlTickMode::Manual) {
             guard = self.cvar.wait(guard).unwrap();
         }
         if guard.closed {
             return false;
         }
-        guard.permits = guard.permits.saturating_sub(1);
+        if matches!(guard.mode, ControlTickMode::Manual) {
+            guard.permits = guard.permits.saturating_sub(1);
+        }
         true
     }
 
@@ -152,6 +157,9 @@ impl TickGate {
     fn set_mode(&self, mode: ControlTickMode) {
         let mut guard = self.inner.lock().unwrap();
         guard.mode = mode;
+        if !matches!(mode, ControlTickMode::Manual) {
+            guard.permits = 0;
+        }
         self.cvar.notify_all();
     }
 }
@@ -166,6 +174,9 @@ struct ControlInner {
     map_epoch: Mutex<u64>,
     current_tick: AtomicU64,
     reset_requested: Mutex<bool>,
+    respawn_requests: Mutex<Vec<PlayerId>>,
+    spawn_requests: Mutex<usize>,
+    despawn_requests: Mutex<Vec<PlayerId>>,
 }
 
 impl ControlInner {
@@ -181,6 +192,9 @@ impl ControlInner {
             map_epoch: Mutex::new(0),
             current_tick: AtomicU64::new(0),
             reset_requested: Mutex::new(false),
+            respawn_requests: Mutex::new(Vec::new()),
+            spawn_requests: Mutex::new(0),
+            despawn_requests: Mutex::new(Vec::new()),
         })
     }
 }
@@ -222,6 +236,18 @@ impl ControlBridge {
         std::mem::take(&mut *requested)
     }
 
+    pub fn take_respawn_requests(&self) -> Vec<PlayerId> {
+        std::mem::take(&mut *self.inner.respawn_requests.lock().unwrap())
+    }
+
+    pub fn take_spawn_requests(&self) -> usize {
+        std::mem::take(&mut *self.inner.spawn_requests.lock().unwrap())
+    }
+
+    pub fn take_despawn_requests(&self) -> Vec<PlayerId> {
+        std::mem::take(&mut *self.inner.despawn_requests.lock().unwrap())
+    }
+
     pub fn set_ai_map(&self, map: &AiMap) {
         let mut epoch = self.inner.map_epoch.lock().unwrap();
         *epoch = epoch.saturating_add(1);
@@ -259,6 +285,10 @@ impl ControlHandle {
         self.inner.current_tick.load(Ordering::Relaxed)
     }
 
+    fn tick_mode(&self) -> ControlTickMode {
+        self.inner.gate.mode()
+    }
+
     fn subscribe(&self) -> broadcast::Receiver<Vec<u8>> {
         self.inner.frames.subscribe()
     }
@@ -281,6 +311,33 @@ impl ControlHandle {
 
     fn request_reset(&self) {
         *self.inner.reset_requested.lock().unwrap() = true;
+    }
+
+    fn request_respawn(&self, raw_player_id: u64) -> Result<()> {
+        let raw_id = IdGeneratorIdType::from_str(&raw_player_id.to_string())
+            .map_err(|_| anyhow!("invalid player_id"))?;
+        self.inner
+            .respawn_requests
+            .lock()
+            .unwrap()
+            .push(PlayerId::from(raw_id));
+        Ok(())
+    }
+
+    fn request_spawn(&self) {
+        let mut requests = self.inner.spawn_requests.lock().unwrap();
+        *requests = requests.saturating_add(1);
+    }
+
+    fn request_despawn(&self, raw_player_id: u64) -> Result<()> {
+        let raw_id = IdGeneratorIdType::from_str(&raw_player_id.to_string())
+            .map_err(|_| anyhow!("invalid player_id"))?;
+        self.inner
+            .despawn_requests
+            .lock()
+            .unwrap()
+            .push(PlayerId::from(raw_id));
+        Ok(())
     }
 
     fn queue_input(&self, input: AiInput) -> Result<()> {
@@ -434,7 +491,13 @@ fn handle_command(handle: &ControlHandle, frame: &[u8]) -> Result<Vec<u8>> {
     let tick = match kind {
         HELLO => {
             expect_length(body, 8)?;
-            handle.current_tick()
+            if matches!(handle.tick_mode(), ControlTickMode::Manual) {
+                let tick = handle.current_tick().saturating_add(1);
+                handle.allow_ticks(1);
+                tick
+            } else {
+                handle.current_tick()
+            }
         }
         INPUT => {
             expect_length(body, 29)?;
@@ -465,6 +528,32 @@ fn handle_command(handle: &ControlHandle, frame: &[u8]) -> Result<Vec<u8>> {
             handle.set_tick_mode(ControlTickMode::Manual);
             handle.allow_ticks(1);
             handle.current_tick()
+        }
+        RESPAWN => {
+            expect_length(body, 8)?;
+            handle.request_respawn(u64::from_le_bytes(body.try_into().unwrap()))?;
+            handle.set_tick_mode(ControlTickMode::Manual);
+            // Vanilla respawn waits for five game ticks after a kill request.
+            const RESPAWN_TICKS: usize = 6;
+            let tick = handle.current_tick().saturating_add(RESPAWN_TICKS as u64);
+            handle.allow_ticks(RESPAWN_TICKS);
+            tick
+        }
+        SPAWN => {
+            expect_length(body, 0)?;
+            handle.request_spawn();
+            handle.set_tick_mode(ControlTickMode::Manual);
+            let tick = handle.current_tick().saturating_add(1);
+            handle.allow_ticks(1);
+            tick
+        }
+        DESPAWN => {
+            expect_length(body, 8)?;
+            handle.request_despawn(u64::from_le_bytes(body.try_into().unwrap()))?;
+            handle.set_tick_mode(ControlTickMode::Manual);
+            let tick = handle.current_tick().saturating_add(1);
+            handle.allow_ticks(1);
+            tick
         }
         _ => return Err(anyhow!("unsupported AI message type: {kind}")),
     };
@@ -574,4 +663,33 @@ fn encode_state(map_epoch: u64, state: &AiTickState) -> Vec<u8> {
         }
     }
     encode_message(STATE, &body)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{
+        sync::{Arc, mpsc},
+        thread,
+        time::Duration,
+    };
+
+    #[test]
+    fn leaving_manual_mode_wakes_a_waiting_tick_gate() {
+        let gate = Arc::new(TickGate::new());
+        gate.set_mode(ControlTickMode::Manual);
+        let waiter = gate.clone();
+        let (sender, receiver) = mpsc::channel();
+        let thread = thread::spawn(move || {
+            sender.send(waiter.wait_for_tick()).unwrap();
+        });
+
+        std::thread::sleep(Duration::from_millis(10));
+        gate.set_mode(ControlTickMode::Realtime);
+        let result = receiver.recv_timeout(Duration::from_secs(1)).ok();
+        gate.close();
+        thread.join().unwrap();
+
+        assert_eq!(result, Some(true));
+    }
 }

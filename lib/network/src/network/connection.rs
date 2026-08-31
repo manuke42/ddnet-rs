@@ -19,6 +19,14 @@ impl NetworkConnectionId {
         Self { id, ty }
     }
 
+    /// Creates an identifier for an in-process client that has no network peer.
+    ///
+    /// Transport implementations use their own type values, so `u32::MAX` is
+    /// reserved for server-owned actors such as deterministic training players.
+    pub fn internal(id: u64) -> Self {
+        Self { id, ty: u32::MAX }
+    }
+
     pub(crate) fn ty(&self) -> u32 {
         self.ty
     }
