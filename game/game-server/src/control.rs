@@ -29,6 +29,7 @@ use tokio::{
 };
 
 pub const AI_SOCKET_PATH: &str = "/tmp/ddnet-ai.sock";
+pub const AI_SOCKET_PATH_ENV: &str = "DDNET_AI_SOCKET_PATH";
 
 const MAGIC: &[u8; 4] = b"DAI1";
 const VERSION: u8 = 1;
@@ -403,8 +404,10 @@ struct AiInput {
 }
 
 pub fn spawn_ai_socket_server(io_rt: &IoRuntime, handle: ControlHandle) -> IoRuntimeTask<()> {
+    let socket_path =
+        std::env::var(AI_SOCKET_PATH_ENV).unwrap_or_else(|_| AI_SOCKET_PATH.to_owned());
     io_rt.spawn(async move {
-        let path = Path::new(AI_SOCKET_PATH);
+        let path = Path::new(&socket_path);
         if let Err(error) = std::fs::remove_file(path)
             && error.kind() != std::io::ErrorKind::NotFound
         {
