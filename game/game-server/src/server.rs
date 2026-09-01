@@ -124,6 +124,7 @@ use game_interface::{
             AccountId, PlayerBanReason, PlayerClientInfo, PlayerDropReason, PlayerKickReason,
             PlayerUniqueId,
         },
+        render::character::CharacterDebuff,
         snapshot::SnapshotClientInfo,
     },
     vote_commands::{VoteCommand, VoteCommandResultEvent},
@@ -3697,6 +3698,13 @@ impl Server {
                     .as_ref()
                     .map(|hook| [hook.pos.x, hook.pos.y])
                     .unwrap_or_default();
+                let freeze = character.debuffs.get(&CharacterDebuff::Freeze);
+                let deep_frozen = character.debuffs.contains_key(&CharacterDebuff::DeepFrozen);
+                let live_frozen = character.debuffs.contains_key(&CharacterDebuff::LiveFrozen);
+                let freeze_remaining_ms = freeze
+                    .and_then(|debuff| debuff.remaining_time)
+                    .map(|remaining| remaining.as_millis().min((u32::MAX >> 2) as u128) as u32)
+                    .unwrap_or_default();
                 objects.push(AiDynamicObject {
                     object_id,
                     kind: 1,
@@ -3709,8 +3717,14 @@ impl Server {
                                 .lerped_hook
                                 .as_ref()
                                 .is_some_and(|hook| hook.hooked_char.is_some()),
-                        ) << 3),
-                    state: (character.move_dir + 1) as u32,
+                        ) << 3)
+                        | (u16::from(freeze.is_some()) << 4)
+                        | (u16::from(deep_frozen) << 5)
+                        | (u16::from(live_frozen) << 6),
+                    // Low two bits store move direction + 1. Remaining bits store
+                    // normal-freeze duration in milliseconds (zero for indefinite
+                    // deep/live freeze and for characters that are not frozen).
+                    state: (character.move_dir + 1) as u32 | (freeze_remaining_ms << 2),
                     position: [character.lerped_pos.x, character.lerped_pos.y],
                     velocity: [character.lerped_vel.x, character.lerped_vel.y],
                     size: [1.0, 1.0],
