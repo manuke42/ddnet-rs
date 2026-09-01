@@ -51,7 +51,16 @@ f32 cursor_x
 f32 cursor_y
 ```
 
-The server turns rising button edges into DDNet consumable jump/fire/hook events while preserving button hold state. Input is applied through the existing authoritative `PlayerInput` path rather than emulating keyboard events in a graphical client.
+The cursor is a vector relative to the character, exactly like the real client
+target coordinates. Its direction controls hook launch and weapon fire; its
+magnitude does not affect those mechanics. `(0, 0)` is invalid and is sanitized
+by the game to a tiny right-facing vector.
+
+The server turns rising button edges into DDNet consumable jump/fire/hook events
+at the supplied cursor while preserving button hold state. A held button must be
+released before another rising-edge event can occur. Input is applied through
+the existing authoritative `PlayerInput` path rather than emulating keyboard
+events in a graphical client.
 
 ## State
 

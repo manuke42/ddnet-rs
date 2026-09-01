@@ -3702,7 +3702,14 @@ impl Server {
                     kind: 1,
                     subtype: character.cur_weapon as u8,
                     properties: u16::from(character.has_air_jump)
-                        | (u16::from(character.phased) << 1),
+                        | (u16::from(character.phased) << 1)
+                        | (u16::from(character.lerped_hook.is_some()) << 2)
+                        | (u16::from(
+                            character
+                                .lerped_hook
+                                .as_ref()
+                                .is_some_and(|hook| hook.hooked_char.is_some()),
+                        ) << 3),
                     state: (character.move_dir + 1) as u32,
                     position: [character.lerped_pos.x, character.lerped_pos.y],
                     velocity: [character.lerped_vel.x, character.lerped_vel.y],

@@ -347,6 +347,7 @@ impl ControlHandle {
         let mut inputs = self.inner.player_inputs.lock().unwrap();
         let stored = inputs.entry(player_id).or_default();
         let mut next = *stored;
+        let cursor = CharacterInputCursor::from_vec2(&dvec2::new(input.cursor[0], input.cursor[1]));
 
         next.inp.state.dir.set(input.direction);
         let was_jump = *next.inp.state.jump;
@@ -357,25 +358,14 @@ impl ControlHandle {
         let was_fire = *next.inp.state.fire;
         next.inp.state.fire.set(input.fire);
         if input.fire && !was_fire {
-            next.inp
-                .consumable
-                .fire
-                .add(1, CharacterInputCursor::default());
+            next.inp.consumable.fire.add(1, cursor);
         }
         let was_hook = *next.inp.state.hook;
         next.inp.state.hook.set(input.hook);
         if input.hook && !was_hook {
-            next.inp
-                .consumable
-                .hook
-                .add(1, CharacterInputCursor::default());
+            next.inp.consumable.hook.add(1, cursor);
         }
-        next.inp
-            .cursor
-            .set(CharacterInputCursor::from_vec2(&dvec2::new(
-                input.cursor[0],
-                input.cursor[1],
-            )));
+        next.inp.cursor.set(cursor);
         if let Some(weapon) = input.weapon {
             next.inp.consumable.set_weapon_req(Some(weapon));
         }
@@ -691,5 +681,29 @@ mod tests {
         thread.join().unwrap();
 
         assert_eq!(result, Some(true));
+    }
+
+    #[test]
+    fn hook_click_uses_the_requested_cursor() {
+        let (bridge, handle) = ControlBridge::create();
+        handle
+            .queue_input(AiInput {
+                player_id: 1,
+                for_tick: None,
+                direction: 0,
+                jump: false,
+                fire: false,
+                hook: true,
+                weapon: None,
+                cursor: [0.0, 10.0],
+            })
+            .unwrap();
+
+        let input = bridge.take_inputs().pop().unwrap().input;
+        let (_, cursor) = input.inp.consumable.diff(&Default::default()).hook.unwrap();
+        let cursor = cursor.to_vec2();
+
+        assert!(cursor.x.abs() < 0.001);
+        assert!((cursor.y - 10.0).abs() < 0.001);
     }
 }
