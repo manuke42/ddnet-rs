@@ -2709,6 +2709,56 @@ pub mod state {
                     );
                     self.handle_chat_commands(player_id, cmds);
                 }
+                ClientCommand::AiReset { position } => {
+                    // Bypass the public team setting only for the local scenario command.
+                    if let Some(player) = self.game.players.player(player_id) {
+                        let old_stage = player.stage_id();
+                        let stage_id = self.add_stage(Default::default(), ubvec4::new(0, 0, 0, 0));
+                        let stage = self.game.stages.get_mut(&old_stage).unwrap();
+                        let mut character = stage.world.characters.remove(player_id).unwrap();
+                        let info = character.player_info.clone();
+                        let stats = character.is_player_character().unwrap();
+                        let eye = character.core.default_eye;
+                        let eye_reset = character.core.default_eye_reset_in;
+                        character.despawn_completely_silent();
+                        drop(character);
+                        self.check_stage_remove(old_stage);
+                        Self::add_char_to_stage(
+                            &mut self.game.stages,
+                            &stage_id,
+                            player_id,
+                            info,
+                            Default::default(),
+                            self.game.players.clone(),
+                            self.game.spectator_players.clone(),
+                            stats,
+                            None,
+                            0,
+                            eye,
+                            eye_reset,
+                            &self.game_pools,
+                        );
+                        if let Some(pos) = position.filter(|p| {
+                            p[0] >= 0.0
+                                && p[1] >= 0.0
+                                && p[0] < self.collision.get_playfield_width() as f32
+                                && p[1] < self.collision.get_playfield_height() as f32
+                        }) {
+                            let character = self
+                                .game
+                                .stages
+                                .get_mut(&stage_id)
+                                .unwrap()
+                                .world
+                                .characters
+                                .get_mut(player_id)
+                                .unwrap();
+                            character
+                                .pos
+                                .move_pos(vec2::new(pos[0] * 32.0, pos[1] * 32.0));
+                        }
+                    }
+                }
                 ClientCommand::JoinStage(join_stage) => {
                     if self.game_options.allow_stages()
                         || (!Self::is_sided_from_conf(self.game_options.game_ty())

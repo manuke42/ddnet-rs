@@ -89,3 +89,50 @@ path because it requires no graphical client and retains authoritative stepping.
 `DESPAWN` contains the native player's eight-byte little-endian ID. It removes
 that player through the normal disconnect lifecycle and advances one manual tick.
 Actors must only despawn players they created themselves.
+
+## Isolated shared-server training (bridge capability version 2)
+
+The DAI1 outer framing/version remains unchanged. `INFO=10` with an empty body
+returns an `INFO` frame containing UTF-8 JSON (no ACK): `bridge_version`,
+`map_name`, `map_hash`, `isolated_stages`, and `maintenance_resets`. The map hash
+covers the loaded map file, not just its name. New trainers query these
+capabilities and reject an outdated bridge.
+
+The previously reserved u32 in every dynamic object record now contains a
+nonzero stage label. Labels are local to that state frame, not persistent IDs.
+Filter all dynamic entities to the controlled character's label before making
+an observation. This isolates pickups/projectiles as well as other characters.
+
+`SPAWN` now places native players in independent stages regardless of the public
+team setting. It still uses normal native player creation and character inputs.
+Stages separate physics, hooks, entities and character switch state while
+sharing static map data and the simulation process.
+
+`RESET_ACTOR=9` has a 17-byte payload:
+
+```text
+u64 native_player_id
+u8 has_position       # 0 = ordinary spawn; 1 = supplied section start
+f32 x_tiles
+f32 y_tiles
+```
+
+It creates a fresh stage/character for that player, clears bridge/server input
+versions and queued inputs, and restores ordinary spawn state. Optional section
+starts are tile coordinates; clients must validate them against map dimensions.
+Nonfinite/negative coordinates are rejected; out-of-map coordinates fall back to
+ordinary spawn on the game side. Held-out evaluation must send `has_position=0`.
+
+SPAWN, RESET_ACTOR and DESPAWN each consume one **maintenance permit**, publish a
+fresh acknowledged transport tick, and skip physics for every world. Therefore
+resetting one actor cannot move another actor or advance its world timers.
+Transport ticks include maintenance operations; active episode timing must count
+STEP permits, not subtract global tick IDs across other actors' resets.
+The older RESPAWN command retains its kill/six-physics-ticks semantics and should
+not be used for shared-server training resets.
+
+Use one coordinator per training server. Submit all actors' INPUT commands,
+then one STEP for the batch, then read through the acknowledged tick before
+choosing the next actions. Do not attach several independent STEP clients to a
+shared server: they would each advance the same clock. The Python framework's
+SharedServer coordinates actor threads through a barrier and one socket owner.

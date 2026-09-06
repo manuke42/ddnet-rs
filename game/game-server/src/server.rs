@@ -3070,7 +3070,11 @@ impl Server {
         self.last_tick_time = cur_time;
         self.last_register_time = None;
 
-        self.control_bridge.set_ai_map(&self.game_server.map.ai_map);
+        self.control_bridge.set_ai_map(
+            &self.game_server.map.ai_map,
+            self.game_server.map.name.as_str(),
+            &fmt_hash(&generate_hash_for(&self.game_server.map.map_file)),
+        );
         self.publish_ai_state();
 
         let game_event_generator = self.game_event_generator_server.clone();
@@ -3305,11 +3309,27 @@ impl Server {
                     self.publish_ai_state();
                     continue;
                 }
-                for _ in 0..self.control_bridge.take_spawn_requests() {
+                let spawn_count = self.control_bridge.take_spawn_requests();
+                let actor_resets = self.control_bridge.take_actor_resets();
+                let despawns = self.control_bridge.take_despawn_requests();
+                let maintenance =
+                    spawn_count > 0 || !actor_resets.is_empty() || !despawns.is_empty();
+                for (player_id, position) in actor_resets {
+                    if let Some(player) = self.game_server.players.get_mut(&player_id) {
+                        player.inp = Default::default();
+                    }
+                    for inputs in self.game_server.queued_inputs.values_mut() {
+                        inputs.remove(&player_id);
+                    }
+                    self.game_server
+                        .game
+                        .client_command(&player_id, ClientCommand::AiReset { position });
+                }
+                for _ in 0..spawn_count {
                     let player_id = self.spawn_native_ai_player();
                     log::info!("spawned native AI training player {player_id}");
                 }
-                for player_id in self.control_bridge.take_despawn_requests() {
+                for player_id in despawns {
                     if self.game_server.players.contains_key(&player_id) {
                         self.game_server
                             .player_drop(&player_id, PlayerDropReason::Disconnect);
@@ -3322,6 +3342,12 @@ impl Server {
                             .game
                             .client_command(&player_id, ClientCommand::Kill);
                     }
+                }
+                if maintenance {
+                    // Publish a fresh transport tick without advancing any world's physics.
+                    self.game_server.cur_monotonic_tick += 1;
+                    self.publish_ai_state();
+                    continue;
                 }
                 let pending_inputs = self.control_bridge.take_inputs();
                 if !pending_inputs.is_empty() {
@@ -3660,7 +3686,7 @@ impl Server {
     fn spawn_native_ai_player(&mut self) -> PlayerId {
         let mut character = NetworkCharacterInfo::explicit_default();
         character.name = NetworkString::new_lossy("ddnet-ai");
-        self.game_server.player_join(
+        let player_id = self.game_server.player_join(
             &NetworkConnectionId::internal(u64::MAX),
             &PlayerClientInfo {
                 info: character,
@@ -3670,7 +3696,11 @@ impl Server {
                 )),
                 initial_network_stats: PlayerNetworkStats::default(),
             },
-        )
+        );
+        self.game_server
+            .game
+            .client_command(&player_id, ClientCommand::AiReset { position: None });
+        player_id
     }
 
     fn publish_ai_state(&mut self) {
@@ -3688,7 +3718,8 @@ impl Server {
             .build_from_snapshot_for_prev(&cur_snap);
 
         let mut objects = Vec::new();
-        for (_, stage) in self.game_server.game.all_stages(1.0).iter() {
+        for (stage_index, (_, stage)) in self.game_server.game.all_stages(1.0).iter().enumerate() {
+            let stage_id = u32::try_from(stage_index + 1).expect("AI stage index overflow");
             for (id, character) in stage.world.characters.iter() {
                 let Some(object_id) = Self::entity_id_to_u64(id) else {
                     continue;
@@ -3706,6 +3737,7 @@ impl Server {
                     .map(|remaining| remaining.as_millis().min((u32::MAX >> 2) as u128) as u32)
                     .unwrap_or_default();
                 objects.push(AiDynamicObject {
+                    stage_id,
                     object_id,
                     kind: 1,
                     subtype: character.cur_weapon as u8,
@@ -3741,6 +3773,7 @@ impl Server {
                     continue;
                 };
                 objects.push(AiDynamicObject {
+                    stage_id,
                     object_id,
                     kind: 2,
                     subtype: projectile.ty as u8,
@@ -3761,6 +3794,7 @@ impl Server {
                     .map(|(passed, total)| [passed as f32, total.get() as f32])
                     .unwrap_or_default();
                 objects.push(AiDynamicObject {
+                    stage_id,
                     object_id,
                     kind: 3,
                     subtype: laser.ty as u8,
@@ -3789,6 +3823,7 @@ impl Server {
                     game_interface::types::pickup::PickupType::PowerupNinjaShield => 4,
                 };
                 objects.push(AiDynamicObject {
+                    stage_id,
                     object_id,
                     kind: 4,
                     subtype,
@@ -3805,6 +3840,7 @@ impl Server {
                     continue;
                 };
                 objects.push(AiDynamicObject {
+                    stage_id,
                     object_id,
                     kind: 5,
                     subtype: flag.ty as u8,
@@ -3878,7 +3914,11 @@ impl Server {
                 .game
                 .build_from_snapshot_by_hotreload(&snapshot);
         }
-        self.control_bridge.set_ai_map(&self.game_server.map.ai_map);
+        self.control_bridge.set_ai_map(
+            &self.game_server.map.ai_map,
+            self.game_server.map.name.as_str(),
+            &fmt_hash(&generate_hash_for(&self.game_server.map.map_file)),
+        );
         // put all players back to a loading state
         self.clients.clients.drain().for_each(|(net_id, client)| {
             self.clients.network_clients.insert(

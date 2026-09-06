@@ -50,4 +50,6 @@ pub enum ClientCommand {
     JoinSpectator,
     /// The client requests to switch to a freecam mode
     SetCameraMode(ClientCameraMode),
+    /// Local AI scenario reset into an independent world; positions are in tiles.
+    AiReset { position: Option<[f32; 2]> },
 }

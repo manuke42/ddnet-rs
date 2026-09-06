@@ -43,6 +43,8 @@ const RESET: u8 = 5;
 const RESPAWN: u8 = 6;
 const SPAWN: u8 = 7;
 const DESPAWN: u8 = 8;
+const RESET_ACTOR: u8 = 9;
+const INFO: u8 = 10;
 const ACK: u8 = 128;
 const MAP: u8 = 129;
 const STATE: u8 = 130;
@@ -79,6 +81,7 @@ pub struct AiDynamicObject {
     pub subtype: u8,
     pub properties: u16,
     pub state: u32,
+    pub stage_id: u32,
     pub position: [f32; 2],
     pub velocity: [f32; 2],
     pub size: [f32; 2],
@@ -171,12 +174,14 @@ struct ControlInner {
     player_inputs: Mutex<HashMap<PlayerId, PlayerInput>>,
     frames: broadcast::Sender<Vec<u8>>,
     last_map: Mutex<Option<Vec<u8>>>,
+    info: Mutex<Vec<u8>>,
     last_state: Mutex<Option<Vec<u8>>>,
     map_epoch: Mutex<u64>,
     current_tick: AtomicU64,
     reset_requested: Mutex<bool>,
     respawn_requests: Mutex<Vec<PlayerId>>,
     spawn_requests: Mutex<usize>,
+    actor_resets: Mutex<Vec<(PlayerId, Option<[f32; 2]>)>>,
     despawn_requests: Mutex<Vec<PlayerId>>,
 }
 
@@ -189,12 +194,14 @@ impl ControlInner {
             player_inputs: Mutex::new(HashMap::new()),
             frames,
             last_map: Mutex::new(None),
+            info: Mutex::new(Vec::new()),
             last_state: Mutex::new(None),
             map_epoch: Mutex::new(0),
             current_tick: AtomicU64::new(0),
             reset_requested: Mutex::new(false),
             respawn_requests: Mutex::new(Vec::new()),
             spawn_requests: Mutex::new(0),
+            actor_resets: Mutex::new(Vec::new()),
             despawn_requests: Mutex::new(Vec::new()),
         })
     }
@@ -241,6 +248,10 @@ impl ControlBridge {
         std::mem::take(&mut *self.inner.respawn_requests.lock().unwrap())
     }
 
+    pub fn take_actor_resets(&self) -> Vec<(PlayerId, Option<[f32; 2]>)> {
+        std::mem::take(&mut *self.inner.actor_resets.lock().unwrap())
+    }
+
     pub fn take_spawn_requests(&self) -> usize {
         std::mem::take(&mut *self.inner.spawn_requests.lock().unwrap())
     }
@@ -249,7 +260,10 @@ impl ControlBridge {
         std::mem::take(&mut *self.inner.despawn_requests.lock().unwrap())
     }
 
-    pub fn set_ai_map(&self, map: &AiMap) {
+    pub fn set_ai_map(&self, map: &AiMap, name: &str, map_hash: &str) {
+        let metadata = serde_json::json!({"bridge_version": 2, "map_name": name, "map_hash": map_hash,
+            "isolated_stages": true, "maintenance_resets": true});
+        *self.inner.info.lock().unwrap() = encode_message(INFO, metadata.to_string().as_bytes());
         let mut epoch = self.inner.map_epoch.lock().unwrap();
         *epoch = epoch.saturating_add(1);
         let frame = encode_map(*epoch, map);
@@ -482,6 +496,10 @@ async fn write_frame(writer: &mut tokio::net::unix::OwnedWriteHalf, frame: &[u8]
 fn handle_command(handle: &ControlHandle, frame: &[u8]) -> Result<Vec<u8>> {
     let (kind, body) = split_frame(frame)?;
     let tick = match kind {
+        INFO => {
+            expect_length(body, 0)?;
+            return Ok(handle.inner.info.lock().unwrap().clone());
+        }
         HELLO => {
             expect_length(body, 8)?;
             if matches!(handle.tick_mode(), ControlTickMode::Manual) {
@@ -530,6 +548,41 @@ fn handle_command(handle: &ControlHandle, frame: &[u8]) -> Result<Vec<u8>> {
             const RESPAWN_TICKS: usize = 6;
             let tick = handle.current_tick().saturating_add(RESPAWN_TICKS as u64);
             handle.allow_ticks(RESPAWN_TICKS);
+            tick
+        }
+        RESET_ACTOR => {
+            expect_length(body, 17)?;
+            let raw = u64::from_le_bytes(body[..8].try_into().unwrap());
+            let id = IdGeneratorIdType::from_str(&raw.to_string())
+                .map_err(|_| anyhow!("invalid player_id"))?;
+            let pos = [
+                f32::from_le_bytes(body[9..13].try_into().unwrap()),
+                f32::from_le_bytes(body[13..17].try_into().unwrap()),
+            ];
+            if body[8] > 1 || (body[8] == 1 && pos.iter().any(|x| !x.is_finite() || *x < 0.0)) {
+                return Err(anyhow!("invalid scenario position"));
+            }
+            handle
+                .inner
+                .player_inputs
+                .lock()
+                .unwrap()
+                .remove(&PlayerId::from(id));
+            handle
+                .inner
+                .queue
+                .lock()
+                .unwrap()
+                .retain(|input| input.player_id != PlayerId::from(id));
+            handle
+                .inner
+                .actor_resets
+                .lock()
+                .unwrap()
+                .push((PlayerId::from(id), (body[8] == 1).then_some(pos)));
+            handle.set_tick_mode(ControlTickMode::Manual);
+            let tick = handle.current_tick().saturating_add(1);
+            handle.allow_ticks(1);
             tick
         }
         SPAWN => {
@@ -644,7 +697,7 @@ fn encode_state(map_epoch: u64, state: &AiTickState) -> Vec<u8> {
         body.push(object.subtype);
         body.extend_from_slice(&object.properties.to_le_bytes());
         body.extend_from_slice(&object.state.to_le_bytes());
-        body.extend_from_slice(&0_u32.to_le_bytes());
+        body.extend_from_slice(&object.stage_id.to_le_bytes());
         for scalar in object
             .position
             .into_iter()
@@ -666,6 +719,36 @@ mod tests {
         thread,
         time::Duration,
     };
+
+    #[test]
+    fn actor_reset_queues_one_maintenance_tick_and_clears_inputs() {
+        let (bridge, handle) = ControlBridge::create();
+        handle.set_tick_mode(ControlTickMode::Manual);
+        let mut body = 12_u64.to_le_bytes().to_vec();
+        body.push(1);
+        body.extend_from_slice(&5.5_f32.to_le_bytes());
+        body.extend_from_slice(&7.5_f32.to_le_bytes());
+        let response = handle_command(&handle, &encode_message(RESET_ACTOR, &body)).unwrap();
+        let (kind, ack) = split_frame(&response).unwrap();
+        assert_eq!(kind, ACK);
+        assert_eq!(ack[0], RESET_ACTOR);
+        assert_eq!(u64::from_le_bytes(ack[1..].try_into().unwrap()), 1);
+        let requests = bridge.take_actor_resets();
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].1, Some([5.5, 7.5]));
+        assert_eq!(handle.inner.gate.inner.lock().unwrap().permits, 1);
+    }
+
+    #[test]
+    fn actor_reset_rejects_nonfinite_positions_without_releasing_ticks() {
+        let (_, handle) = ControlBridge::create();
+        let mut body = 12_u64.to_le_bytes().to_vec();
+        body.push(1);
+        body.extend_from_slice(&f32::NAN.to_le_bytes());
+        body.extend_from_slice(&7.5_f32.to_le_bytes());
+        assert!(handle_command(&handle, &encode_message(RESET_ACTOR, &body)).is_err());
+        assert_eq!(handle.inner.gate.inner.lock().unwrap().permits, 0);
+    }
 
     #[test]
     fn leaving_manual_mode_wakes_a_waiting_tick_gate() {
