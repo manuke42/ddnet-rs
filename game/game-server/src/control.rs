@@ -45,6 +45,7 @@ const SPAWN: u8 = 7;
 const DESPAWN: u8 = 8;
 const RESET_ACTOR: u8 = 9;
 const INFO: u8 = 10;
+const RESET_ACTORS: u8 = 11;
 const ACK: u8 = 128;
 const MAP: u8 = 129;
 const STATE: u8 = 130;
@@ -262,7 +263,7 @@ impl ControlBridge {
 
     pub fn set_ai_map(&self, map: &AiMap, name: &str, map_hash: &str) {
         let metadata = serde_json::json!({"bridge_version": 2, "map_name": name, "map_hash": map_hash,
-            "isolated_stages": true, "maintenance_resets": true});
+            "isolated_stages": true, "maintenance_resets": true, "batch_actor_resets": true});
         *self.inner.info.lock().unwrap() = encode_message(INFO, metadata.to_string().as_bytes());
         let mut epoch = self.inner.map_epoch.lock().unwrap();
         *epoch = epoch.saturating_add(1);
@@ -550,38 +551,49 @@ fn handle_command(handle: &ControlHandle, frame: &[u8]) -> Result<Vec<u8>> {
             handle.allow_ticks(RESPAWN_TICKS);
             tick
         }
-        RESET_ACTOR => {
-            expect_length(body, 17)?;
-            let raw = u64::from_le_bytes(body[..8].try_into().unwrap());
-            let id = IdGeneratorIdType::from_str(&raw.to_string())
-                .map_err(|_| anyhow!("invalid player_id"))?;
-            let pos = [
-                f32::from_le_bytes(body[9..13].try_into().unwrap()),
-                f32::from_le_bytes(body[13..17].try_into().unwrap()),
-            ];
-            if body[8] > 1 || (body[8] == 1 && pos.iter().any(|x| !x.is_finite() || *x < 0.0)) {
-                return Err(anyhow!("invalid scenario position"));
+        RESET_ACTOR | RESET_ACTORS => {
+            if kind == RESET_ACTOR {
+                expect_length(body, 17)?;
+            } else if body.is_empty() || body.len() % 17 != 0 {
+                return Err(anyhow!("invalid actor reset batch length"));
+            }
+            // Validate the entire batch before mutating inputs, queues or the gate.
+            let mut resets = Vec::new();
+            for record in body.chunks_exact(17) {
+                let raw = u64::from_le_bytes(record[..8].try_into().unwrap());
+                let id = IdGeneratorIdType::from_str(&raw.to_string())
+                    .map_err(|_| anyhow!("invalid player_id"))?;
+                let player_id = PlayerId::from(id);
+                let pos = [
+                    f32::from_le_bytes(record[9..13].try_into().unwrap()),
+                    f32::from_le_bytes(record[13..17].try_into().unwrap()),
+                ];
+                if record[8] > 1
+                    || (record[8] == 1 && pos.iter().any(|x| !x.is_finite() || *x < 0.0))
+                {
+                    return Err(anyhow!("invalid scenario position"));
+                }
+                if resets.iter().any(|(id, _)| *id == player_id) {
+                    return Err(anyhow!("duplicate actor in reset batch"));
+                }
+                resets.push((player_id, (record[8] == 1).then_some(pos)));
             }
             handle
                 .inner
                 .player_inputs
                 .lock()
                 .unwrap()
-                .remove(&PlayerId::from(id));
+                .retain(|id, _| !resets.iter().any(|(reset_id, _)| reset_id == id));
             handle
                 .inner
                 .queue
                 .lock()
                 .unwrap()
-                .retain(|input| input.player_id != PlayerId::from(id));
-            handle
-                .inner
-                .actor_resets
-                .lock()
-                .unwrap()
-                .push((PlayerId::from(id), (body[8] == 1).then_some(pos)));
+                .retain(|input| !resets.iter().any(|(id, _)| *id == input.player_id));
+            handle.inner.actor_resets.lock().unwrap().extend(resets);
             handle.set_tick_mode(ControlTickMode::Manual);
             let tick = handle.current_tick().saturating_add(1);
+            // One maintenance tick applies every reset and publishes one state.
             handle.allow_ticks(1);
             tick
         }
@@ -748,6 +760,35 @@ mod tests {
         body.extend_from_slice(&7.5_f32.to_le_bytes());
         assert!(handle_command(&handle, &encode_message(RESET_ACTOR, &body)).is_err());
         assert_eq!(handle.inner.gate.inner.lock().unwrap().permits, 0);
+    }
+
+    #[test]
+    fn batch_reset_releases_one_tick_and_rejects_partial_invalid_requests() {
+        let (bridge, handle) = ControlBridge::create();
+        let record = |id: u64, x: f32| {
+            let mut body = id.to_le_bytes().to_vec();
+            body.push(1);
+            body.extend_from_slice(&x.to_le_bytes());
+            body.extend_from_slice(&7.5_f32.to_le_bytes());
+            body
+        };
+        let invalid = [record(12, 5.5), record(13, f32::NAN)].concat();
+        assert!(handle_command(&handle, &encode_message(RESET_ACTORS, &invalid)).is_err());
+        assert!(bridge.take_actor_resets().is_empty());
+        assert_eq!(handle.inner.gate.inner.lock().unwrap().permits, 0);
+        let duplicate = [record(12, 5.5), record(12, 6.5)].concat();
+        assert!(handle_command(&handle, &encode_message(RESET_ACTORS, &duplicate)).is_err());
+        assert!(handle_command(&handle, &encode_message(RESET_ACTORS, &[])).is_err());
+        assert!(handle_command(&handle, &encode_message(RESET_ACTORS, &[0])).is_err());
+        let body = [record(12, 5.5), record(13, 6.5)].concat();
+        let response = handle_command(&handle, &encode_message(RESET_ACTORS, &body)).unwrap();
+        let (_, ack) = split_frame(&response).unwrap();
+        assert_eq!(ack[0], RESET_ACTORS);
+        let requests = bridge.take_actor_resets();
+        assert_eq!(requests.len(), 2);
+        assert_eq!(requests[0].1, Some([5.5, 7.5]));
+        assert_eq!(requests[1].1, Some([6.5, 7.5]));
+        assert_eq!(handle.inner.gate.inner.lock().unwrap().permits, 1);
     }
 
     #[test]
